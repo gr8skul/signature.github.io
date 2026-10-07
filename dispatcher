@@ -497,7 +497,7 @@
 
   <header>
 
-```
+
 <div class="brand">
   <div class="brand-name">SIGNATURE</div>
   <div class="brand-section">DISPATCH</div>
@@ -520,7 +520,7 @@
   </button>
 
 </div>
-```
+
 
   </header>
 
@@ -530,7 +530,7 @@
 
   <div class="app">
 
-```
+
 <nav>
 
   <div class="nav-label">Dispatch</div>
@@ -599,7 +599,7 @@
     Loading Dispatch...
   </div>
 </main>
-```
+
 
   </div>
 
