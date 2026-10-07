@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Signature Dispatch — Sign In</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f4f5f7;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #222;
+    }
+
+    .login-box {
+      width: min(92%, 400px);
+      background: #ffffff;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .brand p {
+      margin: 8px 0 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px 14px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #555;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 6px;
+      background: #222;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #000;
+    }
+
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+
+    .message {
+      min-height: 20px;
+      margin-top: 18px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .error {
+      color: #b00020;
+    }
+
+    .success {
+      color: #267326;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <main class="login-box">
+
+```
+<div class="brand">
+  <h1>Signature</h1>
+  <p>Dispatch</p>
+</div>
+
+<form id="loginForm">
+
+  <label for="email">Email</label>
+
+  <input
+    type="email"
+    id="email"
+    autocomplete="email"
+    required
+  >
+
+  <label for="password">Password</label>
+
+  <input
+    type="password"
+    id="password"
+    autocomplete="current-password"
+    required
+  >
+
+  <button type="submit" id="loginButton">
+    Sign In
+  </button>
+
+  <div id="message" class="message"></div>
+
+</form>
+```
+
+  </main>
+
+  <script>
+
+    // ============================================
+    // SUPABASE CONNECTION
+    // ============================================
+
+    const SUPABASE_URL =
+      "https://zpawrfdfutswbvhlwvqf.supabase.co";
+
+    const SUPABASE_ANON_KEY =
+      "sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68";
+
+    const { createClient } = supabase;
+
+    const db = createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
+
+
+    // ============================================
+    // LOGIN
+    // ============================================
+
+    const loginForm =
+      document.getElementById("loginForm");
+
+    const loginButton =
+      document.getElementById("loginButton");
+
+    const message =
+      document.getElementById("message");
+
+
+    loginForm.addEventListener(
+      "submit",
+      async function (event) {
+
+        event.preventDefault();
+
+        message.textContent = "";
+        message.className = "message";
+
+        const email =
+          document.getElementById("email").value.trim();
+
+        const password =
+          document.getElementById("password").value;
+
+
+        loginButton.disabled = true;
+        loginButton.textContent = "Signing in...";
+
+
+        const { data, error } =
+          await db.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
+
+
+        if (error) {
+
+          message.textContent =
+            error.message;
+
+          message.className =
+            "message error";
+
+          loginButton.disabled = false;
+          loginButton.textContent = "Sign In";
+
+          return;
+        }
+
+
+        if (data.session) {
+
+          message.textContent =
+            "Signed in successfully.";
+
+          message.className =
+            "message success";
+
+
+          /*
+            Temporary destination.
+
+            We will replace this with the
+            actual Dispatch application once
+            we build it.
+          */
+
+          window.location.href =
+            "dispatch.html";
+
+        } else {
+
+          message.textContent =
+            "Sign-in succeeded, but no session was created.";
+
+          message.className =
+            "message error";
+
+          loginButton.disabled = false;
+          loginButton.textContent = "Sign In";
+        }
+
+      }
+    );
+
+  </script>
+
+</body>
+</html>
