@@ -22,6 +22,8 @@
       --muted: #6b7075;
       --accent: #222;
       --danger: #a52a2a;
+      --success: #356b45;
+      --warning: #8a641f;
     }
 
     body {
@@ -41,10 +43,6 @@
     button {
       cursor: pointer;
     }
-
-    /* =========================================
-       HEADER
-       ========================================= */
 
     header {
       height: 68px;
@@ -110,10 +108,6 @@
       background: #f0f1f2;
     }
 
-    /* =========================================
-       LAYOUT
-       ========================================= */
-
     .app {
       display: flex;
       min-height: calc(100vh - 68px);
@@ -156,11 +150,8 @@
       flex: 1;
       padding: 30px;
       max-width: 1500px;
+      width: 100%;
     }
-
-    /* =========================================
-       PAGE HEAD
-       ========================================= */
 
     .page-head {
       display: flex;
@@ -194,15 +185,12 @@
       background: #000;
     }
 
-    /* =========================================
-       CARDS
-       ========================================= */
-
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
+      margin-bottom: 20px;
     }
 
     .card-head {
@@ -211,6 +199,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 15px;
     }
 
     .card-head h2 {
@@ -222,14 +211,11 @@
       padding: 18px;
     }
 
-    /* =========================================
-       SCHEDULE
-       ========================================= */
-
     .date-controls {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .date-controls button {
@@ -276,16 +262,43 @@
     .schedule-meta {
       color: var(--muted);
       font-size: 13px;
+      line-height: 1.5;
     }
 
-    .status {
+    .status,
+    .type-badge,
+    .release-badge {
       display: inline-block;
       padding: 5px 8px;
       border-radius: 4px;
-      background: #eceef0;
       font-size: 11px;
-      text-transform: capitalize;
       white-space: nowrap;
+    }
+
+    .status {
+      background: #eceef0;
+      text-transform: capitalize;
+    }
+
+    .type-badge {
+      background: #f0f1f2;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-right: 5px;
+    }
+
+    .release-badge {
+      background: #f0f1f2;
+    }
+
+    .release-badge.released {
+      background: #e5efe7;
+      color: var(--success);
+    }
+
+    .release-badge.unreleased {
+      background: #f3eee3;
+      color: var(--warning);
     }
 
     .empty {
@@ -294,10 +307,6 @@
       color: var(--muted);
       font-size: 14px;
     }
-
-    /* =========================================
-       TABLES
-       ========================================= */
 
     .table-wrap {
       overflow-x: auto;
@@ -314,6 +323,7 @@
       padding: 12px 14px;
       border-bottom: 1px solid #eceef0;
       font-size: 14px;
+      vertical-align: middle;
     }
 
     th {
@@ -327,9 +337,40 @@
       border-bottom: 0;
     }
 
-    /* =========================================
-       FORMS
-       ========================================= */
+    .row-button {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 6px 9px;
+      font-size: 12px;
+    }
+
+    .row-button:hover {
+      background: #f0f1f2;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+    }
+
+    .filter-button {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 11px;
+      font-size: 12px;
+    }
+
+    .filter-button.active {
+      background: #222;
+      color: white;
+      border-color: #222;
+    }
 
     .form-grid {
       display: grid;
@@ -375,6 +416,17 @@
       resize: vertical;
     }
 
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding-top: 28px;
+    }
+
+    .checkbox-row input {
+      width: auto;
+    }
+
     .form-actions {
       display: flex;
       justify-content: flex-end;
@@ -389,9 +441,44 @@
       padding: 10px 15px;
     }
 
-    /* =========================================
-       MESSAGE
-       ========================================= */
+    .secondary:hover {
+      background: #f0f1f2;
+    }
+
+    .danger {
+      background: white;
+      color: var(--danger);
+      border: 1px solid #d9b5b5;
+      border-radius: 5px;
+      padding: 10px 15px;
+    }
+
+    .danger:hover {
+      background: #faf0f0;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .detail-item {
+      border-bottom: 1px solid #eceef0;
+      padding-bottom: 12px;
+    }
+
+    .detail-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 5px;
+    }
+
+    .detail-value {
+      font-size: 14px;
+    }
 
     #message {
       position: fixed;
@@ -405,18 +492,14 @@
       z-index: 50;
       font-size: 14px;
       box-shadow: 0 5px 20px rgba(0,0,0,.15);
+      max-width: 420px;
     }
 
     #message.error {
       background: var(--danger);
     }
 
-    /* =========================================
-       RESPONSIVE
-       ========================================= */
-
     @media (max-width: 800px) {
-
       header {
         padding: 0 16px;
       }
@@ -443,11 +526,12 @@
         grid-template-columns: 70px 1fr;
       }
 
-      .schedule-item .status {
-        display: none;
+      .schedule-item .schedule-actions {
+        grid-column: 2;
       }
 
-      .form-grid {
+      .form-grid,
+      .detail-grid {
         grid-template-columns: 1fr;
       }
 
@@ -457,7 +541,6 @@
     }
 
     @media (max-width: 600px) {
-
       .app {
         display: block;
       }
@@ -484,6 +567,19 @@
       main {
         padding: 16px;
       }
+
+      .schedule-item {
+        grid-template-columns: 1fr;
+        gap: 7px;
+      }
+
+      .schedule-item .schedule-actions {
+        grid-column: auto;
+      }
+
+      .date-controls strong {
+        min-width: 0;
+      }
     }
   </style>
 
@@ -491,417 +587,664 @@
 
 <body>
 
-  <!-- =========================================
-       HEADER
-       ========================================= -->
+<header>
+  <div class="brand">
+    <div class="brand-name">SIGNATURE</div>
+    <div class="brand-section">DISPATCH</div>
+  </div>
 
-  <header>
-
-
-<div class="brand">
-  <div class="brand-name">SIGNATURE</div>
-  <div class="brand-section">DISPATCH</div>
-</div>
-
-<div class="user-area">
-
-  <div class="user-info">
-    <div class="user-name" id="userName">
-      Loading...
+  <div class="user-area">
+    <div class="user-info">
+      <div class="user-name" id="userName">Loading...</div>
+      <div class="user-role" id="userRole">Loading...</div>
     </div>
 
-    <div class="user-role" id="userRole">
-      Loading...
-    </div>
-  </div>
+```
+<button class="sign-out" id="signOutButton">
+  Sign Out
+</button>
+```
 
-  <button class="sign-out" id="signOutButton">
-    Sign Out
-  </button>
+  </div>
+</header>
+
+<div class="app">
+
+  <nav>
+    <div class="nav-label">Dispatch</div>
+
+```
+<button class="nav-button active" data-page="schedule">
+  Schedule
+</button>
+
+<button class="nav-button" data-page="work-orders">
+  Work Orders
+</button>
+
+<button class="nav-button" data-page="customers">
+  Customers
+</button>
+
+<button class="nav-button" data-page="locations">
+  Locations
+</button>
+
+<button class="nav-button" data-page="technicians">
+  Technicians
+</button>
+
+<button class="nav-button" data-page="parts">
+  Parts
+</button>
+
+<button class="nav-button" data-page="notes">
+  Notes
+</button>
+
+<button class="nav-button" data-page="photos">
+  Photos
+</button>
+```
+
+  </nav>
+
+  <main id="mainContent">
+    <div class="empty">
+      Loading Dispatch...
+    </div>
+  </main>
 
 </div>
 
+<div id="message"></div>
 
-  </header>
+<script>
 
-  <!-- =========================================
-       APP
-       ========================================= -->
+  const SUPABASE_URL =
+    "https://zpawrfdfutswbvhlwvqf.supabase.co";
 
-  <div class="app">
+  const SUPABASE_ANON_KEY =
+    "sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68";
 
+  const { createClient } = supabase;
 
-<nav>
+  const db = createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
 
-  <div class="nav-label">Dispatch</div>
-
-  <button
-    class="nav-button active"
-    data-page="schedule"
-  >
-    Schedule
-  </button>
-
-  <button
-    class="nav-button"
-    data-page="service-calls"
-  >
-    Service Calls
-  </button>
-
-  <button
-    class="nav-button"
-    data-page="customers"
-  >
-    Customers
-  </button>
-
-  <button
-    class="nav-button"
-    data-page="locations"
-  >
-    Locations
-  </button>
-
-  <button
-    class="nav-button"
-    data-page="technicians"
-  >
-    Technicians
-  </button>
-
-  <button
-    class="nav-button"
-    data-page="parts"
-  >
-    Parts
-  </button>
-
-  <button
-    class="nav-button"
-    data-page="notes"
-  >
-    Notes
-  </button>
-
-  <button
-    class="nav-button"
-    data-page="photos"
-  >
-    Photos
-  </button>
-
-</nav>
+  let currentUser = null;
+  let currentProfile = null;
+  let currentDate = new Date();
+  let currentWorkOrderFilter = "all";
 
 
-<main id="mainContent">
-  <div class="empty">
-    Loading Dispatch...
-  </div>
-</main>
+  // ============================================
+  // HELPERS
+  // ============================================
+
+  function showMessage(text, error = false) {
+    const element = document.getElementById("message");
+
+    element.textContent = text;
+    element.className = error ? "error" : "";
+    element.style.display = "block";
+
+    setTimeout(() => {
+      element.style.display = "none";
+    }, 4000);
+  }
 
 
-  </div>
-
-  <div id="message"></div>
-
-  <script>
-
-    // ============================================
-    // SUPABASE
-    // ============================================
-
-    const SUPABASE_URL =
-      "https://zpawrfdfutswbvhlwvqf.supabase.co";
-
-    const SUPABASE_ANON_KEY =
-      "sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68";
-
-    const { createClient } = supabase;
-
-    const db = createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
+  function formatDate(date) {
+    return date.toLocaleDateString(
+      "en-US",
+      {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric"
+      }
     );
+  }
 
 
-    // ============================================
-    // GLOBAL STATE
-    // ============================================
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
 
-    let currentUser = null;
-    let currentProfile = null;
-    let currentDate = new Date();
 
-
-    // ============================================
-    // HELPERS
-    // ============================================
-
-    function showMessage(text, error = false) {
-
-      const element =
-        document.getElementById("message");
-
-      element.textContent = text;
-      element.className = error ? "error" : "";
-      element.style.display = "block";
-
-      setTimeout(() => {
-        element.style.display = "none";
-      }, 3500);
+  function customerName(customer) {
+    if (!customer) {
+      return "Customer";
     }
 
+    if (customer.company_name) {
+      return customer.company_name;
+    }
 
-    function formatDate(date) {
+    return `${customer.first_name || ""} ${customer.last_name || ""}`
+      .trim() || "Unnamed Customer";
+  }
 
-      return date.toLocaleDateString(
-        "en-US",
+
+  function technicianName(technician) {
+    if (!technician) {
+      return "Unassigned";
+    }
+
+    return `${technician.first_name || ""} ${technician.last_name || ""}`
+      .trim() || "Technician";
+  }
+
+
+  function workTypeLabel(type) {
+    return type === "install"
+      ? "Installation"
+      : "Service";
+  }
+
+
+  function statusLabel(status) {
+    return String(status || "open")
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, letter => letter.toUpperCase());
+  }
+
+
+  function localDateTimeValue(date) {
+    const d = new Date(date);
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+
+  function escapeAttribute(value) {
+    return escapeHtml(value);
+  }
+
+
+  // ============================================
+  // AUTH
+  // ============================================
+
+  async function requireLogin() {
+
+    const {
+      data: {
+        session
+      }
+    } = await db.auth.getSession();
+
+    if (!session) {
+      window.location.href = "login.html";
+      return false;
+    }
+
+    currentUser = session.user;
+
+    return true;
+  }
+
+
+  async function loadUserProfile() {
+
+    const {
+      data,
+      error
+    } = await db
+      .from("users")
+      .select("*")
+      .eq("auth_user_id", currentUser.id)
+      .single();
+
+    if (error) {
+      console.error(error);
+
+      showMessage(
+        "Unable to load your Signature profile.",
+        true
+      );
+
+      return false;
+    }
+
+    currentProfile = data;
+
+    document.getElementById("userName")
+      .textContent =
+      `${data.first_name || ""} ${data.last_name || ""}`.trim();
+
+    document.getElementById("userRole")
+      .textContent =
+      data.role || "";
+
+    return true;
+  }
+
+
+  // ============================================
+  // SCHEDULE
+  // ============================================
+
+  async function showSchedule() {
+
+    setActiveNav("schedule");
+
+    const main =
+      document.getElementById("mainContent");
+
+    main.innerHTML = `
+
+      <div class="page-head">
+
+        <div>
+          <h1>Schedule</h1>
+          <p>Dispatch schedule for the selected day.</p>
+        </div>
+
+        <button
+          class="primary"
+          id="newWorkOrderButton"
+        >
+          + New Work Order
+        </button>
+
+      </div>
+
+      <div class="card">
+
+        <div class="card-head">
+
+          <div class="date-controls">
+
+            <button id="previousDay">‹</button>
+
+            <strong id="scheduleDate">
+              ${formatDate(currentDate)}
+            </strong>
+
+            <button id="nextDay">›</button>
+
+            <button id="todayButton">
+              Today
+            </button>
+
+          </div>
+
+        </div>
+
+        <div
+          class="schedule-list"
+          id="scheduleList"
+        >
+          <div class="empty">
+            Loading schedule...
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    document.getElementById("previousDay")
+      .addEventListener("click", () => {
+
+        currentDate.setDate(
+          currentDate.getDate() - 1
+        );
+
+        showSchedule();
+      });
+
+
+    document.getElementById("nextDay")
+      .addEventListener("click", () => {
+
+        currentDate.setDate(
+          currentDate.getDate() + 1
+        );
+
+        showSchedule();
+      });
+
+
+    document.getElementById("todayButton")
+      .addEventListener("click", () => {
+
+        currentDate = new Date();
+
+        showSchedule();
+      });
+
+
+    document.getElementById("newWorkOrderButton")
+      .addEventListener(
+        "click",
+        () => showWorkOrderForm()
+      );
+
+
+    await loadSchedule();
+  }
+
+
+  async function loadSchedule() {
+
+    const list =
+      document.getElementById("scheduleList");
+
+    const start = new Date(currentDate);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(currentDate);
+    end.setHours(23, 59, 59, 999);
+
+    const {
+      data,
+      error
+    } = await db
+      .from("service_calls")
+      .select(`
+        *,
+        customers (
+          first_name,
+          last_name,
+          company_name
+        ),
+        locations (
+          address,
+          city,
+          state
+        ),
+        technicians (
+          first_name,
+          last_name
+        )
+      `)
+      .gte(
+        "scheduled_at",
+        start.toISOString()
+      )
+      .lte(
+        "scheduled_at",
+        end.toISOString()
+      )
+      .order(
+        "scheduled_at",
         {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-          year: "numeric"
+          ascending: true
         }
       );
 
-    }
+    if (error) {
+      console.error(error);
 
-
-    function dateForDatabase(date) {
-
-      const year =
-        date.getFullYear();
-
-      const month =
-        String(date.getMonth() + 1).padStart(2, "0");
-
-      const day =
-        String(date.getDate()).padStart(2, "0");
-
-      return `${year}-${month}-${day}`;
-
-    }
-
-
-    // ============================================
-    // AUTHENTICATION
-    // ============================================
-
-    async function requireLogin() {
-
-      const {
-        data: {
-          session
-        }
-      } = await db.auth.getSession();
-
-
-      if (!session) {
-
-        window.location.href =
-          "login.html";
-
-        return false;
-      }
-
-
-      currentUser =
-        session.user;
-
-      return true;
-
-    }
-
-
-    // ============================================
-    // LOAD USER PROFILE
-    // ============================================
-
-    async function loadUserProfile() {
-
-      const {
-        data,
-        error
-      } = await db
-        .from("users")
-        .select("*")
-        .eq(
-          "auth_user_id",
-          currentUser.id
-        )
-        .single();
-
-
-      if (error) {
-
-        console.error(error);
-
-        showMessage(
-          "Unable to load your Signature profile.",
-          true
-        );
-
-        return false;
-      }
-
-
-      currentProfile =
-        data;
-
-
-      document.getElementById("userName")
-        .textContent =
-          `${data.first_name} ${data.last_name}`;
-
-
-      document.getElementById("userRole")
-        .textContent =
-          data.role;
-
-
-      return true;
-
-    }
-
-
-    // ============================================
-    // SCHEDULE PAGE
-    // ============================================
-
-    async function showSchedule() {
-
-      const main =
-        document.getElementById("mainContent");
-
-
-      main.innerHTML = `
-
-        <div class="page-head">
-
-          <div>
-            <h1>Schedule</h1>
-            <p>Service calls scheduled for the selected day.</p>
-          </div>
-
-          <button
-            class="primary"
-            id="newServiceCallButton"
-          >
-            + New Service Call
-          </button>
-
-        </div>
-
-
-        <div class="card">
-
-          <div class="card-head">
-
-            <div class="date-controls">
-
-              <button id="previousDay">
-                ‹
-              </button>
-
-              <strong id="scheduleDate">
-                ${formatDate(currentDate)}
-              </strong>
-
-              <button id="nextDay">
-                ›
-              </button>
-
-              <button id="todayButton">
-                Today
-              </button>
-
-            </div>
-
-          </div>
-
-          <div
-            class="schedule-list"
-            id="scheduleList"
-          >
-            <div class="empty">
-              Loading schedule...
-            </div>
-          </div>
-
+      list.innerHTML = `
+        <div class="empty">
+          Unable to load the schedule.<br><br>
+          ${escapeHtml(error.message)}
         </div>
       `;
 
-
-      document.getElementById("previousDay")
-        .addEventListener("click", () => {
-
-          currentDate.setDate(
-            currentDate.getDate() - 1
-          );
-
-          showSchedule();
-
-        });
-
-
-      document.getElementById("nextDay")
-        .addEventListener("click", () => {
-
-          currentDate.setDate(
-            currentDate.getDate() + 1
-          );
-
-          showSchedule();
-
-        });
-
-
-      document.getElementById("todayButton")
-        .addEventListener("click", () => {
-
-          currentDate =
-            new Date();
-
-          showSchedule();
-
-        });
-
-
-      document.getElementById("newServiceCallButton")
-        .addEventListener(
-          "click",
-          showNewServiceCall
-        );
-
-
-      await loadSchedule();
-
+      return;
     }
 
+    if (!data || data.length === 0) {
+      list.innerHTML = `
+        <div class="empty">
+          No work is scheduled for this day.
+        </div>
+      `;
 
-    async function loadSchedule() {
+      return;
+    }
 
-      const list =
-        document.getElementById("scheduleList");
+    list.innerHTML =
+      data.map(call => {
+
+        const scheduled =
+          new Date(call.scheduled_at);
+
+        const customer =
+          customerName(call.customers);
+
+        const technician =
+          technicianName(call.technicians);
+
+        const location =
+          call.locations
+            ? `${call.locations.address || ""}, ${call.locations.city || ""}, ${call.locations.state || ""}`
+            : "No location";
+
+        const releasedClass =
+          call.released
+            ? "released"
+            : "unreleased";
+
+        const releasedText =
+          call.released
+            ? "Released"
+            : "Not Released";
+
+        return `
+
+          <div class="schedule-item">
+
+            <div class="schedule-time">
+              ${scheduled.toLocaleTimeString(
+                "en-US",
+                {
+                  hour: "numeric",
+                  minute: "2-digit"
+                }
+              )}
+            </div>
+
+            <div>
+
+              <div class="schedule-description">
+                ${escapeHtml(
+                  call.description ||
+                  customer
+                )}
+              </div>
+
+              <div class="schedule-meta">
+
+                <span class="type-badge">
+                  ${escapeHtml(
+                    workTypeLabel(call.work_type)
+                  )}
+                </span>
+
+                ${escapeHtml(customer)}
+
+                &nbsp; · &nbsp;
+
+                ${escapeHtml(technician)}
+
+                &nbsp; · &nbsp;
+
+                ${escapeHtml(location)}
+
+                <br>
+
+                ${escapeHtml(
+                  call.priority || "normal"
+                )}
+
+              </div>
+
+            </div>
+
+            <div class="schedule-actions">
+
+              <span class="release-badge ${releasedClass}">
+                ${releasedText}
+              </span>
+
+              <br><br>
+
+              <button
+                class="row-button"
+                onclick="showWorkOrderDetail('${call.id}')"
+              >
+                Open
+              </button>
+
+            </div>
+
+          </div>
+        `;
+
+      }).join("");
+  }
 
 
-      const start =
-        new Date(currentDate);
+  // ============================================
+  // WORK ORDERS
+  // ============================================
 
-      start.setHours(0, 0, 0, 0);
+  async function showWorkOrders(filter = currentWorkOrderFilter) {
+
+    currentWorkOrderFilter = filter;
+
+    setActiveNav("work-orders");
+
+    const main =
+      document.getElementById("mainContent");
+
+    main.innerHTML = `
+
+      <div class="page-head">
+
+        <div>
+          <h1>Work Orders</h1>
+          <p>
+            All dispatch work, including work not yet released to technicians.
+          </p>
+        </div>
+
+        <button
+          class="primary"
+          id="newWorkOrderButton"
+        >
+          + New Work Order
+        </button>
+
+      </div>
+
+      <div class="card">
+
+        <div class="filter-bar">
+
+          ${filterButton("all", "All")}
+          ${filterButton("service", "Service")}
+          ${filterButton("install", "Installation")}
+          ${filterButton("upcoming", "Upcoming")}
+          ${filterButton("in_progress", "Current / In Progress")}
+          ${filterButton("completed", "Completed")}
+          ${filterButton("cancelled", "Cancelled")}
+
+        </div>
+
+        <div class="table-wrap">
+
+          <table>
+
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Customer</th>
+                <th>Location</th>
+                <th>Scheduled</th>
+                <th>Technician</th>
+                <th>Status</th>
+                <th>Release</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody id="workOrdersBody">
+
+              <tr>
+                <td colspan="8">
+                  <div class="empty">
+                    Loading work orders...
+                  </div>
+                </td>
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+    `;
 
 
-      const end =
-        new Date(currentDate);
+    document.getElementById("newWorkOrderButton")
+      .addEventListener(
+        "click",
+        () => showWorkOrderForm()
+      );
 
-      end.setHours(23, 59, 59, 999);
+
+    document.querySelectorAll(".filter-button")
+      .forEach(button => {
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            showWorkOrders(
+              button.dataset.filter
+            );
+
+          }
+        );
+
+      });
 
 
-      const {
-        data,
-        error
-      } = await db
+    await loadWorkOrders();
+  }
+
+
+  function filterButton(value, label) {
+
+    return `
+      <button
+        class="filter-button ${currentWorkOrderFilter === value ? "active" : ""}"
+        data-filter="${value}"
+      >
+        ${label}
+      </button>
+    `;
+  }
+
+
+  async function loadWorkOrders() {
+
+    const body =
+      document.getElementById("workOrdersBody");
+
+    let query =
+      db
         .from("service_calls")
         .select(`
           *,
@@ -920,375 +1263,1318 @@
             last_name
           )
         `)
-        .gte(
-          "scheduled_at",
-          start.toISOString()
-        )
-        .lte(
-          "scheduled_at",
-          end.toISOString()
-        )
         .order(
           "scheduled_at",
           {
-            ascending: true
+            ascending: true,
+            nullsFirst: false
           }
         );
 
 
-      if (error) {
+    if (
+      currentWorkOrderFilter === "service" ||
+      currentWorkOrderFilter === "install"
+    ) {
 
-        console.error(error);
-
-        list.innerHTML = `
-          <div class="empty">
-            Unable to load the schedule.
-          </div>
-        `;
-
-        return;
-      }
-
-
-      if (!data || data.length === 0) {
-
-        list.innerHTML = `
-          <div class="empty">
-            No service calls are scheduled for this day.
-          </div>
-        `;
-
-        return;
-      }
-
-
-      list.innerHTML =
-        data.map(call => {
-
-          const scheduled =
-            new Date(call.scheduled_at);
-
-
-          const customer =
-            call.customers;
-
-          const technician =
-            call.technicians;
-
-          let customerName =
-            "Customer";
-
-          if (customer) {
-
-            if (customer.company_name) {
-
-              customerName =
-                customer.company_name;
-
-            } else {
-
-              customerName =
-                `${customer.first_name || ""} ${customer.last_name || ""}`
-                  .trim();
-
-            }
-
-          }
-
-
-          const technicianName =
-            technician
-              ? `${technician.first_name} ${technician.last_name}`
-              : "Unassigned";
-
-
-          return `
-
-            <div class="schedule-item">
-
-              <div class="schedule-time">
-                ${scheduled.toLocaleTimeString(
-                  "en-US",
-                  {
-                    hour: "numeric",
-                    minute: "2-digit"
-                  }
-                )}
-              </div>
-
-              <div>
-
-                <div class="schedule-description">
-                  ${escapeHtml(
-                    call.description ||
-                    customerName
-                  )}
-                </div>
-
-                <div class="schedule-meta">
-                  ${escapeHtml(customerName)}
-                  &nbsp; · &nbsp;
-                  ${escapeHtml(technicianName)}
-                  &nbsp; · &nbsp;
-                  ${escapeHtml(
-                    call.priority || "normal"
-                  )}
-                </div>
-
-              </div>
-
-              <div>
-                <span class="status">
-                  ${escapeHtml(
-                    call.status || "open"
-                  )}
-                </span>
-              </div>
-
-            </div>
-
-          `;
-
-        }).join("");
+      query =
+        query.eq(
+          "work_type",
+          currentWorkOrderFilter
+        );
 
     }
 
 
-    // ============================================
-    // NEW SERVICE CALL
-    // ============================================
+    if (
+      currentWorkOrderFilter === "in_progress"
+    ) {
 
-    async function showNewServiceCall() {
+      query =
+        query.eq(
+          "status",
+          "in_progress"
+        );
 
-      const main =
-        document.getElementById("mainContent");
+    }
 
 
-      main.innerHTML = `
+    if (
+      currentWorkOrderFilter === "completed"
+    ) {
 
-        <div class="page-head">
+      query =
+        query.eq(
+          "status",
+          "completed"
+        );
 
-          <div>
-            <h1>New Service Call</h1>
-            <p>Create and schedule a new service call.</p>
+    }
+
+
+    if (
+      currentWorkOrderFilter === "cancelled"
+    ) {
+
+      query =
+        query.eq(
+          "status",
+          "cancelled"
+        );
+
+    }
+
+
+    if (
+      currentWorkOrderFilter === "upcoming"
+    ) {
+
+      query =
+        query
+          .gte(
+            "scheduled_at",
+            new Date().toISOString()
+          )
+          .neq(
+            "status",
+            "completed"
+          )
+          .neq(
+            "status",
+            "cancelled"
+          );
+
+    }
+
+
+    const {
+      data,
+      error
+    } = await query;
+
+
+    if (error) {
+
+      console.error(error);
+
+      body.innerHTML = `
+        <tr>
+          <td colspan="8">
+
+            <div class="empty">
+              Unable to load work orders.<br><br>
+              ${escapeHtml(error.message)}
+            </div>
+
+          </td>
+        </tr>
+      `;
+
+      return;
+    }
+
+
+    if (!data || data.length === 0) {
+
+      body.innerHTML = `
+        <tr>
+          <td colspan="8">
+
+            <div class="empty">
+              No work orders match this view.
+            </div>
+
+          </td>
+        </tr>
+      `;
+
+      return;
+    }
+
+
+    body.innerHTML =
+      data.map(call => {
+
+        const scheduled =
+          call.scheduled_at
+            ? new Date(call.scheduled_at)
+                .toLocaleString(
+                  "en-US",
+                  {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit"
+                  }
+                )
+            : "Not scheduled";
+
+
+        const location =
+          call.locations
+            ? `${call.locations.city || ""}, ${call.locations.state || ""}`
+            : "—";
+
+
+        return `
+
+          <tr>
+
+            <td>
+              <span class="type-badge">
+                ${escapeHtml(
+                  workTypeLabel(call.work_type)
+                )}
+              </span>
+            </td>
+
+            <td>
+              ${escapeHtml(
+                customerName(call.customers)
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(location)}
+            </td>
+
+            <td>
+              ${escapeHtml(scheduled)}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                technicianName(call.technicians)
+              )}
+            </td>
+
+            <td>
+              <span class="status">
+                ${escapeHtml(
+                  statusLabel(call.status)
+                )}
+              </span>
+            </td>
+
+            <td>
+
+              <span
+                class="release-badge ${call.released ? "released" : "unreleased"}"
+              >
+                ${call.released ? "Released" : "Not Released"}
+              </span>
+
+            </td>
+
+            <td>
+
+              <button
+                class="row-button"
+                onclick="showWorkOrderDetail('${call.id}')"
+              >
+                Open
+              </button>
+
+            </td>
+
+          </tr>
+        `;
+
+      }).join("");
+  }
+
+
+  // ============================================
+  // WORK ORDER DETAIL
+  // ============================================
+
+  async function showWorkOrderDetail(id) {
+
+    const {
+      data: call,
+      error
+    } = await db
+      .from("service_calls")
+      .select(`
+        *,
+        customers (
+          first_name,
+          last_name,
+          company_name,
+          phone,
+          email
+        ),
+        locations (
+          address,
+          city,
+          state,
+          zip,
+          notes
+        ),
+        technicians (
+          first_name,
+          last_name,
+          phone,
+          email
+        )
+      `)
+      .eq(
+        "id",
+        id
+      )
+      .single();
+
+
+    if (error) {
+
+      console.error(error);
+
+      showMessage(
+        error.message,
+        true
+      );
+
+      return;
+    }
+
+
+    const main =
+      document.getElementById("mainContent");
+
+
+    main.innerHTML = `
+
+      <div class="page-head">
+
+        <div>
+
+          <h1>Work Order</h1>
+
+          <p>
+            ${escapeHtml(
+              workTypeLabel(call.work_type)
+            )}
+            &nbsp; · &nbsp;
+            ${escapeHtml(
+              statusLabel(call.status)
+            )}
+          </p>
+
+        </div>
+
+        <div>
+
+          <button
+            class="secondary"
+            id="backToWorkOrders"
+          >
+            Back
+          </button>
+
+          <button
+            class="primary"
+            id="editWorkOrder"
+          >
+            Edit Work Order
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="card">
+
+        <div class="card-head">
+
+          <h2>
+            ${escapeHtml(
+              customerName(call.customers)
+            )}
+          </h2>
+
+          <span class="release-badge ${call.released ? "released" : "unreleased"}">
+            ${call.released ? "Released to Technician" : "Not Released"}
+          </span>
+
+        </div>
+
+        <div class="card-body">
+
+          <div class="detail-grid">
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Work Type
+              </div>
+              <div class="detail-value">
+                ${escapeHtml(
+                  workTypeLabel(call.work_type)
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Status
+              </div>
+              <div class="detail-value">
+                ${escapeHtml(
+                  statusLabel(call.status)
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Scheduled
+              </div>
+              <div class="detail-value">
+                ${call.scheduled_at
+                  ? escapeHtml(
+                      new Date(call.scheduled_at)
+                        .toLocaleString()
+                    )
+                  : "Not scheduled"}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Priority
+              </div>
+              <div class="detail-value">
+                ${escapeHtml(
+                  call.priority || "normal"
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Technician
+              </div>
+              <div class="detail-value">
+                ${escapeHtml(
+                  technicianName(call.technicians)
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Location
+              </div>
+              <div class="detail-value">
+                ${call.locations
+                  ? escapeHtml(
+                      `${call.locations.address || ""}, ${call.locations.city || ""}, ${call.locations.state || ""} ${call.locations.zip || ""}`
+                    )
+                  : "No location"}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Customer Phone
+              </div>
+              <div class="detail-value">
+                ${escapeHtml(
+                  call.customers?.phone || "—"
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Customer Email
+              </div>
+              <div class="detail-value">
+                ${escapeHtml(
+                  call.customers?.email || "—"
+                )}
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="card">
+
+        <div class="card-head">
+          <h2>Description</h2>
+        </div>
+
+        <div class="card-body">
+
+          ${
+            call.description
+              ? escapeHtml(call.description)
+              : '<span style="color:#6b7075;">No description.</span>'
+          }
+
+        </div>
+
+      </div>
+
+    `;
+
+
+    document.getElementById("backToWorkOrders")
+      .addEventListener(
+        "click",
+        () => showWorkOrders()
+      );
+
+
+    document.getElementById("editWorkOrder")
+      .addEventListener(
+        "click",
+        () => showWorkOrderForm(call)
+      );
+  }
+
+
+  // ============================================
+  // NEW / EDIT WORK ORDER
+  // ============================================
+
+  async function showWorkOrderForm(existing = null) {
+
+    const editing =
+      !!existing;
+
+
+    const main =
+      document.getElementById("mainContent");
+
+
+    main.innerHTML = `
+
+      <div class="page-head">
+
+        <div>
+
+          <h1>
+            ${editing
+              ? "Edit Work Order"
+              : "New Work Order"}
+          </h1>
+
+          <p>
+            ${editing
+              ? "Update the work order and release status."
+              : "Create work for Dispatch. It remains unreleased until you release it to the technician."}
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="card">
+
+        <div class="card-body">
+
+          <form id="workOrderForm">
+
+            <div class="form-grid">
+
+              <div class="form-group">
+
+                <label for="customer">
+                  Customer
+                </label>
+
+                <select
+                  id="customer"
+                  required
+                >
+                  <option value="">
+                    Loading customers...
+                  </option>
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="location">
+                  Location
+                </label>
+
+                <select
+                  id="location"
+                  required
+                >
+                  <option value="">
+                    Select a customer first
+                  </option>
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="workType">
+                  Work Type
+                </label>
+
+                <select id="workType">
+
+                  <option value="service">
+                    Service
+                  </option>
+
+                  <option value="install">
+                    Installation
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="technician">
+                  Technician
+                </label>
+
+                <select id="technician">
+
+                  <option value="">
+                    Unassigned
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="scheduledAt">
+                  Scheduled
+                </label>
+
+                <input
+                  type="datetime-local"
+                  id="scheduledAt"
+                >
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="priority">
+                  Priority
+                </label>
+
+                <select id="priority">
+
+                  <option value="normal">
+                    Normal
+                  </option>
+
+                  <option value="low">
+                    Low
+                  </option>
+
+                  <option value="high">
+                    High
+                  </option>
+
+                  <option value="urgent">
+                    Urgent
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="status">
+                  Status
+                </label>
+
+                <select id="status">
+
+                  <option value="open">
+                    Open
+                  </option>
+
+                  <option value="scheduled">
+                    Scheduled
+                  </option>
+
+                  <option value="in_progress">
+                    In Progress
+                  </option>
+
+                  <option value="completed">
+                    Completed
+                  </option>
+
+                  <option value="cancelled">
+                    Cancelled
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <div class="checkbox-row">
+
+                  <input
+                    type="checkbox"
+                    id="released"
+                  >
+
+                  <label
+                    for="released"
+                    style="margin:0;"
+                  >
+                    Release this work order to the technician
+                  </label>
+
+                </div>
+
+              </div>
+
+
+              <div class="form-group full">
+
+                <label for="description">
+                  Description
+                </label>
+
+                <textarea
+                  id="description"
+                  placeholder="Describe the work..."
+                ></textarea>
+
+
           </div>
 
         </div>
 
 
-        <div class="card">
+        <div class="form-actions">
 
-          <div class="card-body">
+          <button
+            type="button"
+            class="secondary"
+            id="cancelWorkOrder"
+          >
+            Cancel
+          </button>
 
-            <form id="serviceCallForm">
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${editing
+              ? "Save Work Order"
+              : "Create Work Order"}
+          </button>
 
-              <div class="form-grid">
+        </div>
 
-                <div class="form-group">
-
-                  <label for="customer">
-                    Customer
-                  </label>
-
-                  <select
-                    id="customer"
-                    required
-                  >
-                    <option value="">
-                      Loading customers...
-                    </option>
-                  </select>
-
-                </div>
-
-
-                <div class="form-group">
-
-                  <label for="location">
-                    Location
-                  </label>
-
-                  <select
-                    id="location"
-                    required
-                  >
-                    <option value="">
-                      Select a customer first
-                    </option>
-                  </select>
-
-                </div>
-
-
-                <div class="form-group">
-
-                  <label for="technician">
-                    Technician
-                  </label>
-
-                  <select
-                    id="technician"
-                  >
-                    <option value="">
-                      Unassigned
-                    </option>
-                  </select>
-
-                </div>
-
-
-                <div class="form-group">
-
-                  <label for="scheduledAt">
-                    Scheduled
-                  </label>
-
-                  <input
-                    type="datetime-local"
-                    id="scheduledAt"
-                    required
-                  >
-
-                </div>
-
-
-                <div class="form-group">
-
-                  <label for="priority">
-                    Priority
-                  </label>
-
-                  <select id="priority">
-
-                    <option value="normal">
-                      Normal
-                    </option>
-
-                    <option value="low">
-                      Low
-                    </option>
-
-                    <option value="high">
-                      High
-                    </option>
-
-                    <option value="urgent">
-                      Urgent
-                    </option>
-
-                  </select>
-
-                </div>
-
-
-                <div class="form-group">
-
-                  <label for="status">
-                    Status
-                  </label>
-
-                  <select id="status">
-
-                    <option value="open">
-                      Open
-                    </option>
-
-                    <option value="scheduled">
-                      Scheduled
-                    </option>
-
-                    <option value="in_progress">
-                      In Progress
-                    </option>
-
-                    <option value="completed">
-                      Completed
-                    </option>
-
-                    <option value="cancelled">
-                      Cancelled
-                    </option>
-
-                  </select>
-
-                </div>
-
-
-                <div class="form-group full">
-
-                  <label for="description">
-                    Description
-                  </label>
-
-                  <textarea
-                    id="description"
-                    placeholder="Describe the work needed..."
-                  ></textarea>
-
-            </div>
-
-          </div>
-
-
-          <div class="form-actions">
-
-            <button
-              type="button"
-              class="secondary"
-              id="cancelServiceCall"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              class="primary"
-            >
-              Create Service Call
-            </button>
-
-          </div>
-
-        </form>
-
-      </div>
+      </form>
 
     </div>
-  `;
+
+  </div>
+`;
 
 
-  await loadCustomersForForm();
-  await loadTechniciansForForm();
+await loadCustomersForForm(
+  existing?.customer_id || null
+);
+
+await loadTechniciansForForm(
+  existing?.assigned_technician_id || null
+);
 
 
-  document.getElementById("customer")
-    .addEventListener(
-      "change",
-      loadLocationsForSelectedCustomer
-    );
+if (existing) {
 
+  document.getElementById("customer").value =
+    existing.customer_id || "";
 
-  document.getElementById("cancelServiceCall")
-    .addEventListener(
-      "click",
-      showSchedule
-    );
+  await loadLocationsForSelectedCustomer(
+    existing.locations_id || null
+  );
 
+  document.getElementById("workType").value =
+    existing.work_type || "service";
 
-  document.getElementById("serviceCallForm")
-    .addEventListener(
-      "submit",
-      createServiceCall
-    );
+  document.getElementById("scheduledAt").value =
+    existing.scheduled_at
+      ? localDateTimeValue(existing.scheduled_at)
+      : "";
+
+  document.getElementById("priority").value =
+    existing.priority || "normal";
+
+  document.getElementById("status").value =
+    existing.status || "open";
+
+  document.getElementById("released").checked =
+    existing.released === true;
+
+  document.getElementById("description").value =
+    existing.description || "";
 
 }
 
 
-async function loadCustomersForForm() {
+document.getElementById("customer")
+  .addEventListener(
+    "change",
+    () => loadLocationsForSelectedCustomer()
+  );
 
-  const select =
-    document.getElementById("customer");
 
+document.getElementById("cancelWorkOrder")
+  .addEventListener(
+    "click",
+    () => showWorkOrders()
+  );
+
+
+document.getElementById("workOrderForm")
+  .addEventListener(
+    "submit",
+    event =>
+      saveWorkOrder(event, existing?.id || null)
+  );
+
+
+}
+
+async function loadCustomersForForm(selectedId = null) {
+
+
+const select =
+  document.getElementById("customer");
+
+
+const {
+  data,
+  error
+} = await db
+  .from("customers")
+  .select("*")
+  .order("last_name");
+
+
+if (error) {
+
+  console.error(error);
+
+  select.innerHTML = `
+    <option value="">
+      Unable to load customers
+    </option>
+  `;
+
+  return;
+}
+
+
+select.innerHTML =
+  `<option value="">Select customer</option>`;
+
+
+data.forEach(customer => {
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    customer.id;
+
+  option.textContent =
+    customerName(customer);
+
+  select.appendChild(option);
+
+});
+
+
+if (selectedId) {
+  select.value = selectedId;
+}
+
+
+}
+
+async function loadLocationsForSelectedCustomer(
+selectedLocationId = null
+) {
+
+
+const customerId =
+  document.getElementById("customer").value;
+
+const select =
+  document.getElementById("location");
+
+
+if (!customerId) {
+
+  select.innerHTML =
+    `<option value="">
+      Select a customer first
+    </option>`;
+
+  return;
+}
+
+
+const {
+  data,
+  error
+} = await db
+  .from("locations")
+  .select("*")
+  .eq(
+    "customer_id",
+    customerId
+  )
+  .order("address");
+
+
+if (error) {
+
+  console.error(error);
+
+  select.innerHTML =
+    `<option value="">
+      Unable to load locations
+    </option>`;
+
+  return;
+}
+
+
+select.innerHTML =
+  `<option value="">
+    Select location
+  </option>`;
+
+
+data.forEach(location => {
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    location.id;
+
+  option.textContent =
+    `${location.address || ""}, ${location.city || ""}, ${location.state || ""} ${location.zip || ""}`;
+
+  select.appendChild(option);
+
+});
+
+
+if (selectedLocationId) {
+  select.value = selectedLocationId;
+}
+
+
+}
+
+async function loadTechniciansForForm(
+selectedId = null
+) {
+
+```
+const select =
+  document.getElementById("technician");
+
+
+const {
+  data,
+  error
+} = await db
+  .from("technicians")
+  .select("*")
+  .eq(
+    "active",
+    true
+  )
+  .order("last_name");
+
+
+if (error) {
+
+  console.error(error);
+
+  return;
+}
+
+
+data.forEach(technician => {
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    technician.id;
+
+  option.textContent =
+    `${technician.first_name || ""} ${technician.last_name || ""}`.trim();
+
+  select.appendChild(option);
+
+});
+
+
+if (selectedId) {
+  select.value = selectedId;
+}
+
+
+}
+
+async function saveWorkOrder(
+event,
+existingId
+) {
+
+
+event.preventDefault();
+
+
+const customerId =
+  document.getElementById("customer").value;
+
+const locationId =
+  document.getElementById("location").value;
+
+const technicianId =
+  document.getElementById("technician").value ||
+  null;
+
+const workType =
+  document.getElementById("workType").value;
+
+const scheduledAt =
+  document.getElementById("scheduledAt").value;
+
+const priority =
+  document.getElementById("priority").value;
+
+const status =
+  document.getElementById("status").value;
+
+const released =
+  document.getElementById("released").checked;
+
+const description =
+  document.getElementById("description")
+    .value
+    .trim();
+
+
+if (!customerId || !locationId) {
+
+  showMessage(
+    "Customer and location are required.",
+    true
+  );
+
+  return;
+}
+
+
+const payload = {
+
+  customer_id:
+    customerId,
+
+  locations_id:
+    locationId,
+
+  assigned_technician_id:
+    technicianId,
+
+  work_type:
+    workType,
+
+  released:
+    released,
+
+  status:
+    status,
+
+  priority:
+    priority,
+
+  description:
+    description,
+
+  scheduled_at:
+    scheduledAt
+      ? new Date(scheduledAt).toISOString()
+      : null
+};
+
+
+let error;
+
+
+if (existingId) {
+
+  ({
+    error
+  } =
+    await db
+      .from("service_calls")
+      .update(payload)
+      .eq(
+        "id",
+        existingId
+      ));
+
+} else {
+
+  ({
+    error
+  } =
+    await db
+      .from("service_calls")
+      .insert(payload));
+
+}
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  existingId
+    ? "Work order saved."
+    : "Work order created."
+);
+
+
+await showWorkOrders();
+
+
+}
+
+// ============================================
+// CUSTOMERS
+// ============================================
+
+async function showCustomers() {
+
+```
+setActiveNav("customers");
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Customers</h1>
+
+      <p>
+        Customer records used by Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newCustomerButton"
+    >
+      + New Customer
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+          <tr>
+            <th>Name / Company</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody id="customersBody">
+
+          <tr>
+            <td colspan="4">
+              <div class="empty">
+                Loading customers...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newCustomerButton")
+  .addEventListener(
+    "click",
+    () => showCustomerForm()
+  );
+
+
+await loadCustomersPage();
+
+
+}
+
+async function loadCustomersPage() {
+
+```
+const body =
+  document.getElementById("customersBody");
+
+
+const {
+  data,
+  error
+} = await db
+  .from("customers")
+  .select("*")
+  .order("last_name");
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="4">
+        <div class="empty">
+          Unable to load customers.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="4">
+        <div class="empty">
+          No customers yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body.innerHTML =
+  data.map(customer => `
+
+    <tr>
+
+      <td>
+        ${escapeHtml(
+          customerName(customer)
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          customer.phone || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          customer.email || "—"
+        )}
+      </td>
+
+      <td>
+
+        <button
+          class="row-button"
+          onclick="showCustomerForm('${customer.id}')"
+        >
+          Edit
+        </button>
+
+      </td>
+
+    </tr>
+
+  `).join("");
+
+
+}
+
+async function showCustomerForm(id = null) {
+
+```
+let customer = null;
+
+
+if (id) {
 
   const {
     data,
@@ -1296,208 +2582,11 @@ async function loadCustomersForForm() {
   } = await db
     .from("customers")
     .select("*")
-    .order("last_name");
+    .eq("id", id)
+    .single();
 
 
   if (error) {
-
-    console.error(error);
-
-    select.innerHTML =
-      `<option value="">Unable to load customers</option>`;
-
-    return;
-  }
-
-
-  select.innerHTML =
-    `<option value="">Select customer</option>`;
-
-
-  data.forEach(customer => {
-
-    let name =
-      customer.company_name ||
-      `${customer.first_name || ""} ${customer.last_name || ""}`
-        .trim();
-
-
-    if (!name) {
-      name = "Unnamed Customer";
-    }
-
-
-    const option =
-      document.createElement("option");
-
-    option.value =
-      customer.id;
-
-    option.textContent =
-      name;
-
-    select.appendChild(option);
-
-  });
-
-}
-
-
-async function loadLocationsForSelectedCustomer() {
-
-  const customerId =
-    document.getElementById("customer").value;
-
-  const select =
-    document.getElementById("location");
-
-
-  if (!customerId) {
-
-    select.innerHTML =
-      `<option value="">Select a customer first</option>`;
-
-    return;
-  }
-
-
-  const {
-    data,
-    error
-  } = await db
-    .from("locations")
-    .select("*")
-    .eq(
-      "customer_id",
-      customerId
-    )
-    .order("address");
-
-
-  if (error) {
-
-    console.error(error);
-
-    select.innerHTML =
-      `<option value="">Unable to load locations</option>`;
-
-    return;
-  }
-
-
-  select.innerHTML =
-    `<option value="">Select location</option>`;
-
-
-  data.forEach(location => {
-
-    const option =
-      document.createElement("option");
-
-    option.value =
-      location.id;
-
-    option.textContent =
-      `${location.address}, ${location.city}, ${location.state} ${location.zip || ""}`;
-
-    select.appendChild(option);
-
-  });
-
-}
-
-
-async function loadTechniciansForForm() {
-
-  const select =
-    document.getElementById("technician");
-
-
-  const {
-    data,
-    error
-  } = await db
-    .from("technicians")
-    .select("*")
-    .eq(
-      "active",
-      true
-    )
-    .order("last_name");
-
-
-  if (error) {
-
-    console.error(error);
-
-    return;
-  }
-
-
-  data.forEach(technician => {
-
-    const option =
-      document.createElement("option");
-
-    option.value =
-      technician.id;
-
-    option.textContent =
-      `${technician.first_name} ${technician.last_name}`;
-
-    select.appendChild(option);
-
-  });
-
-}
-
-
-async function createServiceCall(event) {
-
-  event.preventDefault();
-
-
-  const customerId =
-    document.getElementById("customer").value;
-
-  const locationId =
-    document.getElementById("location").value;
-
-  const technicianId =
-    document.getElementById("technician").value ||
-    null;
-
-  const scheduledAt =
-    document.getElementById("scheduledAt").value;
-
-  const priority =
-    document.getElementById("priority").value;
-
-  const status =
-    document.getElementById("status").value;
-
-  const description =
-    document.getElementById("description").value.trim();
-
-
-  const { error } =
-    await db
-      .from("service_calls")
-      .insert({
-        customer_id: customerId,
-        locations_id: locationId,
-        assigned_technician_id: technicianId,
-        status: status,
-        priority: priority,
-        description: description,
-        scheduled_at:
-          new Date(scheduledAt).toISOString()
-      });
-
-
-  if (error) {
-
-    console.error(error);
 
     showMessage(
       error.message,
@@ -1507,20 +2596,225 @@ async function createServiceCall(event) {
     return;
   }
 
+  customer = data;
+}
 
-  showMessage(
-    "Service call created."
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${customer
+          ? "Edit Customer"
+          : "New Customer"}
+      </h1>
+
+      <p>
+        Customer information.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="customerForm">
+
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label>First Name</label>
+            <input
+              id="firstName"
+              value="${escapeAttribute(
+                customer?.first_name || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Last Name</label>
+            <input
+              id="lastName"
+              value="${escapeAttribute(
+                customer?.last_name || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Company Name</label>
+            <input
+              id="companyName"
+              value="${escapeAttribute(
+                customer?.company_name || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Phone</label>
+            <input
+              id="phone"
+              value="${escapeAttribute(
+                customer?.phone || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Email</label>
+            <input
+              type="email"
+              id="email"
+              value="${escapeAttribute(
+                customer?.email || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group full">
+            <label>Notes</label>
+            <textarea id="notes">${escapeHtml(
+              customer?.notes || ""
+            )}</textarea>
+          </div>
+
+        </div>
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelCustomer"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${customer
+              ? "Save Customer"
+              : "Create Customer"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("cancelCustomer")
+  .addEventListener(
+    "click",
+    showCustomers
   );
 
 
-  currentDate =
-    new Date(scheduledAt);
+document.getElementById("customerForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
 
 
-  await showSchedule();
+      const payload = {
+
+        first_name:
+          document.getElementById("firstName").value.trim(),
+
+        last_name:
+          document.getElementById("lastName").value.trim(),
+
+        company_name:
+          document.getElementById("companyName").value.trim(),
+
+        phone:
+          document.getElementById("phone").value.trim(),
+
+        email:
+          document.getElementById("email").value.trim(),
+
+        notes:
+          document.getElementById("notes").value.trim()
+
+      };
+
+
+      let error;
+
+
+      if (customer) {
+
+        ({
+          error
+        } =
+          await db
+            .from("customers")
+            .update(payload)
+            .eq(
+              "id",
+              customer.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("customers")
+            .insert(payload));
+
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        customer
+          ? "Customer saved."
+          : "Customer created."
+      );
+
+
+      await showCustomers();
+
+    }
+  );
+
 
 }
-
 
 // ============================================
 // PLACEHOLDER SECTIONS
@@ -1528,114 +2822,127 @@ async function createServiceCall(event) {
 
 function showPlaceholder(title, description) {
 
-  document.getElementById("mainContent")
-    .innerHTML = `
 
-      <div class="page-head">
+document.getElementById("mainContent")
+  .innerHTML = `
 
-        <div>
-          <h1>${title}</h1>
-          <p>${description}</p>
-        </div>
+    <div class="page-head">
 
+      <div>
+        <h1>${escapeHtml(title)}</h1>
+        <p>${escapeHtml(description)}</p>
       </div>
 
-      <div class="card">
+    </div>
 
-        <div class="empty">
-          This section is ready for its
-          database interface.
-        </div>
+    <div class="card">
 
+      <div class="empty">
+        This section is ready for its
+        database interface.
       </div>
-    `;
+
+    </div>
+  `;
+
 
 }
-
 
 // ============================================
 // NAVIGATION
 // ============================================
 
+function setActiveNav(page) {
+
+
 document.querySelectorAll(".nav-button")
   .forEach(button => {
 
-    button.addEventListener(
-      "click",
-      async () => {
-
-        document.querySelectorAll(".nav-button")
-          .forEach(item =>
-            item.classList.remove("active")
-          );
-
-
-        button.classList.add("active");
-
-
-        const page =
-          button.dataset.page;
-
-
-        if (page === "schedule") {
-
-          await showSchedule();
-
-        } else if (page === "service-calls") {
-
-          showPlaceholder(
-            "Service Calls",
-            "View and manage service calls."
-          );
-
-        } else if (page === "customers") {
-
-          showPlaceholder(
-            "Customers",
-            "Customer records."
-          );
-
-        } else if (page === "locations") {
-
-          showPlaceholder(
-            "Locations",
-            "Customer service locations."
-          );
-
-        } else if (page === "technicians") {
-
-          showPlaceholder(
-            "Technicians",
-            "Technician records and assignments."
-          );
-
-        } else if (page === "parts") {
-
-          showPlaceholder(
-            "Parts",
-            "Parts used on service calls."
-          );
-
-        } else if (page === "notes") {
-
-          showPlaceholder(
-            "Notes",
-            "Service call notes."
-          );
-
-        } else if (page === "photos") {
-
-          showPlaceholder(
-            "Photos",
-            "Service call photos."
-          );
-
-        }
-
-      }
+    button.classList.toggle(
+      "active",
+      button.dataset.page === page
     );
 
   });
+
+
+}
+
+document.querySelectorAll(".nav-button")
+.forEach(button => {
+
+```
+  button.addEventListener(
+    "click",
+    async () => {
+
+      const page =
+        button.dataset.page;
+
+
+      if (page === "schedule") {
+
+        await showSchedule();
+
+      } else if (page === "work-orders") {
+
+        await showWorkOrders();
+
+      } else if (page === "customers") {
+
+        await showCustomers();
+
+      } else if (page === "locations") {
+
+        setActiveNav("locations");
+
+        showPlaceholder(
+          "Locations",
+          "Customer service locations."
+        );
+
+      } else if (page === "technicians") {
+
+        setActiveNav("technicians");
+
+        showPlaceholder(
+          "Technicians",
+          "Technician records and assignments."
+        );
+
+      } else if (page === "parts") {
+
+        setActiveNav("parts");
+
+        showPlaceholder(
+          "Parts",
+          "Parts used on work orders."
+        );
+
+      } else if (page === "notes") {
+
+        setActiveNav("notes");
+
+        showPlaceholder(
+          "Notes",
+          "Work order notes."
+        );
+
+      } else if (page === "photos") {
+
+        setActiveNav("photos");
+
+        showPlaceholder(
+          "Photos",
+          "Work order photos."
+        );
+
+      }
+
+    }
+  );
+
+});
 
 
 // ============================================
@@ -1643,67 +2950,53 @@ document.querySelectorAll(".nav-button")
 // ============================================
 
 document.getElementById("signOutButton")
-  .addEventListener(
-    "click",
-    async () => {
-
-      await db.auth.signOut();
-
-      window.location.href =
-        "login.html";
-
-    }
-  );
+.addEventListener(
+"click",
+async () => {
 
 
-// ============================================
-// HTML ESCAPE
-// ============================================
+    await db.auth.signOut();
 
-function escapeHtml(value) {
+    window.location.href =
+      "login.html";
 
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-
-}
+  }
+);
 
 
 // ============================================
-// START APPLICATION
+// START
 // ============================================
 
 async function startApp() {
 
-  const loggedIn =
-    await requireLogin();
+```
+const loggedIn =
+  await requireLogin();
 
 
-  if (!loggedIn) {
-    return;
-  }
-
-
-  const profileLoaded =
-    await loadUserProfile();
-
-
-  if (!profileLoaded) {
-    return;
-  }
-
-
-  await showSchedule();
-
+if (!loggedIn) {
+  return;
 }
 
 
+const profileLoaded =
+  await loadUserProfile();
 
 
-  </script>
+if (!profileLoaded) {
+  return;
+}
+
+
+await showSchedule();
+
+
+}
+
+startApp();
+
+</script>
 
 </body>
 </html>
