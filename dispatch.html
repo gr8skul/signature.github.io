@@ -2863,32 +2863,37 @@ document.getElementById("customerForm")
       };
 
 
+      ```javascript
       let error;
-
 
       if (customer) {
 
-        ({
-          error
-        } =
+        const result =
           await db
             .from("customers")
             .update(payload)
-            .eq(
-              "id",
-              customer.id
-            ));
+            .eq("id", customer.id)
+            .select()
+            .single();
+
+        error = result.error;
+
+        if (!error) {
+          customer = result.data;
+        }
 
       } else {
 
-        ({
-          error
-        } =
+        const result =
           await db
             .from("customers")
-            .insert(payload));
-      }
+            .insert(payload)
+            .select()
+            .single();
 
+        error = result.error;
+
+      }
 
       if (error) {
 
@@ -2902,15 +2907,15 @@ document.getElementById("customerForm")
         return;
       }
 
-
       showMessage(
         customer
           ? "Customer saved."
           : "Customer created."
       );
 
-
       await showCustomers();
+```
+
 
     }
   );
