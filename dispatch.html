@@ -612,11 +612,11 @@
       <div class="user-role" id="userRole">Loading...</div>
     </div>
 
-```
+
 <button class="sign-out" id="signOutButton">
   Sign Out
 </button>
-```
+
 
   </div>
 </header>
@@ -626,7 +626,7 @@
   <nav>
     <div class="nav-label">Dispatch</div>
 
-```
+
 <button class="nav-button active" data-page="schedule">
   Schedule
 </button>
@@ -658,7 +658,7 @@
 <button class="nav-button" data-page="photos">
   Photos
 </button>
-```
+
 
   </nav>
 
@@ -2153,7 +2153,7 @@ document.getElementById("workOrderForm")
         existing?.id || null
       )
   );
-```
+
 
 }
 
@@ -2161,7 +2161,7 @@ async function loadCustomersForForm(
 selectedId = null
 ) {
 
-```
+
 const select =
   document.getElementById("customer");
 
@@ -2216,7 +2216,7 @@ async function loadLocationsForSelectedCustomer(
 selectedLocationId = null
 ) {
 
-```
+
 const customerId =
   document.getElementById("customer").value;
 
@@ -2289,7 +2289,7 @@ async function loadTechniciansForForm(
 selectedId = null
 ) {
 
-```
+
 const select =
   document.getElementById("technician");
 
@@ -2334,7 +2334,7 @@ if (selectedId) {
   select.value =
     selectedId;
 }
-```
+
 
 }
 
@@ -2343,7 +2343,7 @@ event,
 existingId
 ) {
 
-```
+
 event.preventDefault();
 
 const customerId =
@@ -2552,13 +2552,13 @@ document.getElementById("newCustomerButton")
 
 
 await loadCustomersPage();
-```
+
 
 }
 
 async function loadCustomersPage() {
 
-```
+
 const body =
   document.getElementById("customersBody");
 
@@ -2642,7 +2642,7 @@ body.innerHTML =
     </tr>
 
   `).join("");
-```
+
 
 }
 
@@ -2650,7 +2650,7 @@ async function showCustomerForm(
 id = null
 ) {
 
-```
+
 let customer = null;
 
 
@@ -2914,7 +2914,7 @@ document.getElementById("customerForm")
 
     }
   );
-```
+
 
 }
 
@@ -2924,7 +2924,7 @@ document.getElementById("customerForm")
 
 async function showLocations() {
 
-```
+
 setActiveNav("locations");
 
 const main =
@@ -2995,13 +2995,13 @@ document.getElementById("newLocationButton")
 
 
 await loadLocationsPage();
-```
+
 
 }
 
 async function loadLocationsPage() {
 
-```
+
 const body =
   document.getElementById("locationsBody");
 
@@ -3112,7 +3112,7 @@ body.innerHTML =
     </tr>
 
   `).join("");
-```
+
 
 }
 
@@ -3120,7 +3120,7 @@ async function showLocationForm(
 id = null
 ) {
 
-```
+
 let location = null;
 
 
@@ -3428,13 +3428,13 @@ document.getElementById("locationForm")
 
     }
   );
-```
+
 
 }
 
 async function deleteLocation(id) {
 
-```
+
 if (!confirmDelete(
   "Delete this location?"
 )) {
@@ -3472,7 +3472,7 @@ showMessage(
 
 
 await showLocations();
-```
+
 
 }
 
@@ -3481,7 +3481,7 @@ elementId,
 selectedId = null
 ) {
 
-```
+
 const select =
   document.getElementById(elementId);
 
@@ -3534,7 +3534,7 @@ if (selectedId) {
   select.value =
     selectedId;
 }
-```
+
 
 }
 
@@ -3544,7 +3544,7 @@ if (selectedId) {
 
 async function showTechnicians() {
 
-```
+
 setActiveNav("technicians");
 
 const main =
@@ -3627,7 +3627,7 @@ await loadTechniciansPage();
 
 async function loadTechniciansPage() {
 
-```
+
 const body =
   document.getElementById(
     "techniciansBody"
@@ -3740,7 +3740,7 @@ body.innerHTML =
     </tr>
 
   `).join("");
-```
+
 
 }
 
@@ -3748,7 +3748,7 @@ async function showTechnicianForm(
 id = null
 ) {
 
-```
+
 let technician = null;
 
 
@@ -4027,7 +4027,7 @@ document.getElementById(
 
     }
   );
-```
+
 
 }
 
@@ -4036,7 +4036,7 @@ id,
 active
 ) {
 
-```
+
 const {
   error
 } = await db
@@ -4071,7 +4071,7 @@ showMessage(
 
 
 await showTechnicians();
-```
+
 
 }
 
@@ -4081,7 +4081,7 @@ await showTechnicians();
 
 async function showParts() {
 
-```
+
 setActiveNav("parts");
 
 const main =
@@ -4159,13 +4159,13 @@ document.getElementById("newPartButton")
 
 
 await loadPartsPage();
-```
+
 
 }
 
 async function loadPartsPage() {
 
-```
+
 const body =
   document.getElementById(
     "partsBody"
@@ -4303,7 +4303,7 @@ body.innerHTML =
       </tr>
     `;
   }).join("");
-```
+
 
 }
 
@@ -4311,7 +4311,7 @@ async function showPartForm(
 id = null
 ) {
 
-```
+
 let part = null;
 
 
@@ -4603,7 +4603,7 @@ document.getElementById("partForm")
 
     }
   );
-```
+
 
 }
 
@@ -4647,7 +4647,7 @@ showMessage(
 
 
 await showParts();
-```
+
 
 }
 
@@ -4657,7 +4657,7 @@ await showParts();
 
 async function showNotes() {
 
-```
+
 setActiveNav("notes");
 
 const main =
@@ -4735,13 +4735,13 @@ document.getElementById("newNoteButton")
 
 
 await loadNotesPage();
-```
+
 
 }
 
 async function loadNotesPage() {
 
-```
+
 const body =
   document.getElementById(
     "notesBody"
@@ -4871,7 +4871,7 @@ body.innerHTML =
       </tr>
     `;
   }).join("");
-```
+
 
 }
 
@@ -4879,7 +4879,7 @@ async function showNoteForm(
 id = null
 ) {
 
-```
+
 let note = null;
 
 
@@ -5116,13 +5116,13 @@ document.getElementById("noteForm")
 
     }
   );
-```
+
 
 }
 
 async function deleteNote(id) {
 
-```
+
 if (!confirmDelete(
   "Delete this note?"
 )) {
@@ -5160,7 +5160,7 @@ showMessage(
 
 
 await showNotes();
-```
+
 
 }
 
@@ -5170,7 +5170,7 @@ await showNotes();
 
 async function showPhotos() {
 
-```
+
 setActiveNav("photos");
 
 const main =
@@ -5249,13 +5249,13 @@ document.getElementById("newPhotoButton")
 
 
 await loadPhotosPage();
-```
+
 
 }
 
 async function loadPhotosPage() {
 
-```
+
 const body =
   document.getElementById(
     "photosBody"
@@ -5413,7 +5413,7 @@ body.innerHTML =
       </tr>
     `;
   }).join("");
-```
+
 
 }
 
@@ -5421,7 +5421,7 @@ async function showPhotoForm(
 id = null
 ) {
 
-```
+
 let photo = null;
 
 
@@ -5683,13 +5683,13 @@ document.getElementById("photoForm")
 
     }
   );
-```
+
 
 }
 
 async function deletePhoto(id) {
 
-```
+
 if (!confirmDelete(
   "Delete this photo record?"
 )) {
@@ -5727,7 +5727,7 @@ showMessage(
 
 
 await showPhotos();
-```
+
 
 }
 
@@ -5740,7 +5740,7 @@ elementId,
 selectedId = null
 ) {
 
-```
+
 const select =
   document.getElementById(
     elementId
@@ -5832,7 +5832,7 @@ if (selectedId) {
   select.value =
     selectedId;
 }
-```
+
 
 }
 
@@ -5842,7 +5842,7 @@ if (selectedId) {
 
 function setActiveNav(page) {
 
-```
+
 document.querySelectorAll(
   ".nav-button"
 )
@@ -5854,7 +5854,7 @@ document.querySelectorAll(
     );
 
   });
-```
+
 
 }
 
@@ -5924,7 +5924,7 @@ document.querySelectorAll(
   );
 
 });
-```
+
 
 // ============================================
 // SIGN OUT
@@ -5937,7 +5937,6 @@ document.getElementById(
 "click",
 async () => {
 
-```
     await db.auth.signOut();
 
     window.location.href =
@@ -5945,7 +5944,7 @@ async () => {
 
   }
 );
-```
+
 
 // ============================================
 // START
@@ -5953,7 +5952,7 @@ async () => {
 
 async function startApp() {
 
-```
+
 const loggedIn =
   await requireLogin();
 
@@ -5971,7 +5970,7 @@ if (!profileLoaded) {
 
 
 await showSchedule();
-```
+
 
 }
 
