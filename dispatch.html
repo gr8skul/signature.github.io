@@ -480,6 +480,19 @@
       font-size: 14px;
     }
 
+    .small-muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .photo-preview {
+      max-width: 180px;
+      max-height: 120px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+    }
+
     #message {
       position: fixed;
       right: 25px;
@@ -599,11 +612,11 @@
       <div class="user-role" id="userRole">Loading...</div>
     </div>
 
-
+```
 <button class="sign-out" id="signOutButton">
   Sign Out
 </button>
-
+```
 
   </div>
 </header>
@@ -613,7 +626,7 @@
   <nav>
     <div class="nav-label">Dispatch</div>
 
-
+```
 <button class="nav-button active" data-page="schedule">
   Schedule
 </button>
@@ -645,7 +658,7 @@
 <button class="nav-button" data-page="photos">
   Photos
 </button>
-
+```
 
   </nav>
 
@@ -685,7 +698,9 @@
   // ============================================
 
   function showMessage(text, error = false) {
-    const element = document.getElementById("message");
+
+    const element =
+      document.getElementById("message");
 
     element.textContent = text;
     element.className = error ? "error" : "";
@@ -698,6 +713,7 @@
 
 
   function formatDate(date) {
+
     return date.toLocaleDateString(
       "en-US",
       {
@@ -711,6 +727,7 @@
 
 
   function escapeHtml(value) {
+
     return String(value ?? "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -721,6 +738,7 @@
 
 
   function customerName(customer) {
+
     if (!customer) {
       return "Customer";
     }
@@ -729,22 +747,30 @@
       return customer.company_name;
     }
 
-    return `${customer.first_name || ""} ${customer.last_name || ""}`
-      .trim() || "Unnamed Customer";
+    return (
+      `${customer.first_name || ""} ${customer.last_name || ""}`
+        .trim()
+      || "Unnamed Customer"
+    );
   }
 
 
   function technicianName(technician) {
+
     if (!technician) {
       return "Unassigned";
     }
 
-    return `${technician.first_name || ""} ${technician.last_name || ""}`
-      .trim() || "Technician";
+    return (
+      `${technician.first_name || ""} ${technician.last_name || ""}`
+        .trim()
+      || "Technician"
+    );
   }
 
 
   function workTypeLabel(type) {
+
     return type === "install"
       ? "Installation"
       : "Service";
@@ -752,6 +778,7 @@
 
 
   function statusLabel(status) {
+
     return String(status || "open")
       .replaceAll("_", " ")
       .replace(/\b\w/g, letter => letter.toUpperCase());
@@ -759,20 +786,37 @@
 
 
   function localDateTimeValue(date) {
+
     const d = new Date(date);
 
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const hours = String(d.getHours()).padStart(2, "0");
-    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const year =
+      d.getFullYear();
 
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    const month =
+      String(d.getMonth() + 1).padStart(2, "0");
+
+    const day =
+      String(d.getDate()).padStart(2, "0");
+
+    const hours =
+      String(d.getHours()).padStart(2, "0");
+
+    const minutes =
+      String(d.getMinutes()).padStart(2, "0");
+
+    return (
+      `${year}-${month}-${day}T${hours}:${minutes}`
+    );
   }
 
 
   function escapeAttribute(value) {
     return escapeHtml(value);
+  }
+
+
+  function confirmDelete(message) {
+    return window.confirm(message);
   }
 
 
@@ -789,11 +833,15 @@
     } = await db.auth.getSession();
 
     if (!session) {
-      window.location.href = "login.html";
+
+      window.location.href =
+        "login.html";
+
       return false;
     }
 
-    currentUser = session.user;
+    currentUser =
+      session.user;
 
     return true;
   }
@@ -807,10 +855,14 @@
     } = await db
       .from("users")
       .select("*")
-      .eq("auth_user_id", currentUser.id)
+      .eq(
+        "auth_user_id",
+        currentUser.id
+      )
       .single();
 
     if (error) {
+
       console.error(error);
 
       showMessage(
@@ -821,7 +873,8 @@
       return false;
     }
 
-    currentProfile = data;
+    currentProfile =
+      data;
 
     document.getElementById("userName")
       .textContent =
@@ -923,7 +976,8 @@
     document.getElementById("todayButton")
       .addEventListener("click", () => {
 
-        currentDate = new Date();
+        currentDate =
+          new Date();
 
         showSchedule();
       });
@@ -945,11 +999,25 @@
     const list =
       document.getElementById("scheduleList");
 
-    const start = new Date(currentDate);
-    start.setHours(0, 0, 0, 0);
+    const start =
+      new Date(currentDate);
 
-    const end = new Date(currentDate);
-    end.setHours(23, 59, 59, 999);
+    start.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+
+    const end =
+      new Date(currentDate);
+
+    end.setHours(
+      23,
+      59,
+      59,
+      999
+    );
 
     const {
       data,
@@ -989,6 +1057,7 @@
       );
 
     if (error) {
+
       console.error(error);
 
       list.innerHTML = `
@@ -1002,6 +1071,7 @@
     }
 
     if (!data || data.length === 0) {
+
       list.innerHTML = `
         <div class="empty">
           No work is scheduled for this day.
@@ -1117,9 +1187,12 @@
   // WORK ORDERS
   // ============================================
 
-  async function showWorkOrders(filter = currentWorkOrderFilter) {
+  async function showWorkOrders(
+    filter = currentWorkOrderFilter
+  ) {
 
-    currentWorkOrderFilter = filter;
+    currentWorkOrderFilter =
+      filter;
 
     setActiveNav("work-orders");
 
@@ -1132,6 +1205,7 @@
 
         <div>
           <h1>Work Orders</h1>
+
           <p>
             All dispatch work, including work not yet released to technicians.
           </p>
@@ -1225,7 +1299,10 @@
   }
 
 
-  function filterButton(value, label) {
+  function filterButton(
+    value,
+    label
+  ) {
 
     return `
       <button
@@ -1282,7 +1359,6 @@
           "work_type",
           currentWorkOrderFilter
         );
-
     }
 
 
@@ -1295,7 +1371,6 @@
           "status",
           "in_progress"
         );
-
     }
 
 
@@ -1308,7 +1383,6 @@
           "status",
           "completed"
         );
-
     }
 
 
@@ -1321,7 +1395,6 @@
           "status",
           "cancelled"
         );
-
     }
 
 
@@ -1343,7 +1416,6 @@
             "status",
             "cancelled"
           );
-
     }
 
 
@@ -1397,17 +1469,18 @@
 
         const scheduled =
           call.scheduled_at
-            ? new Date(call.scheduled_at)
-                .toLocaleString(
-                  "en-US",
-                  {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit"
-                  }
-                )
+            ? new Date(
+                call.scheduled_at
+              ).toLocaleString(
+                "en-US",
+                {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit"
+                }
+              )
             : "Not scheduled";
 
 
@@ -1608,6 +1681,7 @@
               <div class="detail-label">
                 Work Type
               </div>
+
               <div class="detail-value">
                 ${escapeHtml(
                   workTypeLabel(call.work_type)
@@ -1619,6 +1693,7 @@
               <div class="detail-label">
                 Status
               </div>
+
               <div class="detail-value">
                 ${escapeHtml(
                   statusLabel(call.status)
@@ -1630,13 +1705,17 @@
               <div class="detail-label">
                 Scheduled
               </div>
+
               <div class="detail-value">
-                ${call.scheduled_at
-                  ? escapeHtml(
-                      new Date(call.scheduled_at)
-                        .toLocaleString()
-                    )
-                  : "Not scheduled"}
+                ${
+                  call.scheduled_at
+                    ? escapeHtml(
+                        new Date(
+                          call.scheduled_at
+                        ).toLocaleString()
+                      )
+                    : "Not scheduled"
+                }
               </div>
             </div>
 
@@ -1644,6 +1723,7 @@
               <div class="detail-label">
                 Priority
               </div>
+
               <div class="detail-value">
                 ${escapeHtml(
                   call.priority || "normal"
@@ -1655,6 +1735,7 @@
               <div class="detail-label">
                 Technician
               </div>
+
               <div class="detail-value">
                 ${escapeHtml(
                   technicianName(call.technicians)
@@ -1666,12 +1747,15 @@
               <div class="detail-label">
                 Location
               </div>
+
               <div class="detail-value">
-                ${call.locations
-                  ? escapeHtml(
-                      `${call.locations.address || ""}, ${call.locations.city || ""}, ${call.locations.state || ""} ${call.locations.zip || ""}`
-                    )
-                  : "No location"}
+                ${
+                  call.locations
+                    ? escapeHtml(
+                        `${call.locations.address || ""}, ${call.locations.city || ""}, ${call.locations.state || ""} ${call.locations.zip || ""}`
+                      )
+                    : "No location"
+                }
               </div>
             </div>
 
@@ -1679,6 +1763,7 @@
               <div class="detail-label">
                 Customer Phone
               </div>
+
               <div class="detail-value">
                 ${escapeHtml(
                   call.customers?.phone || "—"
@@ -1690,6 +1775,7 @@
               <div class="detail-label">
                 Customer Email
               </div>
+
               <div class="detail-value">
                 ${escapeHtml(
                   call.customers?.email || "—"
@@ -1744,15 +1830,15 @@
   // NEW / EDIT WORK ORDER
   // ============================================
 
-  async function showWorkOrderForm(existing = null) {
+  async function showWorkOrderForm(
+    existing = null
+  ) {
 
     const editing =
       !!existing;
 
-
     const main =
       document.getElementById("mainContent");
-
 
     main.innerHTML = `
 
@@ -1967,7 +2053,7 @@
                   placeholder="Describe the work..."
                 ></textarea>
 
-
+```
           </div>
 
         </div>
@@ -2025,7 +2111,9 @@ if (existing) {
 
   document.getElementById("scheduledAt").value =
     existing.scheduled_at
-      ? localDateTimeValue(existing.scheduled_at)
+      ? localDateTimeValue(
+          existing.scheduled_at
+        )
       : "";
 
   document.getElementById("priority").value =
@@ -2039,7 +2127,6 @@ if (existing) {
 
   document.getElementById("description").value =
     existing.description || "";
-
 }
 
 
@@ -2061,18 +2148,22 @@ document.getElementById("workOrderForm")
   .addEventListener(
     "submit",
     event =>
-      saveWorkOrder(event, existing?.id || null)
+      saveWorkOrder(
+        event,
+        existing?.id || null
+      )
   );
-
+```
 
 }
 
-async function loadCustomersForForm(selectedId = null) {
+async function loadCustomersForForm(
+selectedId = null
+) {
 
-
+```
 const select =
   document.getElementById("customer");
-
 
 const {
   data,
@@ -2081,7 +2172,6 @@ const {
   .from("customers")
   .select("*")
   .order("last_name");
-
 
 if (error) {
 
@@ -2096,10 +2186,8 @@ if (error) {
   return;
 }
 
-
 select.innerHTML =
   `<option value="">Select customer</option>`;
-
 
 data.forEach(customer => {
 
@@ -2113,14 +2201,14 @@ data.forEach(customer => {
     customerName(customer);
 
   select.appendChild(option);
-
 });
 
 
 if (selectedId) {
-  select.value = selectedId;
+  select.value =
+    selectedId;
 }
-
+```
 
 }
 
@@ -2128,13 +2216,12 @@ async function loadLocationsForSelectedCustomer(
 selectedLocationId = null
 ) {
 
-
+```
 const customerId =
   document.getElementById("customer").value;
 
 const select =
   document.getElementById("location");
-
 
 if (!customerId) {
 
@@ -2145,7 +2232,6 @@ if (!customerId) {
 
   return;
 }
-
 
 const {
   data,
@@ -2159,7 +2245,6 @@ const {
   )
   .order("address");
 
-
 if (error) {
 
   console.error(error);
@@ -2172,12 +2257,10 @@ if (error) {
   return;
 }
 
-
 select.innerHTML =
   `<option value="">
     Select location
   </option>`;
-
 
 data.forEach(location => {
 
@@ -2191,14 +2274,14 @@ data.forEach(location => {
     `${location.address || ""}, ${location.city || ""}, ${location.state || ""} ${location.zip || ""}`;
 
   select.appendChild(option);
-
 });
 
 
 if (selectedLocationId) {
-  select.value = selectedLocationId;
+  select.value =
+    selectedLocationId;
 }
-
+```
 
 }
 
@@ -2206,10 +2289,9 @@ async function loadTechniciansForForm(
 selectedId = null
 ) {
 
-
+```
 const select =
   document.getElementById("technician");
-
 
 const {
   data,
@@ -2223,7 +2305,6 @@ const {
   )
   .order("last_name");
 
-
 if (error) {
 
   console.error(error);
@@ -2231,6 +2312,8 @@ if (error) {
   return;
 }
 
+select.innerHTML =
+  `<option value="">Unassigned</option>`;
 
 data.forEach(technician => {
 
@@ -2244,14 +2327,14 @@ data.forEach(technician => {
     `${technician.first_name || ""} ${technician.last_name || ""}`.trim();
 
   select.appendChild(option);
-
 });
 
 
 if (selectedId) {
-  select.value = selectedId;
+  select.value =
+    selectedId;
 }
-
+```
 
 }
 
@@ -2260,9 +2343,8 @@ event,
 existingId
 ) {
 
-
+```
 event.preventDefault();
-
 
 const customerId =
   document.getElementById("customer").value;
@@ -2294,7 +2376,6 @@ const description =
     .value
     .trim();
 
-
 if (!customerId || !locationId) {
 
   showMessage(
@@ -2304,7 +2385,6 @@ if (!customerId || !locationId) {
 
   return;
 }
-
 
 const payload = {
 
@@ -2334,7 +2414,9 @@ const payload = {
 
   scheduled_at:
     scheduledAt
-      ? new Date(scheduledAt).toISOString()
+      ? new Date(
+          scheduledAt
+        ).toISOString()
       : null
 };
 
@@ -2363,7 +2445,6 @@ if (existingId) {
     await db
       .from("service_calls")
       .insert(payload));
-
 }
 
 
@@ -2388,7 +2469,7 @@ showMessage(
 
 
 await showWorkOrders();
-
+```
 
 }
 
@@ -2398,12 +2479,11 @@ await showWorkOrders();
 
 async function showCustomers() {
 
-
+```
 setActiveNav("customers");
 
 const main =
   document.getElementById("mainContent");
-
 
 main.innerHTML = `
 
@@ -2472,16 +2552,15 @@ document.getElementById("newCustomerButton")
 
 
 await loadCustomersPage();
-
+```
 
 }
 
 async function loadCustomersPage() {
 
-
+```
 const body =
   document.getElementById("customersBody");
-
 
 const {
   data,
@@ -2490,7 +2569,6 @@ const {
   .from("customers")
   .select("*")
   .order("last_name");
-
 
 if (error) {
 
@@ -2564,13 +2642,15 @@ body.innerHTML =
     </tr>
 
   `).join("");
-
+```
 
 }
 
-async function showCustomerForm(id = null) {
+async function showCustomerForm(
+id = null
+) {
 
-
+```
 let customer = null;
 
 
@@ -2582,7 +2662,10 @@ if (id) {
   } = await db
     .from("customers")
     .select("*")
-    .eq("id", id)
+    .eq(
+      "id",
+      id
+    )
     .single();
 
 
@@ -2596,7 +2679,8 @@ if (id) {
     return;
   }
 
-  customer = data;
+  customer =
+    data;
 }
 
 
@@ -2635,6 +2719,7 @@ main.innerHTML = `
 
           <div class="form-group">
             <label>First Name</label>
+
             <input
               id="firstName"
               value="${escapeAttribute(
@@ -2645,6 +2730,7 @@ main.innerHTML = `
 
           <div class="form-group">
             <label>Last Name</label>
+
             <input
               id="lastName"
               value="${escapeAttribute(
@@ -2655,6 +2741,7 @@ main.innerHTML = `
 
           <div class="form-group">
             <label>Company Name</label>
+
             <input
               id="companyName"
               value="${escapeAttribute(
@@ -2665,6 +2752,7 @@ main.innerHTML = `
 
           <div class="form-group">
             <label>Phone</label>
+
             <input
               id="phone"
               value="${escapeAttribute(
@@ -2675,6 +2763,7 @@ main.innerHTML = `
 
           <div class="form-group">
             <label>Email</label>
+
             <input
               type="email"
               id="email"
@@ -2685,10 +2774,13 @@ main.innerHTML = `
           </div>
 
           <div class="form-group full">
+
             <label>Notes</label>
+
             <textarea id="notes">${escapeHtml(
               customer?.notes || ""
             )}</textarea>
+
           </div>
 
         </div>
@@ -2740,23 +2832,34 @@ document.getElementById("customerForm")
       const payload = {
 
         first_name:
-          document.getElementById("firstName").value.trim(),
+          document.getElementById("firstName")
+            .value
+            .trim(),
 
         last_name:
-          document.getElementById("lastName").value.trim(),
+          document.getElementById("lastName")
+            .value
+            .trim(),
 
         company_name:
-          document.getElementById("companyName").value.trim(),
+          document.getElementById("companyName")
+            .value
+            .trim(),
 
         phone:
-          document.getElementById("phone").value.trim(),
+          document.getElementById("phone")
+            .value
+            .trim(),
 
         email:
-          document.getElementById("email").value.trim(),
+          document.getElementById("email")
+            .value
+            .trim(),
 
         notes:
-          document.getElementById("notes").value.trim()
-
+          document.getElementById("notes")
+            .value
+            .trim()
       };
 
 
@@ -2784,7 +2887,6 @@ document.getElementById("customerForm")
           await db
             .from("customers")
             .insert(payload));
-
       }
 
 
@@ -2812,39 +2914,2925 @@ document.getElementById("customerForm")
 
     }
   );
-
+```
 
 }
 
 // ============================================
-// PLACEHOLDER SECTIONS
+// LOCATIONS
 // ============================================
 
-function showPlaceholder(title, description) {
+async function showLocations() {
 
+```
+setActiveNav("locations");
 
-document.getElementById("mainContent")
-  .innerHTML = `
+const main =
+  document.getElementById("mainContent");
 
-    <div class="page-head">
+main.innerHTML = `
 
-      <div>
-        <h1>${escapeHtml(title)}</h1>
-        <p>${escapeHtml(description)}</p>
-      </div>
+  <div class="page-head">
+
+    <div>
+      <h1>Locations</h1>
+      <p>Customer service locations used by Work Orders.</p>
+    </div>
+
+    <button
+      class="primary"
+      id="newLocationButton"
+    >
+      + New Location
+    </button>
+
+  </div>
+
+  <div class="card">
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Customer</th>
+            <th>Address</th>
+            <th>City</th>
+            <th>State</th>
+            <th>ZIP</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="locationsBody">
+
+          <tr>
+            <td colspan="6">
+              <div class="empty">
+                Loading locations...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
 
     </div>
 
-    <div class="card">
+  </div>
+`;
 
-      <div class="empty">
-        This section is ready for its
-        database interface.
-      </div>
 
-    </div>
+document.getElementById("newLocationButton")
+  .addEventListener(
+    "click",
+    () => showLocationForm()
+  );
+
+
+await loadLocationsPage();
+```
+
+}
+
+async function loadLocationsPage() {
+
+```
+const body =
+  document.getElementById("locationsBody");
+
+const {
+  data,
+  error
+} = await db
+  .from("locations")
+  .select(`
+    *,
+    customers (
+      first_name,
+      last_name,
+      company_name
+    )
+  `)
+  .order("address");
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          Unable to load locations.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
   `;
 
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          No locations yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body.innerHTML =
+  data.map(location => `
+
+    <tr>
+
+      <td>
+        ${escapeHtml(
+          customerName(location.customers)
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          location.address || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          location.city || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          location.state || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          location.zip || "—"
+        )}
+      </td>
+
+      <td>
+
+        <button
+          class="row-button"
+          onclick="showLocationForm('${location.id}')"
+        >
+          Edit
+        </button>
+
+        <button
+          class="danger"
+          onclick="deleteLocation('${location.id}')"
+        >
+          Delete
+        </button>
+
+      </td>
+
+    </tr>
+
+  `).join("");
+```
+
+}
+
+async function showLocationForm(
+id = null
+) {
+
+```
+let location = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("locations")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  location =
+    data;
+}
+
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${location
+          ? "Edit Location"
+          : "New Location"}
+      </h1>
+
+      <p>
+        Customer service location.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="locationForm">
+
+        <div class="form-grid">
+
+          <div class="form-group full">
+
+            <label for="locationCustomer">
+              Customer
+            </label>
+
+            <select
+              id="locationCustomer"
+              required
+            >
+              <option value="">
+                Loading customers...
+              </option>
+            </select>
+
+          </div>
+
+          <div class="form-group full">
+
+            <label for="locationAddress">
+              Address
+            </label>
+
+            <input
+              id="locationAddress"
+              value="${escapeAttribute(
+                location?.address || ""
+              )}"
+              required
+            >
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="locationCity">
+              City
+            </label>
+
+            <input
+              id="locationCity"
+              value="${escapeAttribute(
+                location?.city || ""
+              )}"
+            >
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="locationState">
+              State
+            </label>
+
+            <input
+              id="locationState"
+              value="${escapeAttribute(
+                location?.state || ""
+              )}"
+            >
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="locationZip">
+              ZIP
+            </label>
+
+            <input
+              id="locationZip"
+              value="${escapeAttribute(
+                location?.zip || ""
+              )}"
+            >
+
+          </div>
+
+          <div class="form-group full">
+
+            <label for="locationNotes">
+              Notes
+            </label>
+
+            <textarea
+              id="locationNotes"
+            >${escapeHtml(
+              location?.notes || ""
+            )}</textarea>
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelLocation"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${location
+              ? "Save Location"
+              : "Create Location"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadCustomerOptions(
+  "locationCustomer",
+  location?.customer_id || null
+);
+
+
+document.getElementById("cancelLocation")
+  .addEventListener(
+    "click",
+    showLocations
+  );
+
+
+document.getElementById("locationForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        customer_id:
+          document.getElementById(
+            "locationCustomer"
+          ).value,
+
+        address:
+          document.getElementById(
+            "locationAddress"
+          ).value.trim(),
+
+        city:
+          document.getElementById(
+            "locationCity"
+          ).value.trim(),
+
+        state:
+          document.getElementById(
+            "locationState"
+          ).value.trim(),
+
+        zip:
+          document.getElementById(
+            "locationZip"
+          ).value.trim(),
+
+        notes:
+          document.getElementById(
+            "locationNotes"
+          ).value.trim()
+      };
+
+
+      if (!payload.customer_id) {
+
+        showMessage(
+          "A customer is required.",
+          true
+        );
+
+        return;
+      }
+
+
+      let error;
+
+
+      if (location) {
+
+        ({
+          error
+        } =
+          await db
+            .from("locations")
+            .update(payload)
+            .eq(
+              "id",
+              location.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("locations")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        location
+          ? "Location saved."
+          : "Location created."
+      );
+
+
+      await showLocations();
+
+    }
+  );
+```
+
+}
+
+async function deleteLocation(id) {
+
+```
+if (!confirmDelete(
+  "Delete this location?"
+)) {
+  return;
+}
+
+
+const {
+  error
+} = await db
+  .from("locations")
+  .delete()
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  "Location deleted."
+);
+
+
+await showLocations();
+```
+
+}
+
+async function loadCustomerOptions(
+elementId,
+selectedId = null
+) {
+
+```
+const select =
+  document.getElementById(elementId);
+
+
+const {
+  data,
+  error
+} = await db
+  .from("customers")
+  .select("*")
+  .order("last_name");
+
+
+if (error) {
+
+  console.error(error);
+
+  select.innerHTML =
+    `<option value="">
+      Unable to load customers
+    </option>`;
+
+  return;
+}
+
+
+select.innerHTML =
+  `<option value="">
+    Select customer
+  </option>`;
+
+
+data.forEach(customer => {
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    customer.id;
+
+  option.textContent =
+    customerName(customer);
+
+  select.appendChild(option);
+
+});
+
+
+if (selectedId) {
+  select.value =
+    selectedId;
+}
+```
+
+}
+
+// ============================================
+// TECHNICIANS
+// ============================================
+
+async function showTechnicians() {
+
+```
+setActiveNav("technicians");
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Technicians</h1>
+
+      <p>
+        Technician records available for Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newTechnicianButton"
+    >
+      + New Technician
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="techniciansBody">
+
+          <tr>
+            <td colspan="5">
+              <div class="empty">
+                Loading technicians...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newTechnicianButton")
+  .addEventListener(
+    "click",
+    () => showTechnicianForm()
+  );
+
+
+await loadTechniciansPage();
+```
+
+}
+
+async function loadTechniciansPage() {
+
+```
+const body =
+  document.getElementById(
+    "techniciansBody"
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("technicians")
+  .select("*")
+  .order("last_name");
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="5">
+        <div class="empty">
+          Unable to load technicians.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="5">
+        <div class="empty">
+          No technicians yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body.innerHTML =
+  data.map(technician => `
+
+    <tr>
+
+      <td>
+        ${escapeHtml(
+          technicianName(technician)
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          technician.phone || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          technician.email || "—"
+        )}
+      </td>
+
+      <td>
+
+        <span class="release-badge ${
+          technician.active
+            ? "released"
+            : "unreleased"
+        }">
+
+          ${technician.active
+            ? "Active"
+            : "Inactive"}
+
+        </span>
+
+      </td>
+
+      <td>
+
+        <button
+          class="row-button"
+          onclick="showTechnicianForm('${technician.id}')"
+        >
+          Edit
+        </button>
+
+        <button
+          class="row-button"
+          onclick="toggleTechnician('${technician.id}', ${!technician.active})"
+        >
+          ${technician.active
+            ? "Deactivate"
+            : "Activate"}
+        </button>
+
+      </td>
+
+    </tr>
+
+  `).join("");
+```
+
+}
+
+async function showTechnicianForm(
+id = null
+) {
+
+```
+let technician = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("technicians")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  technician =
+    data;
+}
+
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${technician
+          ? "Edit Technician"
+          : "New Technician"}
+      </h1>
+
+      <p>
+        Technician information.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="technicianForm">
+
+        <div class="form-grid">
+
+          <div class="form-group">
+
+            <label for="technicianFirstName">
+              First Name
+            </label>
+
+            <input
+              id="technicianFirstName"
+              value="${escapeAttribute(
+                technician?.first_name || ""
+              )}"
+              required
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="technicianLastName">
+              Last Name
+            </label>
+
+            <input
+              id="technicianLastName"
+              value="${escapeAttribute(
+                technician?.last_name || ""
+              )}"
+              required
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="technicianPhone">
+              Phone
+            </label>
+
+            <input
+              id="technicianPhone"
+              value="${escapeAttribute(
+                technician?.phone || ""
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="technicianEmail">
+              Email
+            </label>
+
+            <input
+              type="email"
+              id="technicianEmail"
+              value="${escapeAttribute(
+                technician?.email || ""
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="technicianNotes">
+              Notes
+            </label>
+
+            <textarea
+              id="technicianNotes"
+            >${escapeHtml(
+              technician?.notes || ""
+            )}</textarea>
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelTechnician"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${technician
+              ? "Save Technician"
+              : "Create Technician"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById(
+  "cancelTechnician"
+)
+  .addEventListener(
+    "click",
+    showTechnicians
+  );
+
+
+document.getElementById(
+  "technicianForm"
+)
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        first_name:
+          document.getElementById(
+            "technicianFirstName"
+          ).value.trim(),
+
+        last_name:
+          document.getElementById(
+            "technicianLastName"
+          ).value.trim(),
+
+        phone:
+          document.getElementById(
+            "technicianPhone"
+          ).value.trim(),
+
+        email:
+          document.getElementById(
+            "technicianEmail"
+          ).value.trim(),
+
+        notes:
+          document.getElementById(
+            "technicianNotes"
+          ).value.trim()
+      };
+
+
+      let error;
+
+
+      if (technician) {
+
+        ({
+          error
+        } =
+          await db
+            .from("technicians")
+            .update(payload)
+            .eq(
+              "id",
+              technician.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("technicians")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        technician
+          ? "Technician saved."
+          : "Technician created."
+      );
+
+
+      await showTechnicians();
+
+    }
+  );
+```
+
+}
+
+async function toggleTechnician(
+id,
+active
+) {
+
+```
+const {
+  error
+} = await db
+  .from("technicians")
+  .update({
+    active: active
+  })
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  active
+    ? "Technician activated."
+    : "Technician deactivated."
+);
+
+
+await showTechnicians();
+```
+
+}
+
+// ============================================
+// PARTS
+// ============================================
+
+async function showParts() {
+
+```
+setActiveNav("parts");
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Parts</h1>
+
+      <p>
+        Parts used on Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newPartButton"
+    >
+      + Add Part
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Work Order</th>
+            <th>Part Number</th>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th>Unit Cost</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="partsBody">
+
+          <tr>
+            <td colspan="6">
+              <div class="empty">
+                Loading parts...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newPartButton")
+  .addEventListener(
+    "click",
+    () => showPartForm()
+  );
+
+
+await loadPartsPage();
+```
+
+}
+
+async function loadPartsPage() {
+
+```
+const body =
+  document.getElementById(
+    "partsBody"
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("parts")
+  .select(`
+    *,
+    service_calls (
+      id,
+      description,
+      customers (
+        first_name,
+        last_name,
+        company_name
+      )
+    )
+  `)
+  .order(
+    "created_at",
+    {
+      ascending: false
+    }
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          Unable to load parts.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          No parts yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body.innerHTML =
+  data.map(part => {
+
+    const workOrder =
+      part.service_calls;
+
+    const workOrderLabel =
+      workOrder
+        ? customerName(
+            workOrder.customers
+          )
+        : "Work Order";
+
+
+    return `
+
+      <tr>
+
+        <td>
+          ${escapeHtml(
+            workOrderLabel
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            part.part_number || "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            part.description || "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            part.quantity ?? 0
+          )}
+        </td>
+
+        <td>
+          $${escapeHtml(
+            Number(
+              part.unit_cost || 0
+            ).toFixed(2)
+          )}
+        </td>
+
+        <td>
+
+          <button
+            class="row-button"
+            onclick="showPartForm('${part.id}')"
+          >
+            Edit
+          </button>
+
+          <button
+            class="danger"
+            onclick="deletePart('${part.id}')"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+    `;
+  }).join("");
+```
+
+}
+
+async function showPartForm(
+id = null
+) {
+
+```
+let part = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("parts")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  part =
+    data;
+}
+
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${part
+          ? "Edit Part"
+          : "Add Part"}
+      </h1>
+
+      <p>
+        Part information for a Work Order.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="partForm">
+
+        <div class="form-grid">
+
+          <div class="form-group full">
+
+            <label for="partWorkOrder">
+              Work Order
+            </label>
+
+            <select
+              id="partWorkOrder"
+              required
+            >
+              <option value="">
+                Loading Work Orders...
+              </option>
+            </select>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="partNumber">
+              Part Number
+            </label>
+
+            <input
+              id="partNumber"
+              value="${escapeAttribute(
+                part?.part_number || ""
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="partQuantity">
+              Quantity
+            </label>
+
+            <input
+              type="number"
+              min="1"
+              id="partQuantity"
+              value="${escapeAttribute(
+                part?.quantity ?? 1
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="partDescription">
+              Description
+            </label>
+
+            <input
+              id="partDescription"
+              value="${escapeAttribute(
+                part?.description || ""
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="partUnitCost">
+              Unit Cost
+            </label>
+
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              id="partUnitCost"
+              value="${escapeAttribute(
+                part?.unit_cost ?? 0
+              )}"
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelPart"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${part
+              ? "Save Part"
+              : "Add Part"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadWorkOrderOptions(
+  "partWorkOrder",
+  part?.service_call_id || null
+);
+
+
+document.getElementById("cancelPart")
+  .addEventListener(
+    "click",
+    showParts
+  );
+
+
+document.getElementById("partForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        service_call_id:
+          document.getElementById(
+            "partWorkOrder"
+          ).value,
+
+        part_number:
+          document.getElementById(
+            "partNumber"
+          ).value.trim(),
+
+        description:
+          document.getElementById(
+            "partDescription"
+          ).value.trim(),
+
+        quantity:
+          Number(
+            document.getElementById(
+              "partQuantity"
+            ).value
+          ) || 1,
+
+        unit_cost:
+          Number(
+            document.getElementById(
+              "partUnitCost"
+            ).value
+          ) || 0
+      };
+
+
+      let error;
+
+
+      if (part) {
+
+        ({
+          error
+        } =
+          await db
+            .from("parts")
+            .update(payload)
+            .eq(
+              "id",
+              part.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("parts")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        part
+          ? "Part saved."
+          : "Part added."
+      );
+
+
+      await showParts();
+
+    }
+  );
+```
+
+}
+
+async function deletePart(id) {
+
+```
+if (!confirmDelete(
+  "Delete this part?"
+)) {
+  return;
+}
+
+
+const {
+  error
+} = await db
+  .from("parts")
+  .delete()
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  "Part deleted."
+);
+
+
+await showParts();
+```
+
+}
+
+// ============================================
+// NOTES
+// ============================================
+
+async function showNotes() {
+
+```
+setActiveNav("notes");
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Notes</h1>
+
+      <p>
+        Notes attached to Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newNoteButton"
+    >
+      + Add Note
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Work Order</th>
+            <th>Note</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="notesBody">
+
+          <tr>
+            <td colspan="4">
+              <div class="empty">
+                Loading notes...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newNoteButton")
+  .addEventListener(
+    "click",
+    () => showNoteForm()
+  );
+
+
+await loadNotesPage();
+```
+
+}
+
+async function loadNotesPage() {
+
+```
+const body =
+  document.getElementById(
+    "notesBody"
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("service_call_notes")
+  .select(`
+    *,
+    service_calls (
+      id,
+      description,
+      customers (
+        first_name,
+        last_name,
+        company_name
+      )
+    )
+  `)
+  .order(
+    "created_at",
+    {
+      ascending: false
+    }
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="4">
+        <div class="empty">
+          Unable to load notes.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="4">
+        <div class="empty">
+          No notes yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body.innerHTML =
+  data.map(note => {
+
+    const workOrder =
+      note.service_calls;
+
+    const workOrderName =
+      workOrder
+        ? customerName(
+            workOrder.customers
+          )
+        : "Work Order";
+
+
+    const created =
+      note.created_at
+        ? new Date(
+            note.created_at
+          ).toLocaleString()
+        : "—";
+
+
+    return `
+
+      <tr>
+
+        <td>
+          ${escapeHtml(
+            workOrderName
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            note.note || ""
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(created)}
+        </td>
+
+        <td>
+
+          <button
+            class="row-button"
+            onclick="showNoteForm('${note.id}')"
+          >
+            Edit
+          </button>
+
+          <button
+            class="danger"
+            onclick="deleteNote('${note.id}')"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+    `;
+  }).join("");
+```
+
+}
+
+async function showNoteForm(
+id = null
+) {
+
+```
+let note = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("service_call_notes")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  note =
+    data;
+}
+
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${note
+          ? "Edit Note"
+          : "Add Note"}
+      </h1>
+
+      <p>
+        Work Order note.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="noteForm">
+
+        <div class="form-grid">
+
+          <div class="form-group full">
+
+            <label for="noteWorkOrder">
+              Work Order
+            </label>
+
+            <select
+              id="noteWorkOrder"
+              required
+            >
+              <option value="">
+                Loading Work Orders...
+              </option>
+            </select>
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="noteText">
+              Note
+            </label>
+
+            <textarea
+              id="noteText"
+              required
+            >${escapeHtml(
+              note?.note || ""
+            )}</textarea>
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelNote"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${note
+              ? "Save Note"
+              : "Add Note"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadWorkOrderOptions(
+  "noteWorkOrder",
+  note?.service_call_id || null
+);
+
+
+document.getElementById("cancelNote")
+  .addEventListener(
+    "click",
+    showNotes
+  );
+
+
+document.getElementById("noteForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        service_call_id:
+          document.getElementById(
+            "noteWorkOrder"
+          ).value,
+
+        note:
+          document.getElementById(
+            "noteText"
+          ).value.trim()
+      };
+
+
+      if (
+        !payload.service_call_id ||
+        !payload.note
+      ) {
+
+        showMessage(
+          "Work Order and note are required.",
+          true
+        );
+
+        return;
+      }
+
+
+      let error;
+
+
+      if (note) {
+
+        ({
+          error
+        } =
+          await db
+            .from("service_call_notes")
+            .update(payload)
+            .eq(
+              "id",
+              note.id
+            ));
+
+      } else {
+
+        payload.user_id =
+          currentProfile.id;
+
+        ({
+          error
+        } =
+          await db
+            .from("service_call_notes")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        note
+          ? "Note saved."
+          : "Note added."
+      );
+
+
+      await showNotes();
+
+    }
+  );
+```
+
+}
+
+async function deleteNote(id) {
+
+```
+if (!confirmDelete(
+  "Delete this note?"
+)) {
+  return;
+}
+
+
+const {
+  error
+} = await db
+  .from("service_call_notes")
+  .delete()
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  "Note deleted."
+);
+
+
+await showNotes();
+```
+
+}
+
+// ============================================
+// PHOTOS
+// ============================================
+
+async function showPhotos() {
+
+```
+setActiveNav("photos");
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Photos</h1>
+
+      <p>
+        Photos attached to Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newPhotoButton"
+    >
+      + Add Photo
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Work Order</th>
+            <th>Photo</th>
+            <th>Caption</th>
+            <th>Added</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="photosBody">
+
+          <tr>
+            <td colspan="5">
+              <div class="empty">
+                Loading photos...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newPhotoButton")
+  .addEventListener(
+    "click",
+    () => showPhotoForm()
+  );
+
+
+await loadPhotosPage();
+```
+
+}
+
+async function loadPhotosPage() {
+
+```
+const body =
+  document.getElementById(
+    "photosBody"
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("service_call_photos")
+  .select(`
+    *,
+    service_calls (
+      id,
+      description,
+      customers (
+        first_name,
+        last_name,
+        company_name
+      )
+    )
+  `)
+  .order(
+    "created_at",
+    {
+      ascending: false
+    }
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="5">
+        <div class="empty">
+          Unable to load photos.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="5">
+        <div class="empty">
+          No photos yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body.innerHTML =
+  data.map(photo => {
+
+    const workOrder =
+      photo.service_calls;
+
+    const workOrderName =
+      workOrder
+        ? customerName(
+            workOrder.customers
+          )
+        : "Work Order";
+
+
+    const created =
+      photo.created_at
+        ? new Date(
+            photo.created_at
+          ).toLocaleString()
+        : "—";
+
+
+    const image =
+      photo.file_path
+        ? `
+          <a
+            href="${escapeAttribute(
+              photo.file_path
+            )}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img
+              class="photo-preview"
+              src="${escapeAttribute(
+                photo.file_path
+              )}"
+              alt="${escapeAttribute(
+                photo.caption || "Work Order photo"
+              )}"
+            >
+          </a>
+        `
+        : "—";
+
+
+    return `
+
+      <tr>
+
+        <td>
+          ${escapeHtml(
+            workOrderName
+          )}
+        </td>
+
+        <td>
+          ${image}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            photo.caption || "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(created)}
+        </td>
+
+        <td>
+
+          <button
+            class="row-button"
+            onclick="showPhotoForm('${photo.id}')"
+          >
+            Edit
+          </button>
+
+          <button
+            class="danger"
+            onclick="deletePhoto('${photo.id}')"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+    `;
+  }).join("");
+```
+
+}
+
+async function showPhotoForm(
+id = null
+) {
+
+```
+let photo = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("service_call_photos")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  photo =
+    data;
+}
+
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${photo
+          ? "Edit Photo"
+          : "Add Photo"}
+      </h1>
+
+      <p>
+        Attach a photo to a Work Order.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="photoForm">
+
+        <div class="form-grid">
+
+          <div class="form-group full">
+
+            <label for="photoWorkOrder">
+              Work Order
+            </label>
+
+            <select
+              id="photoWorkOrder"
+              required
+            >
+              <option value="">
+                Loading Work Orders...
+              </option>
+            </select>
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="photoPath">
+              Photo URL / File Path
+            </label>
+
+            <input
+              id="photoPath"
+              value="${escapeAttribute(
+                photo?.file_path || ""
+              )}"
+              placeholder="https://..."
+              required
+            >
+
+            <div class="small-muted">
+              Enter the image URL or stored file path.
+            </div>
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="photoCaption">
+              Caption
+            </label>
+
+            <input
+              id="photoCaption"
+              value="${escapeAttribute(
+                photo?.caption || ""
+              )}"
+              placeholder="Describe the photo..."
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelPhoto"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${photo
+              ? "Save Photo"
+              : "Add Photo"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadWorkOrderOptions(
+  "photoWorkOrder",
+  photo?.service_call_id || null
+);
+
+
+document.getElementById("cancelPhoto")
+  .addEventListener(
+    "click",
+    showPhotos
+  );
+
+
+document.getElementById("photoForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        service_call_id:
+          document.getElementById(
+            "photoWorkOrder"
+          ).value,
+
+        file_path:
+          document.getElementById(
+            "photoPath"
+          ).value.trim(),
+
+        caption:
+          document.getElementById(
+            "photoCaption"
+          ).value.trim()
+      };
+
+
+      if (
+        !payload.service_call_id ||
+        !payload.file_path
+      ) {
+
+        showMessage(
+          "Work Order and photo path are required.",
+          true
+        );
+
+        return;
+      }
+
+
+      let error;
+
+
+      if (photo) {
+
+        ({
+          error
+        } =
+          await db
+            .from("service_call_photos")
+            .update(payload)
+            .eq(
+              "id",
+              photo.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("service_call_photos")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        photo
+          ? "Photo saved."
+          : "Photo added."
+      );
+
+
+      await showPhotos();
+
+    }
+  );
+```
+
+}
+
+async function deletePhoto(id) {
+
+```
+if (!confirmDelete(
+  "Delete this photo record?"
+)) {
+  return;
+}
+
+
+const {
+  error
+} = await db
+  .from("service_call_photos")
+  .delete()
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  "Photo deleted."
+);
+
+
+await showPhotos();
+```
+
+}
+
+// ============================================
+// WORK ORDER OPTIONS
+// ============================================
+
+async function loadWorkOrderOptions(
+elementId,
+selectedId = null
+) {
+
+```
+const select =
+  document.getElementById(
+    elementId
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("service_calls")
+  .select(`
+    id,
+    description,
+    scheduled_at,
+    customers (
+      first_name,
+      last_name,
+      company_name
+    )
+  `)
+  .order(
+    "scheduled_at",
+    {
+      ascending: false,
+      nullsFirst: false
+    }
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  select.innerHTML =
+    `<option value="">
+      Unable to load Work Orders
+    </option>`;
+
+  return;
+}
+
+
+select.innerHTML =
+  `<option value="">
+    Select Work Order
+  </option>`;
+
+
+data.forEach(call => {
+
+  const option =
+    document.createElement(
+      "option"
+    );
+
+
+  const customer =
+    customerName(
+      call.customers
+    );
+
+
+  const date =
+    call.scheduled_at
+      ? new Date(
+          call.scheduled_at
+        ).toLocaleDateString()
+      : "Unscheduled";
+
+
+  option.value =
+    call.id;
+
+
+  option.textContent =
+    `${customer} — ${date}`;
+
+
+  select.appendChild(
+    option
+  );
+
+});
+
+
+if (selectedId) {
+
+  select.value =
+    selectedId;
+}
+```
 
 }
 
@@ -2854,8 +5842,10 @@ document.getElementById("mainContent")
 
 function setActiveNav(page) {
 
-
-document.querySelectorAll(".nav-button")
+```
+document.querySelectorAll(
+  ".nav-button"
+)
   .forEach(button => {
 
     button.classList.toggle(
@@ -2864,14 +5854,16 @@ document.querySelectorAll(".nav-button")
     );
 
   });
-
+```
 
 }
 
-document.querySelectorAll(".nav-button")
+document.querySelectorAll(
+".nav-button"
+)
 .forEach(button => {
 
-
+```
   button.addEventListener(
     "click",
     async () => {
@@ -2884,58 +5876,47 @@ document.querySelectorAll(".nav-button")
 
         await showSchedule();
 
-      } else if (page === "work-orders") {
+      } else if (
+        page === "work-orders"
+      ) {
 
         await showWorkOrders();
 
-      } else if (page === "customers") {
+      } else if (
+        page === "customers"
+      ) {
 
         await showCustomers();
 
-      } else if (page === "locations") {
+      } else if (
+        page === "locations"
+      ) {
 
-        setActiveNav("locations");
+        await showLocations();
 
-        showPlaceholder(
-          "Locations",
-          "Customer service locations."
-        );
+      } else if (
+        page === "technicians"
+      ) {
 
-      } else if (page === "technicians") {
+        await showTechnicians();
 
-        setActiveNav("technicians");
+      } else if (
+        page === "parts"
+      ) {
 
-        showPlaceholder(
-          "Technicians",
-          "Technician records and assignments."
-        );
+        await showParts();
 
-      } else if (page === "parts") {
+      } else if (
+        page === "notes"
+      ) {
 
-        setActiveNav("parts");
+        await showNotes();
 
-        showPlaceholder(
-          "Parts",
-          "Parts used on work orders."
-        );
+      } else if (
+        page === "photos"
+      ) {
 
-      } else if (page === "notes") {
-
-        setActiveNav("notes");
-
-        showPlaceholder(
-          "Notes",
-          "Work order notes."
-        );
-
-      } else if (page === "photos") {
-
-        setActiveNav("photos");
-
-        showPlaceholder(
-          "Photos",
-          "Work order photos."
-        );
+        await showPhotos();
 
       }
 
@@ -2943,18 +5924,20 @@ document.querySelectorAll(".nav-button")
   );
 
 });
-
+```
 
 // ============================================
 // SIGN OUT
 // ============================================
 
-document.getElementById("signOutButton")
+document.getElementById(
+"signOutButton"
+)
 .addEventListener(
 "click",
 async () => {
 
-
+```
     await db.auth.signOut();
 
     window.location.href =
@@ -2962,7 +5945,7 @@ async () => {
 
   }
 );
-
+```
 
 // ============================================
 // START
@@ -2970,10 +5953,9 @@ async () => {
 
 async function startApp() {
 
-
+```
 const loggedIn =
   await requireLogin();
-
 
 if (!loggedIn) {
   return;
@@ -2983,14 +5965,13 @@ if (!loggedIn) {
 const profileLoaded =
   await loadUserProfile();
 
-
 if (!profileLoaded) {
   return;
 }
 
 
 await showSchedule();
-
+```
 
 }
 
