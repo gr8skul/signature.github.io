@@ -74,7 +74,7 @@ function render(){
   <div class="tabs">${[['upcoming','Upcoming'],['current','Current'],['completed','Completed']].map(([k,n])=>`<button class="tab ${tab===k?'active':''}" data-tab="${k}">${n} (${counts[k]})</button>`).join('')}</div>
   <div class="actions" style="margin-bottom:12px">${btn('refresh','↻ Refresh')}</div>
   ${filtered().length?filtered().map(o=>`<article class="card"><div class="meta"><b>${esc(wo(o))}</b> · ${esc(date(o.scheduled_at))}</div>
-  <span class="pill">${esc(label(o.status))}</span><span class="pill">${esc(o.work_type==='install'?'Installation':'Service')}</span><h2>${esc(preview(o.description)||'Work Order')}</h2>
+  <span class="pill">${esc(label(o.status))}</span><span class="pill">${esc(o.work_type==='checkout'?'Check-Out':o.work_type==='install'?'Installation':'Service')}</span><h2>${esc(preview(o.description)||'Work Order')}</h2>
   <div class="meta">${customerLines(o.customers)}${address(o.locations)?`<div>${esc(address(o.locations))}</div>`:""}</div>
   <div class="actions">${btn('open:'+o.id,'Open Work Order','dark')}</div></article>`).join(''):'<div class="empty">No work orders in this section.</div>'}`;
 }
@@ -84,7 +84,7 @@ function detail(o){
  const map=addr?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr):'';
  app.innerHTML=`<div class="back">${btn('back','← Work Orders')}</div>
  <div class="card"><h1 class="title">${esc(wo(o))}</h1>
- <span class="pill">${esc(label(o.status))}</span><span class="pill">${esc(o.work_type==='install'?'Installation':'Service')}</span>
+ <span class="pill">${esc(label(o.status))}</span><span class="pill">${esc(o.work_type==='checkout'?'Check-Out':o.work_type==='install'?'Installation':'Service')}</span>
  <div class="section"><h3>CUSTOMER</h3><strong>${customerLines(o.customers)||"Customer"}</strong>${addr?`<div class="meta">${esc(addr)}</div>`:""}
  <div class="actions">${tel?`<a class="btn" href="tel:${esc(tel.replace(/[^\d+]/g,''))}">☎ Call</a>`:''}${map?`<a class="btn" target="_blank" rel="noopener noreferrer" href="${esc(map)}">↗ Directions</a>`:''}</div></div>
  ${o.description?`<div class="section"><h3>WORK DESCRIPTION</h3><p>${esc(o.description)}</p></div>`:''}
