@@ -337,6 +337,21 @@
       border-bottom: 0;
     }
 
+    .sort-heading {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: inherit;
+      font: inherit;
+      font-weight: inherit;
+      text-transform: inherit;
+      letter-spacing: inherit;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .sort-heading:hover { color: var(--text); text-decoration: underline; }
+    .sort-heading:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
     .row-button {
       background: white;
       border: 1px solid var(--border);
@@ -700,6 +715,7 @@
   let currentProfile = null;
   let currentDate = new Date();
   let currentWorkOrderFilter = "all";
+  let workOrderSort = { field: "created_at", ascending: false };
   const dispatchSearch = { "work-orders": "", parts: "", notes: "", photos: "",
     customers: "", locations: "", technicians: "" };
 
@@ -870,12 +886,52 @@
     const matching = body._dispatchRecords.filter(item =>
       terms.every(term => item.search.includes(term))
     );
+    if (page === "work-orders") {
+      matching.sort((a, b) => {
+        const field = workOrderSort.field;
+        const av = a.record[field];
+        const bv = b.record[field];
+        // Unscheduled orders always follow scheduled orders.
+        if (field === "scheduled_at") {
+          if (!av && !bv) return compareWorkOrderDates(a.record, b.record, "created_at", false);
+          if (!av) return 1;
+          if (!bv) return -1;
+        }
+        return compareWorkOrderDates(a.record, b.record, field, workOrderSort.ascending);
+      });
+    }
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
       : `<tr><td colspan="${page === "work-orders" ? 10 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
           <div class="empty">No matching records.</div></td></tr>`;
     const count = document.getElementById("dispatchSearchCount");
     if (count) count.textContent = `${matching.length} of ${body._dispatchRecords.length} records shown`;
+  }
+
+  function compareWorkOrderDates(a, b, field, ascending) {
+    const aTime = Date.parse(a[field] || "") || 0;
+    const bTime = Date.parse(b[field] || "") || 0;
+    if (aTime !== bTime) return ascending ? aTime - bTime : bTime - aTime;
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  }
+
+  function updateWorkOrderSortHeaders() {
+    document.querySelectorAll("[data-work-sort]").forEach(button => {
+      const active = button.dataset.workSort === workOrderSort.field;
+      const label = button.dataset.workSort === "created_at" ? "Work Order" : "Scheduled";
+      button.textContent = label + (active ? (workOrderSort.ascending ? " ↑" : " ↓") : " ↕");
+      button.setAttribute("aria-sort", active ? (workOrderSort.ascending ? "ascending" : "descending") : "none");
+    });
+  }
+
+  function changeWorkOrderSort(field) {
+    if (workOrderSort.field === field) {
+      workOrderSort.ascending = !workOrderSort.ascending;
+    } else {
+      workOrderSort = { field, ascending: true };
+    }
+    updateWorkOrderSortHeaders();
+    applyDispatchSearch("work-orders", "workOrdersBody");
   }
 
   function relatedWorkOrderCell(call) {
@@ -1376,12 +1432,12 @@
 
             <thead>
               <tr>
-                <th>Work Order</th>
+                <th><button type="button" class="sort-heading" data-work-sort="created_at">Work Order ↓</button></th>
                 <th>Type</th>
                 <th>Customer</th>
                 <th>Description</th>
                 <th>Location</th>
-                <th>Scheduled</th>
+                <th><button type="button" class="sort-heading" data-work-sort="scheduled_at">Scheduled ↕</button></th>
                 <th>Technician</th>
                 <th>Status</th>
                 <th>Release</th>
@@ -1433,6 +1489,10 @@
       });
 
 
+    document.querySelectorAll("[data-work-sort]").forEach(button => {
+      button.addEventListener("click", () => changeWorkOrderSort(button.dataset.workSort));
+    });
+    updateWorkOrderSortHeaders();
     setupDispatchSearch("work-orders", "workOrdersBody");
     await loadWorkOrders();
   }
@@ -1479,13 +1539,7 @@
             last_name
           )
         `)
-        .order(
-          "scheduled_at",
-          {
-            ascending: true,
-            nullsFirst: false
-          }
-        );
+        .order("created_at", { ascending: false });
 
 
     if (
@@ -1701,7 +1755,7 @@
 
           </tr>
         `;
-        return { html, search };
+        return { html, search, record: call };
 
       });
     applyDispatchSearch("work-orders", "workOrdersBody");
