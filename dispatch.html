@@ -906,9 +906,7 @@
 
   function workTypeLabel(type) {
 
-    return type === "install"
-      ? "Installation"
-      : "Service";
+    return type === "checkout" ? "Check-Out" : type === "install" ? "Installation" : "Service";
   }
 
 
@@ -1362,6 +1360,7 @@
           ${filterButton("all", "All")}
           ${filterButton("service", "Service")}
           ${filterButton("install", "Installation")}
+          ${filterButton("checkout", "Check-Out")}
           ${filterButton("upcoming", "Upcoming")}
           ${filterButton("in_progress", "Current / In Progress")}
           ${filterButton("completed", "Completed")}
@@ -1491,7 +1490,8 @@
 
     if (
       currentWorkOrderFilter === "service" ||
-      currentWorkOrderFilter === "install"
+      currentWorkOrderFilter === "install" ||
+      currentWorkOrderFilter === "checkout"
     ) {
 
       query =
@@ -2144,6 +2144,9 @@
 
                   <option value="install">
                     Installation
+                  </option>
+                  <option value="checkout">
+                    Check-Out
                   </option>
 
                 </select>
