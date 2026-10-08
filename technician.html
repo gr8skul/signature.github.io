@@ -83,7 +83,7 @@ function detail(o){
  const addr=address(o.locations);
  const map=addr?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr):'';
  app.innerHTML=`<div class="back">${btn('back','← Work Orders')}</div>
- <div class="card"><div class="meta">${esc(wo(o))}</div><h1 class="title">${esc(o.description||'Work Order')}</h1>
+ <div class="card"><h1 class="title">${esc(wo(o))}</h1>
  <span class="pill">${esc(label(o.status))}</span><span class="pill">${esc(o.work_type==='install'?'Installation':'Service')}</span>
  <div class="section"><h3>CUSTOMER</h3><strong>${customerLines(o.customers)||"Customer"}</strong>${addr?`<div class="meta">${esc(addr)}</div>`:""}
  <div class="actions">${tel?`<a class="btn" href="tel:${esc(tel.replace(/[^\d+]/g,''))}">☎ Call</a>`:''}${map?`<a class="btn" target="_blank" rel="noopener noreferrer" href="${esc(map)}">↗ Directions</a>`:''}</div></div>
