@@ -65,8 +65,10 @@
       const role = String(profile.role || '').trim().toLowerCase();
       if (role === 'technician') {
         window.location.replace('technician.html');
-      } else if (role === 'dispatcher' || role === 'secretary') {
+      } else if (role === 'dispatcher') {
         window.location.replace('dispatch.html');
+      } else if (role === 'secretary') {
+        window.location.replace('office.html');
       } else if (role === 'management') {
         throw new Error('Management sign-in is recognized, but the read-only management page has not been built yet.');
       } else {
