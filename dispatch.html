@@ -769,6 +769,17 @@
   }
 
 
+  function workOrderLabel(call) {
+    return call.work_order_number != null
+      ? `WO-${String(call.work_order_number).padStart(6, "0")}`
+      : `ID ${String(call.id || "").slice(0, 8)}`;
+  }
+
+  function descriptionPreview(value, limit = 72) {
+    const clean = String(value || "No description").replace(/\s+/g, " ").trim();
+    return clean.length > limit ? clean.slice(0, limit - 3) + "..." : clean;
+  }
+
   function workTypeLabel(type) {
 
     return type === "install"
@@ -1240,8 +1251,10 @@
 
             <thead>
               <tr>
+                <th>Work Order</th>
                 <th>Type</th>
                 <th>Customer</th>
+                <th>Description</th>
                 <th>Location</th>
                 <th>Scheduled</th>
                 <th>Technician</th>
@@ -1254,7 +1267,7 @@
             <tbody id="workOrdersBody">
 
               <tr>
-                <td colspan="8">
+                <td colspan="10">
                   <div class="empty">
                     Loading work orders...
                   </div>
@@ -1431,7 +1444,7 @@
 
       body.innerHTML = `
         <tr>
-          <td colspan="8">
+          <td colspan="10">
 
             <div class="empty">
               Unable to load work orders.<br><br>
@@ -1450,7 +1463,7 @@
 
       body.innerHTML = `
         <tr>
-          <td colspan="8">
+          <td colspan="10">
 
             <div class="empty">
               No work orders match this view.
@@ -1494,6 +1507,7 @@
 
           <tr>
 
+            <td><strong>${escapeHtml(workOrderLabel(call))}</strong></td>
             <td>
               <span class="type-badge">
                 ${escapeHtml(
@@ -1508,6 +1522,9 @@
               )}
             </td>
 
+            <td title="${escapeAttribute(call.description || "")}">
+              ${escapeHtml(descriptionPreview(call.description))}
+            </td>
             <td>
               ${escapeHtml(location)}
             </td>
@@ -5770,6 +5787,8 @@ const {
   .from("service_calls")
   .select(`
     id,
+    work_order_number,
+    work_type,
     description,
     scheduled_at,
     customers (
@@ -5833,7 +5852,7 @@ data.forEach(call => {
 
 
   option.textContent =
-    `${customer} — ${date}`;
+    `${workOrderLabel(call)} · ${workTypeLabel(call.work_type)} · ${customer} · ${date} · ${descriptionPreview(call.description, 65)}`;
 
 
   select.appendChild(
