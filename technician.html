@@ -8,9 +8,16 @@
 <main><div id="app" class="empty">Loading technician work orders...</div></main><div id="toast" role="status" aria-live="polite"></div>
 <script>
 'use strict';
-const URL='https://zpawrfdfutswbvhlwvqf.supabase.co';
-const KEY='sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68';
-const db=supabase.createClient(URL,KEY);
+const SUPABASE_URL =
+  "https://zpawrfdfutswbvhlwvqf.supabase.co";
+
+const SUPABASE_ANON_KEY =
+  "sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68";
+
+const db = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
 let profile=null,tech=null,orders=[],tab='scheduled',selected=null,busy=false;
 const app=document.getElementById('app');
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
