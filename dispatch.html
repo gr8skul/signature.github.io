@@ -766,6 +766,26 @@
   }
 
 
+  // Show the business and its contact person together when both exist.
+  function customerDisplayHtml(customer) {
+    const business = String(customer?.company_name || "").trim();
+    const contact = [customer?.first_name, customer?.last_name]
+      .filter(Boolean).join(" ").trim();
+    const primary = business || contact || "Unnamed Customer";
+    return `<strong>${escapeHtml(primary)}</strong>` +
+      (business && contact
+        ? `<div class="small-muted">Contact: ${escapeHtml(contact)}</div>`
+        : "");
+  }
+
+  function customerSelectionName(customer) {
+    const business = String(customer?.company_name || "").trim();
+    const contact = [customer?.first_name, customer?.last_name]
+      .filter(Boolean).join(" ").trim();
+    return business && contact ? `${business} — ${contact}`
+      : business || contact || "Unnamed Customer";
+  }
+
   function technicianName(technician) {
 
     if (!technician) {
@@ -863,7 +883,7 @@
     const customer = customerName(call.customers);
     return `
       <strong>${escapeHtml(workOrderLabel(call))}</strong>
-      <div class="small-muted">${escapeHtml(customer)}</div>
+      <div class="small-muted">${customerDisplayHtml(call.customers)}</div>
     `;
   }
 
@@ -1986,7 +2006,7 @@
         ? `<div class="table-wrap"><table><thead><tr>${headings.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`
         : `<span class="small-muted">${empty}</span>`;
     };
-    render(elPart,parts,["Part Number","Description","Quantity","Unit Cost",""],(parts.data||[]).map(p=>
+    render(elPart,parts,["Part Number","Description","Quantity","Unit Price",""],(parts.data||[]).map(p=>
       `<tr><td>${escapeHtml(p.part_number||"—")}</td><td>${escapeHtml(p.description||"—")}</td>
        <td>${escapeHtml(p.quantity??0)}</td><td>$${escapeHtml(Number(p.unit_cost||0).toFixed(2))}</td>
        <td>${buttons("Part",p)}</td></tr>`),"No parts recorded.");
@@ -2401,7 +2421,7 @@ data.forEach(customer => {
     customer.id;
 
   option.textContent =
-    customerName(customer);
+    customerSelectionName(customer);
 
   select.appendChild(option);
 });
@@ -2820,9 +2840,7 @@ body._dispatchRecords =
     <tr>
 
       <td>
-        ${escapeHtml(
-          customerName(customer)
-        )}
+        ${customerDisplayHtml(customer)}
       </td>
 
       <td>
@@ -4374,7 +4392,7 @@ main.innerHTML = `
             <th>Part Number</th>
             <th>Description</th>
             <th>Quantity</th>
-            <th>Unit Cost</th>
+            <th>Unit Price</th>
             <th></th>
           </tr>
 
@@ -4712,7 +4730,7 @@ main.innerHTML = `
           <div class="form-group">
 
             <label for="partUnitCost">
-              Unit Cost
+              Unit Price
             </label>
 
             <input
