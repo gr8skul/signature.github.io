@@ -1946,9 +1946,9 @@
         <div class="card-body" id="detailPhotos">Loading photos...</div></div>
     `;
 
-    document.getElementById("detailAddPart").addEventListener("click", () => showPartForm());
-    document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm());
-    document.getElementById("detailAddPhoto").addEventListener("click", () => showPhotoForm());
+    document.getElementById("detailAddPart").addEventListener("click", () => showPartForm(null, call.id));
+    document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm(null, call.id));
+    document.getElementById("detailAddPhoto").addEventListener("click", () => showPhotoForm(null, call.id));
     await loadWorkOrderRelated(call.id);
 
     document.getElementById("backToWorkOrders")
@@ -1978,7 +1978,7 @@
     const elNote=document.getElementById("detailNotes");
     const elPhoto=document.getElementById("detailPhotos");
     if (!elPart || !elNote || !elPhoto) return;
-    const buttons=(kind,item)=>`<button class="row-button" onclick="show${kind}Form('${item.id}')">Edit</button>
+    const buttons=(kind,item)=>`<button class="row-button" onclick="show${kind}Form('${item.id}', '${id}')">Edit</button>
       <button class="danger" onclick="deleteRelatedRecord('${kind}','${item.id}','${id}')">Delete</button>`;
     const render=(el,result,headings,rows,empty)=>{
       if(result.error){el.textContent="Unable to load: "+result.error.message;return;}
@@ -4568,7 +4568,8 @@ body._dispatchRecords =
 }
 
 async function showPartForm(
-id = null
+id = null,
+contextWorkOrderId = null
 ) {
 
 
@@ -4760,14 +4761,24 @@ main.innerHTML = `
 
 await loadWorkOrderOptions(
   "partWorkOrder",
-  part?.service_call_id || null
+  contextWorkOrderId || part?.service_call_id || null
 );
 
+
+// When opened from a work order, keep the association fixed.
+if (contextWorkOrderId) {
+  const orderSelect = document.getElementById("partWorkOrder");
+  if (orderSelect.value !== contextWorkOrderId) {
+    showMessage("The selected work order could not be loaded.", true);
+    return;
+  }
+  orderSelect.disabled = true;
+}
 
 document.getElementById("cancelPart")
   .addEventListener(
     "click",
-    showParts
+    () => contextWorkOrderId ? showWorkOrderDetail(contextWorkOrderId) : showParts()
   );
 
 
@@ -4782,9 +4793,9 @@ document.getElementById("partForm")
       const payload = {
 
         service_call_id:
-          document.getElementById(
+          (contextWorkOrderId || document.getElementById(
             "partWorkOrder"
-          ).value,
+          ).value),
 
         part_number:
           document.getElementById(
@@ -4859,7 +4870,8 @@ document.getElementById("partForm")
       );
 
 
-      await showParts();
+      if (contextWorkOrderId) await showWorkOrderDetail(contextWorkOrderId);
+      else await showParts();
 
     }
   );
@@ -5151,7 +5163,8 @@ body._dispatchRecords =
 }
 
 async function showNoteForm(
-id = null
+id = null,
+contextWorkOrderId = null
 ) {
 
 
@@ -5290,14 +5303,24 @@ main.innerHTML = `
 
 await loadWorkOrderOptions(
   "noteWorkOrder",
-  note?.service_call_id || null
+  contextWorkOrderId || note?.service_call_id || null
 );
 
+
+// When opened from a work order, keep the association fixed.
+if (contextWorkOrderId) {
+  const orderSelect = document.getElementById("noteWorkOrder");
+  if (orderSelect.value !== contextWorkOrderId) {
+    showMessage("The selected work order could not be loaded.", true);
+    return;
+  }
+  orderSelect.disabled = true;
+}
 
 document.getElementById("cancelNote")
   .addEventListener(
     "click",
-    showNotes
+    () => contextWorkOrderId ? showWorkOrderDetail(contextWorkOrderId) : showNotes()
   );
 
 
@@ -5312,9 +5335,9 @@ document.getElementById("noteForm")
       const payload = {
 
         service_call_id:
-          document.getElementById(
+          (contextWorkOrderId || document.getElementById(
             "noteWorkOrder"
-          ).value,
+          ).value),
 
         note:
           document.getElementById(
@@ -5387,7 +5410,8 @@ document.getElementById("noteForm")
       );
 
 
-      await showNotes();
+      if (contextWorkOrderId) await showWorkOrderDetail(contextWorkOrderId);
+      else await showNotes();
 
     }
   );
@@ -5719,7 +5743,8 @@ body._dispatchRecords =
 }
 
 async function showPhotoForm(
-id = null
+id = null,
+contextWorkOrderId = null
 ) {
 
 
@@ -5881,14 +5906,24 @@ main.innerHTML = `
 
 await loadWorkOrderOptions(
   "photoWorkOrder",
-  photo?.service_call_id || null
+  contextWorkOrderId || photo?.service_call_id || null
 );
 
+
+// When opened from a work order, keep the association fixed.
+if (contextWorkOrderId) {
+  const orderSelect = document.getElementById("photoWorkOrder");
+  if (orderSelect.value !== contextWorkOrderId) {
+    showMessage("The selected work order could not be loaded.", true);
+    return;
+  }
+  orderSelect.disabled = true;
+}
 
 document.getElementById("cancelPhoto")
   .addEventListener(
     "click",
-    showPhotos
+    () => contextWorkOrderId ? showWorkOrderDetail(contextWorkOrderId) : showPhotos()
   );
 
 
@@ -5902,7 +5937,7 @@ document.getElementById("photoForm")
 
       const selectedFile = document.getElementById("photoUpload").files[0];
       let uploadedPath = document.getElementById("photoPath").value.trim();
-      const workOrderId = document.getElementById("photoWorkOrder").value;
+      const workOrderId = contextWorkOrderId || document.getElementById("photoWorkOrder").value;
       if (selectedFile) {
         if (!selectedFile.type.startsWith("image/") || selectedFile.size > 10 * 1024 * 1024) {
           showMessage("Select an image smaller than 10 MB.", true);
@@ -5926,9 +5961,9 @@ document.getElementById("photoForm")
       const payload = {
 
         service_call_id:
-          document.getElementById(
+          (contextWorkOrderId || document.getElementById(
             "photoWorkOrder"
-          ).value,
+          ).value),
 
         file_path: uploadedPath,
 
@@ -6000,7 +6035,8 @@ document.getElementById("photoForm")
       );
 
 
-      await showPhotos();
+      if (contextWorkOrderId) await showWorkOrderDetail(contextWorkOrderId);
+      else await showPhotos();
 
     }
   );
