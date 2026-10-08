@@ -700,7 +700,8 @@
   let currentProfile = null;
   let currentDate = new Date();
   let currentWorkOrderFilter = "all";
-  const dispatchSearch = { "work-orders": "", parts: "", notes: "", photos: "" };
+  const dispatchSearch = { "work-orders": "", parts: "", notes: "", photos: "",
+    customers: "", locations: "", technicians: "" };
 
 
   // ============================================
@@ -790,7 +791,11 @@
       <div class="dispatch-search">
         <label for="dispatchSearchInput">Search ${page === "work-orders" ? "Work Orders" : page[0].toUpperCase() + page.slice(1)}</label>
         <input id="dispatchSearchInput" type="search"
-          placeholder="Work order number, customer, description, keywords…"
+          placeholder="${escapeAttribute({
+            customers: "Name, company, phone, email…",
+            locations: "Address, city, state, ZIP, customer…",
+            technicians: "Name, title, phone, email…"
+          }[page] || "Work order number, customer, description, keywords…")}"
           value="${escapeAttribute(dispatchSearch[page] || "")}">
         <div id="dispatchSearchCount" class="small-muted" aria-live="polite"></div>
       </div>`;
@@ -818,6 +823,26 @@
     ].map(x => String(x ?? "")).join(" ").toLowerCase();
   }
 
+  function directorySearchText(record, page) {
+    let values = [];
+    if (page === "customers") {
+      values = [record.first_name, record.last_name,
+        `${record.first_name || ""} ${record.last_name || ""}`.trim(),
+        record.company_name, record.phone, record.email];
+    } else if (page === "locations") {
+      const customer = record.customers || {};
+      values = [record.address, record.city, record.state, record.zip,
+        customer.first_name, customer.last_name,
+        `${customer.first_name || ""} ${customer.last_name || ""}`.trim(),
+        customer.company_name, customerName(customer)];
+    } else if (page === "technicians") {
+      values = [record.first_name, record.last_name,
+        technicianName(record), record.title, record.phone, record.email,
+        record.active ? "active" : "inactive"];
+    }
+    return values.map(value => String(value ?? "")).join(" ").toLowerCase();
+  }
+
   function applyDispatchSearch(page, bodyId) {
     const body = document.getElementById(bodyId);
     if (!body || !body._dispatchRecords) return;
@@ -827,7 +852,7 @@
     );
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
-      : `<tr><td colspan="${page === "work-orders" ? 10 : page === "parts" ? 8 : page === "notes" ? 6 : 7}">
+      : `<tr><td colspan="${page === "work-orders" ? 10 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
           <div class="empty">No matching records.</div></td></tr>`;
     const count = document.getElementById("dispatchSearchCount");
     if (count) count.textContent = `${matching.length} of ${body._dispatchRecords.length} records shown`;
@@ -2689,6 +2714,8 @@ main.innerHTML = `
 
   <div class="card">
 
+    ${dispatchSearchField("customers")}
+
     <div class="table-wrap">
 
       <table>
@@ -2728,6 +2755,8 @@ document.getElementById("newCustomerButton")
     () => showCustomerForm()
   );
 
+
+setupDispatchSearch("customers", "customersBody");
 
 await loadCustomersPage();
 
@@ -2783,8 +2812,10 @@ if (!data || data.length === 0) {
 }
 
 
-body.innerHTML =
-  data.map(customer => `
+body._dispatchRecords =
+  data.map(customer => ({
+    search: directorySearchText(customer, "customers"),
+    html: `
 
     <tr>
 
@@ -2819,7 +2850,9 @@ body.innerHTML =
 
     </tr>
 
-  `).join("");
+  `
+  }));
+applyDispatchSearch("customers", "customersBody");
 
 
 }
@@ -3124,6 +3157,8 @@ main.innerHTML = `
 
   <div class="card">
 
+    ${dispatchSearchField("locations")}
+
     <div class="table-wrap">
 
       <table>
@@ -3167,6 +3202,8 @@ document.getElementById("newLocationButton")
     () => showLocationForm()
   );
 
+
+setupDispatchSearch("locations", "locationsBody");
 
 await loadLocationsPage();
 
@@ -3230,8 +3267,10 @@ if (!data || data.length === 0) {
 }
 
 
-body.innerHTML =
-  data.map(location => `
+body._dispatchRecords =
+  data.map(location => ({
+    search: directorySearchText(location, "locations"),
+    html: `
 
     <tr>
 
@@ -3285,7 +3324,9 @@ body.innerHTML =
 
     </tr>
 
-  `).join("");
+  `
+  }));
+applyDispatchSearch("locations", "locationsBody");
 
 
 }
@@ -3751,6 +3792,8 @@ main.innerHTML = `
 
   <div class="card">
 
+    ${dispatchSearchField("technicians")}
+
     <div class="table-wrap">
 
       <table>
@@ -3794,6 +3837,8 @@ document.getElementById("newTechnicianButton")
     () => showTechnicianForm()
   );
 
+
+setupDispatchSearch("technicians", "techniciansBody");
 
 await loadTechniciansPage();
 
@@ -3853,8 +3898,10 @@ if (!data || data.length === 0) {
 }
 
 
-body.innerHTML =
-  data.map(technician => `
+body._dispatchRecords =
+  data.map(technician => ({
+    search: directorySearchText(technician, "technicians"),
+    html: `
 
     <tr>
 
@@ -3918,7 +3965,9 @@ body.innerHTML =
 
     </tr>
 
-  `).join("");
+  `
+  }));
+applyDispatchSearch("technicians", "techniciansBody");
 
 
 }
