@@ -372,15 +372,6 @@
       border-color: #222;
     }
 
-    .dispatch-search {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
-      background: #fff;
-    }
-    .dispatch-search label { display:block; margin-bottom:7px; }
-    .dispatch-search input { max-width: 680px; }
-    .dispatch-search .small-muted { margin-top: 7px; }
-
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -700,7 +691,6 @@
   let currentProfile = null;
   let currentDate = new Date();
   let currentWorkOrderFilter = "all";
-  const dispatchSearch = { "work-orders": "", parts: "", notes: "", photos: "" };
 
 
   // ============================================
@@ -785,54 +775,6 @@
       : `ID ${String(call.id || "").slice(0, 8)}`;
   }
 
-  function dispatchSearchField(page) {
-    return `
-      <div class="dispatch-search">
-        <label for="dispatchSearchInput">Search ${page === "work-orders" ? "Work Orders" : page[0].toUpperCase() + page.slice(1)}</label>
-        <input id="dispatchSearchInput" type="search"
-          placeholder="Work order number, customer, description, keywords…"
-          value="${escapeAttribute(dispatchSearch[page] || "")}">
-        <div id="dispatchSearchCount" class="small-muted" aria-live="polite"></div>
-      </div>`;
-  }
-
-  function setupDispatchSearch(page, bodyId) {
-    const input = document.getElementById("dispatchSearchInput");
-    if (!input) return;
-    input.addEventListener("input", () => {
-      dispatchSearch[page] = input.value;
-      applyDispatchSearch(page, bodyId);
-    });
-  }
-
-  function dispatchSearchText(record, extra = []) {
-    const call = record.service_calls || record;
-    const customer = call.customers || {};
-    const number = call.work_order_number == null ? "" : String(call.work_order_number);
-    return [
-      number, number ? `WO-${number.padStart(6, "0")}` : "",
-      call.work_type, workTypeLabel(call.work_type),
-      call.description, customer.first_name, customer.last_name,
-      customer.company_name, customerName(customer),
-      ...extra
-    ].map(x => String(x ?? "")).join(" ").toLowerCase();
-  }
-
-  function applyDispatchSearch(page, bodyId) {
-    const body = document.getElementById(bodyId);
-    if (!body || !body._dispatchRecords) return;
-    const terms = (dispatchSearch[page] || "").trim().toLowerCase().split(/\\s+/).filter(Boolean);
-    const matching = body._dispatchRecords.filter(item =>
-      terms.every(term => item.search.includes(term))
-    );
-    body.innerHTML = matching.length
-      ? matching.map(item => item.html).join("")
-      : `<tr><td colspan="${page === "work-orders" ? 10 : page === "parts" ? 8 : page === "notes" ? 6 : 7}">
-          <div class="empty">No matching records.</div></td></tr>`;
-    const count = document.getElementById("dispatchSearchCount");
-    if (count) count.textContent = `${matching.length} of ${body._dispatchRecords.length} records shown`;
-  }
-
   function relatedWorkOrderCell(call) {
     if (!call) return "Work Order unavailable";
     const customer = customerName(call.customers);
@@ -850,7 +792,7 @@
 
   function relatedDescriptionCell(call) {
     return call
-      ? `<span title="${escapeAttribute(call.description || "")}">${escapeHtml(descriptionPreview(call.description))}</span>`
+      ? `<span title="escapeAttribute(call.description||"")">{escapeHtml(descriptionPreview(call.description))}</span>`
       : "—";
   }
 
@@ -895,7 +837,7 @@
       String(d.getMinutes()).padStart(2, "0");
 
     return (
-      `${year}-${month}-${day}T${hours}:${minutes}`
+      `year-{month}-dayT{hours}:${minutes}`
     );
   }
 
@@ -1324,8 +1266,6 @@
 
         </div>
 
-        ${dispatchSearchField("work-orders")}
-
         <div class="table-wrap">
 
           <table>
@@ -1389,7 +1329,6 @@
       });
 
 
-    setupDispatchSearch("work-orders", "workOrdersBody");
     await loadWorkOrders();
   }
 
@@ -1559,7 +1498,7 @@
     }
 
 
-    body._dispatchRecords =
+    body.innerHTML =
       data.map(call => {
 
         const scheduled =
@@ -1585,11 +1524,7 @@
             : "—";
 
 
-        const search = dispatchSearchText(call, [
-          technicianName(call.technicians), call.status,
-          call.locations?.city, call.locations?.state
-        ]);
-        const html = `
+        return `
 
           <tr>
 
@@ -1656,10 +1591,8 @@
 
           </tr>
         `;
-        return { html, search };
 
-      });
-    applyDispatchSearch("work-orders", "workOrdersBody");
+      }).join("");
   }
 
 
@@ -1727,7 +1660,7 @@
 
         <div>
 
-          <h1>${escapeHtml(workOrderLabel(call))}</h1>
+          <h1>Work Order</h1>
 
           <p>
             ${escapeHtml(
@@ -1913,18 +1846,8 @@
 
       </div>
 
-      <div class="card"><div class="card-head"><h2>Parts</h2><button class="row-button" id="detailAddPart">+ Add Part</button></div>
-        <div class="card-body" id="detailParts">Loading parts...</div></div>
-      <div class="card"><div class="card-head"><h2>Notes</h2><button class="row-button" id="detailAddNote">+ Add Note</button></div>
-        <div class="card-body" id="detailNotes">Loading notes...</div></div>
-      <div class="card"><div class="card-head"><h2>Photos</h2><button class="row-button" id="detailAddPhoto">+ Add Photo</button></div>
-        <div class="card-body" id="detailPhotos">Loading photos...</div></div>
     `;
 
-    document.getElementById("detailAddPart").addEventListener("click", () => showPartForm());
-    document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm());
-    document.getElementById("detailAddPhoto").addEventListener("click", () => showPhotoForm());
-    await loadWorkOrderRelated(call.id);
 
     document.getElementById("backToWorkOrders")
       .addEventListener(
@@ -1940,69 +1863,6 @@
       );
   }
 
-
-
-  async function loadWorkOrderRelated(id) {
-    const queries = await Promise.all([
-      db.from("parts").select("*").eq("service_call_id",id).order("created_at",{ascending:false}),
-      db.from("service_call_notes").select("*").eq("service_call_id",id).order("created_at",{ascending:false}),
-      db.from("service_call_photos").select("*").eq("service_call_id",id).order("created_at",{ascending:false})
-    ]);
-    const [parts,notes,photos]=queries;
-    const elPart=document.getElementById("detailParts");
-    const elNote=document.getElementById("detailNotes");
-    const elPhoto=document.getElementById("detailPhotos");
-    if (!elPart || !elNote || !elPhoto) return;
-    const buttons=(kind,item)=>`<button class="row-button" onclick="show${kind}Form('${item.id}')">Edit</button>
-      <button class="danger" onclick="deleteRelatedRecord('${kind}','${item.id}','${id}')">Delete</button>`;
-    const render=(el,result,headings,rows,empty)=>{
-      if(result.error){el.textContent="Unable to load: "+result.error.message;return;}
-      el.innerHTML=result.data.length
-        ? `<div class="table-wrap"><table><thead><tr>${headings.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`
-        : `<span class="small-muted">${empty}</span>`;
-    };
-    render(elPart,parts,["Part Number","Description","Quantity","Unit Cost",""],(parts.data||[]).map(p=>
-      `<tr><td>${escapeHtml(p.part_number||"—")}</td><td>${escapeHtml(p.description||"—")}</td>
-       <td>${escapeHtml(p.quantity??0)}</td><td>$${escapeHtml(Number(p.unit_cost||0).toFixed(2))}</td>
-       <td>${buttons("Part",p)}</td></tr>`),"No parts recorded.");
-    render(elNote,notes,["Note","Created",""],(notes.data||[]).map(n=>
-      `<tr><td>${escapeHtml(n.note||"")}</td><td>${escapeHtml(n.created_at?new Date(n.created_at).toLocaleString():"—")}</td>
-       <td>${buttons("Note",n)}</td></tr>`),"No notes recorded.");
-    if(photos.error){elPhoto.textContent="Unable to load: "+photos.error.message;return;}
-    const photoRows=await Promise.all((photos.data||[]).map(async p=>{
-      let url="";
-      if(p.file_path){
-        if(/^https?:\/\//i.test(p.file_path)) url=p.file_path;
-        else {
-          const signed=await db.storage.from("dispatch-photos").createSignedUrl(p.file_path,3600);
-          if(signed.error)console.error("Photo access:",signed.error);
-          else url=signed.data.signedUrl;
-        }
-      }
-      return `<tr><td>${url?`<a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">
-        <img class="photo-preview" src="${escapeAttribute(url)}" alt="${escapeAttribute(p.caption||"Photo")}"></a>`:"—"}</td>
-        <td>${escapeHtml(p.caption||"—")}</td><td>${buttons("Photo",p)}</td></tr>`;
-    }));
-    render(elPhoto,photos,["Photo","Caption",""],photoRows,"No photos recorded.");
-  }
-
-  async function deleteRelatedRecord(kind,id,workOrderId) {
-    if(!confirmDelete(`Delete this ${kind.toLowerCase()}?`))return;
-    const table={Part:"parts",Note:"service_call_notes",Photo:"service_call_photos"}[kind];
-    if(!table)return;
-    if(kind==="Photo"){
-      const {data,error}=await db.from(table).select("file_path").eq("id",id).single();
-      if(error)return showMessage(error.message,true);
-      if(data.file_path && !/^https?:\/\//i.test(data.file_path)){
-        const {error:storageError}=await db.storage.from("dispatch-photos").remove([data.file_path]);
-        if(storageError)return showMessage(storageError.message,true);
-      }
-    }
-    const {error}=await db.from(table).delete().eq("id",id);
-    if(error)return showMessage(error.message,true);
-    showMessage(kind+" deleted.");
-    await loadWorkOrderRelated(workOrderId);
-  }
 
   // ============================================
   // NEW / EDIT WORK ORDER
@@ -4310,8 +4170,6 @@ main.innerHTML = `
 
   <div class="card">
 
-    ${dispatchSearchField("parts")}
-
     <div class="table-wrap">
 
       <table>
@@ -4357,8 +4215,6 @@ document.getElementById("newPartButton")
     () => showPartForm()
   );
 
-
-setupDispatchSearch("parts", "partsBody");
 
 await loadPartsPage();
 
@@ -4436,7 +4292,7 @@ if (!data || data.length === 0) {
 }
 
 
-body._dispatchRecords =
+body.innerHTML =
   data.map(part => {
 
     const workOrder =
@@ -4450,8 +4306,7 @@ body._dispatchRecords =
         : "Work Order";
 
 
-    const search = dispatchSearchText(part, [part.part_number, part.description, part.quantity]);
-    const html = `
+    return `
 
       <tr>
 
@@ -4511,9 +4366,7 @@ body._dispatchRecords =
 
       </tr>
     `;
-    return { html, search };
-  });
-  applyDispatchSearch("parts", "partsBody");
+  }).join("");
 
 
 }
@@ -4903,8 +4756,6 @@ main.innerHTML = `
 
   <div class="card">
 
-    ${dispatchSearchField("notes")}
-
     <div class="table-wrap">
 
       <table>
@@ -4948,8 +4799,6 @@ document.getElementById("newNoteButton")
     () => showNoteForm()
   );
 
-
-setupDispatchSearch("notes", "notesBody");
 
 await loadNotesPage();
 
@@ -5027,7 +4876,7 @@ if (!data || data.length === 0) {
 }
 
 
-body._dispatchRecords =
+body.innerHTML =
   data.map(note => {
 
     const workOrder =
@@ -5049,8 +4898,7 @@ body._dispatchRecords =
         : "—";
 
 
-    const search = dispatchSearchText(note, [note.note]);
-    const html = `
+    return `
 
       <tr>
 
@@ -5094,9 +4942,7 @@ body._dispatchRecords =
 
       </tr>
     `;
-    return { html, search };
-  });
-  applyDispatchSearch("notes", "notesBody");
+  }).join("");
 
 
 }
@@ -5431,8 +5277,6 @@ main.innerHTML = `
 
   <div class="card">
 
-    ${dispatchSearchField("photos")}
-
     <div class="table-wrap">
 
       <table>
@@ -5477,8 +5321,6 @@ document.getElementById("newPhotoButton")
     () => showPhotoForm()
   );
 
-
-setupDispatchSearch("photos", "photosBody");
 
 await loadPhotosPage();
 
@@ -5556,7 +5398,7 @@ if (!data || data.length === 0) {
 }
 
 
-body._dispatchRecords =
+body.innerHTML =
   await Promise.all(data.map(async photo => {
 
     const workOrder =
@@ -5613,8 +5455,7 @@ body._dispatchRecords =
         : "—";
 
 
-    const search = dispatchSearchText(photo, [photo.caption]);
-    const html = `
+    return `
 
       <tr>
 
@@ -5662,9 +5503,7 @@ body._dispatchRecords =
 
       </tr>
     `;
-    return { html, search };
-  }));
-  applyDispatchSearch("photos", "photosBody");
+  })).then(rows => rows.join(""));
 
 
 }
@@ -5864,7 +5703,7 @@ document.getElementById("photoForm")
           return;
         }
         const extension = (selectedFile.name.split(".").pop() || "jpg").toLowerCase();
-        const storagePath = `${workOrderId}/${crypto.randomUUID()}.${extension}`;
+        const storagePath = `workOrderId/{crypto.randomUUID()}.${extension}`;
         const uploadResult = await db.storage.from("dispatch-photos")
           .upload(storagePath, selectedFile, { contentType: selectedFile.type, upsert: false });
         if (uploadResult.error) {
@@ -6235,3 +6074,4 @@ startApp();
 
 </body>
 </html>
+
