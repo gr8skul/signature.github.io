@@ -70,7 +70,7 @@
       } else if (role === 'secretary') {
         window.location.replace('office.html');
       } else if (role === 'management') {
-        throw new Error('Management sign-in is recognized, but the read-only management page has not been built yet.');
+        window.location.replace('management.html');
       } else {
         throw new Error('No supported Signature role is assigned to this account.');
       }
