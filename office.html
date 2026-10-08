@@ -333,6 +333,10 @@
       letter-spacing: .4px;
     }
 
+    .sort-heading { background: transparent; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; white-space: nowrap; }
+    .sort-heading:hover { color: #202326; text-decoration: underline; }
+    .sort-heading:focus-visible { outline: 2px solid #202326; outline-offset: 4px; }
+
     tr:last-child td {
       border-bottom: 0;
     }
@@ -710,6 +714,7 @@
   let currentProfile = null;
   let currentDate = new Date();
   let currentWorkOrderFilter = "all";
+  let workOrderSort = { column: "created_at", ascending: false };
   const dispatchSearch = { "work-orders": "", parts: "", notes: "", photos: "",
     customers: "", locations: "", technicians: "" };
 
@@ -880,6 +885,18 @@
     const matching = body._dispatchRecords.filter(item =>
       terms.every(term => item.search.includes(term))
     );
+    if (page === "work-orders") {
+      matching.sort((a, b) => {
+        const field = workOrderSort.column;
+        const av = a[field], bv = b[field];
+        if (field === "scheduled_at" && (!av || !bv)) {
+          if (!av && !bv) return 0;
+          return !av ? 1 : -1;
+        }
+        const delta = (Date.parse(av || 0) || 0) - (Date.parse(bv || 0) || 0);
+        return workOrderSort.ascending ? delta : -delta;
+      });
+    }
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
       : `<tr><td colspan="${page === "work-orders" ? 10 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
@@ -1554,12 +1571,12 @@ async function officeSaveIntake(event){
 
             <thead>
               <tr>
-                <th>Work Order</th>
+                <th><button type="button" class="sort-heading" data-sort="created_at">Work Order <span id="workOrderSortArrow">↓</span></button></th>
                 <th>Type</th>
                 <th>Customer</th>
                 <th>Description</th>
                 <th>Location</th>
-                <th>Scheduled</th>
+                <th><button type="button" class="sort-heading" data-sort="scheduled_at">Scheduled <span id="scheduledSortArrow"></span></button></th>
                 <th>Technician</th>
                 <th>Status</th>
                 <th>Release</th>
@@ -1611,10 +1628,32 @@ async function officeSaveIntake(event){
       });
 
 
+    document.querySelectorAll(".sort-heading").forEach(button => {
+      button.addEventListener("click", () => {
+        const column = button.dataset.sort;
+        workOrderSort = column === workOrderSort.column
+          ? { column, ascending: !workOrderSort.ascending }
+          : { column, ascending: column === "scheduled_at" };
+        updateWorkOrderSortArrows();
+        applyDispatchSearch("work-orders", "workOrdersBody");
+      });
+    });
+    updateWorkOrderSortArrows();
     setupDispatchSearch("work-orders", "workOrdersBody");
     await loadWorkOrders();
   }
 
+
+  function updateWorkOrderSortArrows() {
+    const workArrow = document.getElementById("workOrderSortArrow");
+    const scheduledArrow = document.getElementById("scheduledSortArrow");
+    if (workArrow) workArrow.textContent = workOrderSort.column === "created_at" ? (workOrderSort.ascending ? "↑" : "↓") : "";
+    if (scheduledArrow) scheduledArrow.textContent = workOrderSort.column === "scheduled_at" ? (workOrderSort.ascending ? "↑" : "↓") : "";
+    document.querySelectorAll(".sort-heading").forEach(button => {
+      const active = button.dataset.sort === workOrderSort.column;
+      button.setAttribute("aria-label", button.textContent.trim() + (active ? ", currently " + (workOrderSort.ascending ? "ascending" : "descending") : ", sort"));
+    });
+  }
 
   function filterButton(
     value,
@@ -1656,14 +1695,7 @@ async function officeSaveIntake(event){
             first_name,
             last_name
           )
-        `)
-        .order(
-          "scheduled_at",
-          {
-            ascending: true,
-            nullsFirst: false
-          }
-        );
+        `);
 
 
     if (
@@ -1879,7 +1911,7 @@ async function officeSaveIntake(event){
 
           </tr>
         `;
-        return { html, search };
+        return { html, search, created_at: call.created_at, scheduled_at: call.scheduled_at };
 
       });
     applyDispatchSearch("work-orders", "workOrdersBody");
