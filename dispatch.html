@@ -2863,36 +2863,31 @@ document.getElementById("customerForm")
       };
 
 
-      javascript
+      const wasEditing = Boolean(customer);
       let error;
+      let savedRows = null;
 
-      if (customer) {
-
-        const result =
-          await db
-            .from("customers")
-            .update(payload)
-            .eq("id", customer.id)
-            .select()
-            .single();
-
+      if (wasEditing) {
+        const result = await db
+          .from("customers")
+          .update(payload)
+          .eq("id", customer.id)
+          .select("id");
         error = result.error;
-
-        if (!error) {
-          customer = result.data;
+        savedRows = result.data;
+        if (!error && (!savedRows || savedRows.length === 0)) {
+          error = new Error("Customer was not updated. Check your customer UPDATE policy.");
         }
-
       } else {
-
-        const result =
-          await db
-            .from("customers")
-            .insert(payload)
-            .select()
-            .single();
-
+        const result = await db
+          .from("customers")
+          .insert(payload)
+          .select("id");
         error = result.error;
-
+        savedRows = result.data;
+        if (!error && (!savedRows || savedRows.length === 0)) {
+          error = new Error("Customer was not created. Check your customer INSERT policy.");
+        }
       }
 
       if (error) {
@@ -2907,11 +2902,7 @@ document.getElementById("customerForm")
         return;
       }
 
-      showMessage(
-        customer
-          ? "Customer saved."
-          : "Customer created."
-      );
+      showMessage(wasEditing ? "Customer saved." : "Customer created.");
 
       await showCustomers();
 
@@ -5515,17 +5506,17 @@ main.innerHTML = `
 
           <div class="form-group full">
 
-            <label for="photoPath">
-              Photo URL / File Path
-            </label>
+            <label for="photoUpload">Upload Photo</label>
+            <input id="photoUpload" type="file" accept="image/*">
+            <div class="small-muted">Choose an image from your phone or computer (max 10 MB). Alternatively, use a URL below.</div>
+            <label for="photoPath" style="margin-top:14px;">Existing Photo URL / File Path</label>
 
             <input
               id="photoPath"
               value="${escapeAttribute(
                 photo?.file_path || ""
               )}"
-              placeholder="https://..."
-              required
+              placeholder="Optional if uploading a photo"
             >
 
             <div class="small-muted">
@@ -5604,6 +5595,29 @@ document.getElementById("photoForm")
       event.preventDefault();
 
 
+      const selectedFile = document.getElementById("photoUpload").files[0];
+      let uploadedPath = document.getElementById("photoPath").value.trim();
+      const workOrderId = document.getElementById("photoWorkOrder").value;
+      if (selectedFile) {
+        if (!selectedFile.type.startsWith("image/") || selectedFile.size > 10 * 1024 * 1024) {
+          showMessage("Select an image smaller than 10 MB.", true);
+          return;
+        }
+        if (!workOrderId) {
+          showMessage("Select a work order before uploading.", true);
+          return;
+        }
+        const extension = (selectedFile.name.split(".").pop() || "jpg").toLowerCase();
+        const storagePath = `${workOrderId}/${crypto.randomUUID()}.${extension}`;
+        const uploadResult = await db.storage.from("dispatch-photos")
+          .upload(storagePath, selectedFile, { contentType: selectedFile.type, upsert: false });
+        if (uploadResult.error) {
+          showMessage("Photo upload failed: " + uploadResult.error.message, true);
+          return;
+        }
+        uploadedPath = storagePath;
+      }
+
       const payload = {
 
         service_call_id:
@@ -5611,10 +5625,7 @@ document.getElementById("photoForm")
             "photoWorkOrder"
           ).value,
 
-        file_path:
-          document.getElementById(
-            "photoPath"
-          ).value.trim(),
+        file_path: uploadedPath,
 
         caption:
           document.getElementById(
