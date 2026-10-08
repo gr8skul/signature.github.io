@@ -5336,7 +5336,7 @@ if (!data || data.length === 0) {
 
 
 body.innerHTML =
-  data.map(photo => {
+  await Promise.all(data.map(async photo => {
 
     const workOrder =
       photo.service_calls;
@@ -5357,12 +5357,23 @@ body.innerHTML =
         : "—";
 
 
+    let photoUrl = "";
+    if (photo.file_path) {
+      if (/^https?:\/\//i.test(photo.file_path)) {
+        photoUrl = photo.file_path;
+      } else {
+        const signed = await db.storage.from("dispatch-photos").createSignedUrl(photo.file_path, 3600);
+        if (signed.error) console.error("Photo access:", signed.error);
+        else photoUrl = signed.data.signedUrl;
+      }
+    }
+
     const image =
-      photo.file_path
+      photoUrl
         ? `
           <a
             href="${escapeAttribute(
-              photo.file_path
+              photoUrl
             )}"
             target="_blank"
             rel="noopener noreferrer"
@@ -5370,7 +5381,7 @@ body.innerHTML =
             <img
               class="photo-preview"
               src="${escapeAttribute(
-                photo.file_path
+                photoUrl
               )}"
               alt="${escapeAttribute(
                 photo.caption || "Work Order photo"
@@ -5425,7 +5436,7 @@ body.innerHTML =
 
       </tr>
     `;
-  }).join("");
+  })).then(rows => rows.join(""));
 
 
 }
@@ -5721,47 +5732,28 @@ document.getElementById("photoForm")
 }
 
 async function deletePhoto(id) {
-
-
-if (!confirmDelete(
-  "Delete this photo record?"
-)) {
-  return;
-}
-
-
-const {
-  error
-} = await db
-  .from("service_call_photos")
-  .delete()
-  .eq(
-    "id",
-    id
-  );
-
-
-if (error) {
-
-  console.error(error);
-
-  showMessage(
-    error.message,
-    true
-  );
-
-  return;
-}
-
-
-showMessage(
-  "Photo deleted."
-);
-
-
-await showPhotos();
-
-
+  if (!confirmDelete("Permanently delete this photo and its stored image?")) return;
+  const { data: photo, error: readError } = await db
+    .from("service_call_photos").select("id,file_path").eq("id", id).single();
+  if (readError) { showMessage(readError.message, true); return; }
+  // Delete the database record first. If forbidden, do not touch Storage.
+  const { data: deleted, error } = await db.from("service_call_photos")
+    .delete().eq("id", id).select("id");
+  if (error || !deleted?.length) {
+    showMessage(error?.message || "You do not have permission to delete this photo.", true);
+    return;
+  }
+  if (photo.file_path && !/^https?:\/\//i.test(photo.file_path)) {
+    const result = await db.storage.from("dispatch-photos").remove([photo.file_path]);
+    if (result.error) {
+      console.error("Storage deletion:", result.error);
+      showMessage("Photo record removed, but storage cleanup failed: " + result.error.message, true);
+      await showPhotos();
+      return;
+    }
+  }
+  showMessage("Photo deleted.");
+  await showPhotos();
 }
 
 // ============================================
