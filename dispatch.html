@@ -775,6 +775,27 @@
       : `ID ${String(call.id || "").slice(0, 8)}`;
   }
 
+  function relatedWorkOrderCell(call) {
+    if (!call) return "Work Order unavailable";
+    const customer = customerName(call.customers);
+    return `
+      <strong>${escapeHtml(workOrderLabel(call))}</strong>
+      <div class="small-muted">${escapeHtml(customer)}</div>
+    `;
+  }
+
+  function relatedWorkTypeCell(call) {
+    return call
+      ? `<span class="type-badge">${escapeHtml(workTypeLabel(call.work_type))}</span>`
+      : "—";
+  }
+
+  function relatedDescriptionCell(call) {
+    return call
+      ? `<span title="${escapeAttribute(call.description || "")}">${escapeHtml(descriptionPreview(call.description))}</span>`
+      : "—";
+  }
+
   function descriptionPreview(value, limit = 72) {
     const clean = String(value || "No description").replace(/\s+/g, " ").trim();
     return clean.length > limit ? clean.slice(0, limit - 3) + "..." : clean;
@@ -3598,6 +3619,7 @@ main.innerHTML = `
 
           <tr>
             <th>Name</th>
+            <th>Title</th>
             <th>Phone</th>
             <th>Email</th>
             <th>Status</th>
@@ -3609,7 +3631,7 @@ main.innerHTML = `
         <tbody id="techniciansBody">
 
           <tr>
-            <td colspan="5">
+            <td colspan="6">
               <div class="empty">
                 Loading technicians...
               </div>
@@ -3662,7 +3684,7 @@ if (error) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="5">
+      <td colspan="6">
         <div class="empty">
           Unable to load technicians.<br><br>
           ${escapeHtml(error.message)}
@@ -3679,7 +3701,7 @@ if (!data || data.length === 0) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="5">
+      <td colspan="6">
         <div class="empty">
           No technicians yet.
         </div>
@@ -3700,6 +3722,10 @@ body.innerHTML =
         ${escapeHtml(
           technicianName(technician)
         )}
+      </td>
+
+      <td>
+        ${escapeHtml(technician.title || "—")}
       </td>
 
       <td>
@@ -3864,6 +3890,18 @@ main.innerHTML = `
 
           <div class="form-group">
 
+            <label for="technicianTitle">Title</label>
+
+            <input
+              id="technicianTitle"
+              placeholder="e.g. Lead Technician"
+              value="${escapeAttribute(technician?.title || "")}"
+            >
+
+          </div>
+
+          <div class="form-group">
+
             <label for="technicianPhone">
               Phone
             </label>
@@ -3970,6 +4008,11 @@ document.getElementById(
         last_name:
           document.getElementById(
             "technicianLastName"
+          ).value.trim(),
+
+        title:
+          document.getElementById(
+            "technicianTitle"
           ).value.trim(),
 
         phone:
@@ -4135,6 +4178,8 @@ main.innerHTML = `
 
           <tr>
             <th>Work Order</th>
+            <th>Type</th>
+            <th>Work Description</th>
             <th>Part Number</th>
             <th>Description</th>
             <th>Quantity</th>
@@ -4147,7 +4192,7 @@ main.innerHTML = `
         <tbody id="partsBody">
 
           <tr>
-            <td colspan="6">
+            <td colspan="8">
               <div class="empty">
                 Loading parts...
               </div>
@@ -4194,6 +4239,8 @@ const {
     *,
     service_calls (
       id,
+      work_order_number,
+      work_type,
       description,
       customers (
         first_name,
@@ -4216,7 +4263,7 @@ if (error) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="6">
+      <td colspan="8">
         <div class="empty">
           Unable to load parts.<br><br>
           ${escapeHtml(error.message)}
@@ -4233,7 +4280,7 @@ if (!data || data.length === 0) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="6">
+      <td colspan="8">
         <div class="empty">
           No parts yet.
         </div>
@@ -4264,9 +4311,13 @@ body.innerHTML =
       <tr>
 
         <td>
-          ${escapeHtml(
-            workOrderLabel
-          )}
+          ${relatedWorkOrderCell(part.service_calls)}
+        </td>
+        <td>
+          ${relatedWorkTypeCell(part.service_calls)}
+        </td>
+        <td>
+          ${relatedDescriptionCell(part.service_calls)}
         </td>
 
         <td>
@@ -4713,6 +4764,8 @@ main.innerHTML = `
 
           <tr>
             <th>Work Order</th>
+            <th>Type</th>
+            <th>Work Description</th>
             <th>Note</th>
             <th>Created</th>
             <th></th>
@@ -4723,7 +4776,7 @@ main.innerHTML = `
         <tbody id="notesBody">
 
           <tr>
-            <td colspan="4">
+            <td colspan="6">
               <div class="empty">
                 Loading notes...
               </div>
@@ -4770,6 +4823,8 @@ const {
     *,
     service_calls (
       id,
+      work_order_number,
+      work_type,
       description,
       customers (
         first_name,
@@ -4792,7 +4847,7 @@ if (error) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="4">
+      <td colspan="6">
         <div class="empty">
           Unable to load notes.<br><br>
           ${escapeHtml(error.message)}
@@ -4809,7 +4864,7 @@ if (!data || data.length === 0) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="4">
+      <td colspan="6">
         <div class="empty">
           No notes yet.
         </div>
@@ -4848,9 +4903,13 @@ body.innerHTML =
       <tr>
 
         <td>
-          ${escapeHtml(
-            workOrderName
-          )}
+          ${relatedWorkOrderCell(note.service_calls)}
+        </td>
+        <td>
+          ${relatedWorkTypeCell(note.service_calls)}
+        </td>
+        <td>
+          ${relatedDescriptionCell(note.service_calls)}
         </td>
 
         <td>
@@ -5226,6 +5285,8 @@ main.innerHTML = `
 
           <tr>
             <th>Work Order</th>
+            <th>Type</th>
+            <th>Work Description</th>
             <th>Photo</th>
             <th>Caption</th>
             <th>Added</th>
@@ -5237,7 +5298,7 @@ main.innerHTML = `
         <tbody id="photosBody">
 
           <tr>
-            <td colspan="5">
+            <td colspan="7">
               <div class="empty">
                 Loading photos...
               </div>
@@ -5284,6 +5345,8 @@ const {
     *,
     service_calls (
       id,
+      work_order_number,
+      work_type,
       description,
       customers (
         first_name,
@@ -5306,7 +5369,7 @@ if (error) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="5">
+      <td colspan="7">
         <div class="empty">
           Unable to load photos.<br><br>
           ${escapeHtml(error.message)}
@@ -5323,7 +5386,7 @@ if (!data || data.length === 0) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="5">
+      <td colspan="7">
         <div class="empty">
           No photos yet.
         </div>
@@ -5397,9 +5460,13 @@ body.innerHTML =
       <tr>
 
         <td>
-          ${escapeHtml(
-            workOrderName
-          )}
+          ${relatedWorkOrderCell(photo.service_calls)}
+        </td>
+        <td>
+          ${relatedWorkTypeCell(photo.service_calls)}
+        </td>
+        <td>
+          ${relatedDescriptionCell(photo.service_calls)}
         </td>
 
         <td>
