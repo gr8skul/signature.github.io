@@ -1,0 +1,6521 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Signature Office</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --background: #f4f5f7;
+      --surface: #ffffff;
+      --border: #dfe2e6;
+      --text: #202326;
+      --muted: #6b7075;
+      --accent: #222;
+      --danger: #a52a2a;
+      --success: #356b45;
+      --warning: #8a641f;
+    }
+
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    header {
+      height: 68px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .brand-name {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .brand-section {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .user-area {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .user-info {
+      text-align: right;
+    }
+
+    .user-name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .user-role {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+      text-transform: capitalize;
+    }
+
+    .sign-out {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 12px;
+      color: var(--text);
+    }
+
+    .sign-out:hover {
+      background: #f0f1f2;
+    }
+
+    .app {
+      display: flex;
+      min-height: calc(100vh - 68px);
+    }
+
+    nav {
+      width: 220px;
+      background: #fafafa;
+      border-right: 1px solid var(--border);
+      padding: 22px 14px;
+      flex-shrink: 0;
+    }
+
+    .nav-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin: 4px 10px 10px;
+      text-transform: uppercase;
+    }
+
+    .nav-button {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      padding: 11px 10px;
+      margin-bottom: 3px;
+      color: var(--text);
+    }
+
+    .nav-button:hover,
+    .nav-button.active {
+      background: #e9eaec;
+    }
+
+    main {
+      flex: 1;
+      padding: 30px;
+      max-width: 1500px;
+      width: 100%;
+    }
+
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .page-head h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .page-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: white;
+      border: 0;
+      border-radius: 6px;
+      padding: 11px 16px;
+      font-weight: 600;
+    }
+
+    .primary:hover {
+      background: #000;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .card-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .card-head h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .card-body {
+      padding: 18px;
+    }
+
+    .date-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .date-controls button {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 7px 11px;
+    }
+
+    .date-controls strong {
+      min-width: 190px;
+      text-align: center;
+      font-size: 15px;
+    }
+
+    .schedule-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .schedule-item {
+      display: grid;
+      grid-template-columns: 90px 1fr auto;
+      gap: 18px;
+      padding: 17px 18px;
+      border-bottom: 1px solid #eceef0;
+      align-items: center;
+    }
+
+    .schedule-item:last-child {
+      border-bottom: 0;
+    }
+
+    .schedule-time {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .schedule-description {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .schedule-meta {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .status,
+    .type-badge,
+    .release-badge {
+      display: inline-block;
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .status {
+      background: #eceef0;
+      text-transform: capitalize;
+    }
+
+    .type-badge {
+      background: #f0f1f2;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-right: 5px;
+    }
+
+    .release-badge {
+      background: #f0f1f2;
+    }
+
+    .release-badge.released {
+      background: #e5efe7;
+      color: var(--success);
+    }
+
+    .release-badge.unreleased {
+      background: #f3eee3;
+      color: var(--warning);
+    }
+
+    .empty {
+      padding: 45px 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid #eceef0;
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    th {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .row-button {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 6px 9px;
+      font-size: 12px;
+    }
+
+    .row-button:hover {
+      background: #f0f1f2;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+    }
+
+    .filter-button {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 11px;
+      font-size: 12px;
+    }
+
+    .filter-button.active {
+      background: #222;
+      color: white;
+      border-color: #222;
+    }
+
+    .dispatch-search {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+    }
+    .dispatch-search label { display:block; margin-bottom:7px; }
+    .dispatch-search input { max-width: 680px; }
+    .dispatch-search .small-muted { margin-top: 7px; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 17px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group.full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 7px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #cfd3d7;
+      border-radius: 5px;
+      padding: 10px 11px;
+      background: white;
+      color: var(--text);
+      outline: none;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: #555;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding-top: 28px;
+    }
+
+    .checkbox-row input {
+      width: auto;
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+      margin-top: 20px;
+    }
+
+    .secondary {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 10px 15px;
+    }
+
+    .secondary:hover {
+      background: #f0f1f2;
+    }
+
+    .danger {
+      background: white;
+      color: var(--danger);
+      border: 1px solid #d9b5b5;
+      border-radius: 5px;
+      padding: 10px 15px;
+    }
+
+    .danger:hover {
+      background: #faf0f0;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .detail-item {
+      border-bottom: 1px solid #eceef0;
+      padding-bottom: 12px;
+    }
+
+    .detail-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 5px;
+    }
+
+    .detail-value {
+      font-size: 14px;
+    }
+
+    .small-muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .photo-preview {
+      max-width: 180px;
+      max-height: 120px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+    }
+
+    #message {
+      position: fixed;
+      right: 25px;
+      bottom: 25px;
+      background: #222;
+      color: white;
+      padding: 13px 17px;
+      border-radius: 6px;
+      display: none;
+      z-index: 50;
+      font-size: 14px;
+      box-shadow: 0 5px 20px rgba(0,0,0,.15);
+      max-width: 420px;
+    }
+
+    #message.error {
+      background: var(--danger);
+    }
+
+    @media (max-width: 800px) {
+      header {
+        padding: 0 16px;
+      }
+
+      .brand-section,
+      .user-role {
+        display: none;
+      }
+
+      nav {
+        width: 175px;
+      }
+
+      main {
+        padding: 20px;
+      }
+
+      .page-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .schedule-item {
+        grid-template-columns: 70px 1fr;
+      }
+
+      .schedule-item .schedule-actions {
+        grid-column: 2;
+      }
+
+      .form-grid,
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-group.full {
+        grid-column: auto;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .app {
+        display: block;
+      }
+
+      nav {
+        width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        overflow-x: auto;
+        padding: 8px;
+      }
+
+      .nav-label {
+        display: none;
+      }
+
+      .nav-button {
+        width: auto;
+        white-space: nowrap;
+        margin: 0;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .schedule-item {
+        grid-template-columns: 1fr;
+        gap: 7px;
+      }
+
+      .schedule-item .schedule-actions {
+        grid-column: auto;
+      }
+
+      .date-controls strong {
+        min-width: 0;
+      }
+    }
+    .office-intake { max-width: 950px; }
+    .office-intake .card { overflow:visible; }
+    .office-intake .form-grid { align-items:start; }
+    .office-intake .suggestions { border:1px solid var(--border); border-radius:5px; max-height:225px; overflow-y:auto; background:white; margin-top:4px; }
+    .office-intake .suggestion { display:block; width:100%; text-align:left; border:0; border-bottom:1px solid var(--border); background:white; padding:10px 12px; }
+    .office-intake .suggestion:hover, .office-intake .suggestion:focus { background:#edf0f3; }
+    .office-intake .subtle-panel { background:#fafafa; border:1px solid var(--border); border-radius:6px; padding:16px; margin-top:10px; }
+    .office-intake .form-grid { gap:12px; }
+    .office-intake textarea { min-height:125px; }
+  </style>
+
+</head>
+
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-name">SIGNATURE</div>
+    <div class="brand-section">OFFICE</div>
+  </div>
+
+  <div class="user-area">
+    <div class="user-info">
+      <div class="user-name" id="userName">Loading...</div>
+      <div class="user-role" id="userRole">Loading...</div>
+    </div>
+
+
+<button class="sign-out" id="signOutButton">
+  Sign Out
+</button>
+
+
+  </div>
+</header>
+
+<div class="app">
+
+  <nav>
+    <div class="nav-label">Office</div>
+<button class="nav-button" data-page="intake" style="font-weight:700;background:#e9eaec;">+ New Work Order</button>
+
+
+<button class="nav-button active" data-page="schedule">
+  Schedule
+</button>
+
+<button class="nav-button" data-page="work-orders">
+  Work Orders
+</button>
+
+<button class="nav-button" data-page="customers">
+  Customers
+</button>
+
+<button class="nav-button" data-page="locations">
+  Locations
+</button>
+
+<button class="nav-button" data-page="technicians">
+  Technicians
+</button>
+
+<button class="nav-button" data-page="parts">
+  Parts
+</button>
+
+<button class="nav-button" data-page="notes">
+  Notes
+</button>
+
+<button class="nav-button" data-page="photos">
+  Photos
+</button>
+
+
+  </nav>
+
+  <main id="mainContent">
+    <div class="empty">
+      Loading Office...
+    </div>
+  </main>
+
+</div>
+
+<div id="message"></div>
+
+<script>
+
+  const SUPABASE_URL =
+    "https://zpawrfdfutswbvhlwvqf.supabase.co";
+
+  const SUPABASE_ANON_KEY =
+    "sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68";
+
+  const { createClient } = supabase;
+
+  const db = createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
+
+  let currentUser = null;
+  let currentProfile = null;
+  let currentDate = new Date();
+  let currentWorkOrderFilter = "all";
+  const dispatchSearch = { "work-orders": "", parts: "", notes: "", photos: "",
+    customers: "", locations: "", technicians: "" };
+
+
+  // ============================================
+  // HELPERS
+  // ============================================
+
+  function showMessage(text, error = false) {
+
+    const element =
+      document.getElementById("message");
+
+    element.textContent = text;
+    element.className = error ? "error" : "";
+    element.style.display = "block";
+
+    setTimeout(() => {
+      element.style.display = "none";
+    }, 4000);
+  }
+
+
+  function formatDate(date) {
+
+    return date.toLocaleDateString(
+      "en-US",
+      {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric"
+      }
+    );
+  }
+
+
+  function escapeHtml(value) {
+
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+
+  function customerName(customer) {
+
+    if (!customer) {
+      return "Customer";
+    }
+
+    if (customer.company_name) {
+      return customer.company_name;
+    }
+
+    return (
+      `${customer.first_name || ""} ${customer.last_name || ""}`
+        .trim()
+      || "Unnamed Customer"
+    );
+  }
+
+
+  // Show the business and its contact person together when both exist.
+  function customerDisplayHtml(customer) {
+    const business = String(customer?.company_name || "").trim();
+    const contact = [customer?.first_name, customer?.last_name]
+      .filter(Boolean).join(" ").trim();
+    const primary = business || contact || "Unnamed Customer";
+    return `<strong>${escapeHtml(primary)}</strong>` +
+      (business && contact
+        ? `<div class="small-muted">Contact: ${escapeHtml(contact)}</div>`
+        : "");
+  }
+
+  function customerSelectionName(customer) {
+    const business = String(customer?.company_name || "").trim();
+    const contact = [customer?.first_name, customer?.last_name]
+      .filter(Boolean).join(" ").trim();
+    return business && contact ? `${business} — ${contact}`
+      : business || contact || "Unnamed Customer";
+  }
+
+  function technicianName(technician) {
+
+    if (!technician) {
+      return "Unassigned";
+    }
+
+    return (
+      `${technician.first_name || ""} ${technician.last_name || ""}`
+        .trim()
+      || "Technician"
+    );
+  }
+
+
+  function workOrderLabel(call) {
+    return call.work_order_number != null
+      ? `WO-${String(call.work_order_number).padStart(6, "0")}`
+      : `ID ${String(call.id || "").slice(0, 8)}`;
+  }
+
+  function dispatchSearchField(page) {
+    return `
+      <div class="dispatch-search">
+        <label for="dispatchSearchInput">Search ${page === "work-orders" ? "Work Orders" : page[0].toUpperCase() + page.slice(1)}</label>
+        <input id="dispatchSearchInput" type="search"
+          placeholder="${escapeAttribute({
+            customers: "Name, company, phone, email…",
+            locations: "Address, city, state, ZIP, customer…",
+            technicians: "Name, title, phone, email…"
+          }[page] || "Work order number, customer, description, keywords…")}"
+          value="${escapeAttribute(dispatchSearch[page] || "")}">
+        <div id="dispatchSearchCount" class="small-muted" aria-live="polite"></div>
+      </div>`;
+  }
+
+  function setupDispatchSearch(page, bodyId) {
+    const input = document.getElementById("dispatchSearchInput");
+    if (!input) return;
+    input.addEventListener("input", () => {
+      dispatchSearch[page] = input.value;
+      applyDispatchSearch(page, bodyId);
+    });
+  }
+
+  function dispatchSearchText(record, extra = []) {
+    const call = record.service_calls || record;
+    const customer = call.customers || {};
+    const number = call.work_order_number == null ? "" : String(call.work_order_number);
+    return [
+      number, number ? `WO-${number.padStart(6, "0")}` : "",
+      call.work_type, workTypeLabel(call.work_type),
+      call.description, customer.first_name, customer.last_name,
+      customer.company_name, customerName(customer),
+      ...extra
+    ].map(x => String(x ?? "")).join(" ").toLowerCase();
+  }
+
+  function directorySearchText(record, page) {
+    let values = [];
+    if (page === "customers") {
+      values = [record.first_name, record.last_name,
+        `${record.first_name || ""} ${record.last_name || ""}`.trim(),
+        record.company_name, record.phone, record.email];
+    } else if (page === "locations") {
+      const customer = record.customers || {};
+      values = [record.address, record.city, record.state, record.zip,
+        customer.first_name, customer.last_name,
+        `${customer.first_name || ""} ${customer.last_name || ""}`.trim(),
+        customer.company_name, customerName(customer)];
+    } else if (page === "technicians") {
+      values = [record.first_name, record.last_name,
+        technicianName(record), record.title, record.phone, record.email,
+        record.active ? "active" : "inactive"];
+    }
+    return values.map(value => String(value ?? "")).join(" ").toLowerCase();
+  }
+
+  function applyDispatchSearch(page, bodyId) {
+    const body = document.getElementById(bodyId);
+    if (!body || !body._dispatchRecords) return;
+    const terms = (dispatchSearch[page] || "").trim().toLowerCase().split(/\\s+/).filter(Boolean);
+    const matching = body._dispatchRecords.filter(item =>
+      terms.every(term => item.search.includes(term))
+    );
+    body.innerHTML = matching.length
+      ? matching.map(item => item.html).join("")
+      : `<tr><td colspan="${page === "work-orders" ? 10 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
+          <div class="empty">No matching records.</div></td></tr>`;
+    const count = document.getElementById("dispatchSearchCount");
+    if (count) count.textContent = `${matching.length} of ${body._dispatchRecords.length} records shown`;
+  }
+
+  function relatedWorkOrderCell(call) {
+    if (!call) return "Work Order unavailable";
+    const customer = customerName(call.customers);
+    return `
+      <strong>${escapeHtml(workOrderLabel(call))}</strong>
+      <div class="small-muted">${customerDisplayHtml(call.customers)}</div>
+    `;
+  }
+
+  function relatedWorkTypeCell(call) {
+    return call
+      ? `<span class="type-badge">${escapeHtml(workTypeLabel(call.work_type))}</span>`
+      : "—";
+  }
+
+  function relatedDescriptionCell(call) {
+    return call
+      ? `<span title="${escapeAttribute(call.description || "")}">${escapeHtml(descriptionPreview(call.description))}</span>`
+      : "—";
+  }
+
+  function descriptionPreview(value, limit = 72) {
+    const clean = String(value || "No description").replace(/\s+/g, " ").trim();
+    return clean.length > limit ? clean.slice(0, limit - 3) + "..." : clean;
+  }
+
+  function workTypeLabel(type) {
+
+    return type === "checkout" ? "Check-Out" : type === "install" ? "Installation" : "Service";
+  }
+
+
+  function statusLabel(status) {
+
+    return String(status || "open")
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, letter => letter.toUpperCase());
+  }
+
+
+  function localDateTimeValue(date) {
+
+    const d = new Date(date);
+
+    const year =
+      d.getFullYear();
+
+    const month =
+      String(d.getMonth() + 1).padStart(2, "0");
+
+    const day =
+      String(d.getDate()).padStart(2, "0");
+
+    const hours =
+      String(d.getHours()).padStart(2, "0");
+
+    const minutes =
+      String(d.getMinutes()).padStart(2, "0");
+
+    return (
+      `${year}-${month}-${day}T${hours}:${minutes}`
+    );
+  }
+
+
+  function escapeAttribute(value) {
+    return escapeHtml(value);
+  }
+
+
+  function confirmDelete(message) {
+    return window.confirm(message);
+  }
+
+
+
+// ===================================================
+// OFFICE INTAKE: FAST KEYBOARD-FIRST ENTRY
+// ===================================================
+let officeCustomers = [];
+let officeChosenCustomer = null;
+let officeChosenLocation = null;
+let officeLocations = [];
+
+async function showOfficeIntake() {
+  setActiveNav("intake");
+  officeChosenCustomer = null;
+  officeChosenLocation = null;
+  officeLocations = [];
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `
+    <div class="office-intake">
+      <div class="page-head"><div><h1>New Work Order</h1>
+      <p>Customer intake · Tab through the fields · Unreleased until authorized</p></div></div>
+      <div class="card"><div class="card-body">
+        <form id="officeIntakeForm">
+          <div class="form-group"><label for="officeSearch">Customer / Company</label>
+            <input id="officeSearch" type="search" autocomplete="off" placeholder="Type a name, business, or phone number..." required>
+            <div id="officeMatches" class="suggestions" role="listbox"></div>
+            <div id="officeChosen" class="small-muted" aria-live="polite"></div>
+          </div>
+          <div id="officeNewCustomer" class="subtle-panel" hidden>
+            <strong>New customer</strong><p class="small-muted">Enter the customer's information without leaving this work order.</p>
+            <div class="form-grid">
+              <div class="form-group"><label for="officeFirst">First Name / Contact</label><input id="officeFirst" autocomplete="given-name"></div>
+              <div class="form-group"><label for="officeLast">Last Name / Contact</label><input id="officeLast" autocomplete="family-name"></div>
+              <div class="form-group"><label for="officeCompany">Company (optional)</label><input id="officeCompany" autocomplete="organization"></div>
+              <div class="form-group"><label for="officePhone">Phone</label><input id="officePhone" type="tel" autocomplete="tel"></div>
+              <div class="form-group full"><label for="officeEmail">Email (optional)</label><input id="officeEmail" type="email" autocomplete="email"></div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:16px"><label for="officeLocation">Service Address</label>
+            <select id="officeLocation" required><option value="">Select a customer first</option></select>
+          </div>
+          <div id="officeNewLocation" class="subtle-panel" hidden>
+            <strong>New service address</strong>
+            <div class="form-grid" style="margin-top:12px">
+              <div class="form-group full"><label for="officeAddress">Street Address</label><input id="officeAddress" autocomplete="street-address"></div>
+              <div class="form-group"><label for="officeCity">City</label><input id="officeCity" autocomplete="address-level2"></div>
+              <div class="form-group"><label for="officeState">State</label><input id="officeState" autocomplete="address-level1"></div>
+              <div class="form-group"><label for="officeZip">ZIP</label><input id="officeZip" autocomplete="postal-code"></div>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-top:18px">
+            <div class="form-group"><label for="officeType">Work Type</label><select id="officeType"><option value="service">Service</option><option value="install">Installation</option><option value="checkout">Check-Out</option></select></div>
+            <div class="form-group"><label for="officePriority">Priority</label><select id="officePriority"><option value="normal">Normal</option><option value="low">Low</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+            <div class="form-group full"><label for="officeDescription">Work Description</label><textarea id="officeDescription" placeholder="Describe the customer's request..." required></textarea></div>
+          </div>
+          <div class="form-actions"><button type="button" class="secondary" id="officeCancel">Cancel</button><button type="submit" class="primary" id="officeSave">Create Work Order</button></div>
+          <div id="officeFeedback" class="small-muted" role="status"></div>
+        </form>
+      </div></div>
+    </div>`;
+  const get = id => document.getElementById(id);
+  get("officeCancel").onclick = () => showWorkOrders();
+  get("officeSearch").addEventListener("input", officeRenderMatches);
+  get("officeSearch").addEventListener("keydown", e => {
+    if (e.key === "ArrowDown") { const first=get("officeMatches").querySelector("button"); if(first){e.preventDefault();first.focus();} }
+    if (e.key === "Enter") { const first=get("officeMatches").querySelector("button"); if(first){e.preventDefault();first.click();} }
+  });
+  get("officeLocation").addEventListener("change", () => {
+    officeChosenLocation = get("officeLocation").value || null;
+    get("officeNewLocation").hidden = officeChosenLocation !== "new";
+    if(officeChosenLocation === "new") get("officeAddress").focus();
+  });
+  get("officeIntakeForm").addEventListener("submit", officeSaveIntake);
+  const {data,error}=await db.from("customers").select("id,first_name,last_name,company_name,phone,email").order("last_name");
+  if(error){get("officeFeedback").textContent="Customer list could not load: "+error.message;return;}
+  officeCustomers=data||[];
+  officeRenderMatches();
+  get("officeSearch").focus();
+}
+
+function officeRenderMatches(){
+  const input=document.getElementById("officeSearch");
+  if(!input)return;
+  const q=input.value.trim().toLowerCase();
+  const matches=document.getElementById("officeMatches");
+  if(officeChosenCustomer && input.value !== customerSelectionName(officeChosenCustomer)) {
+    officeChosenCustomer=null;
+    document.getElementById("officeChosen").textContent="";
+  }
+  if(officeChosenCustomer){matches.innerHTML="";return;}
+  const found=q ? officeCustomers.filter(c => [c.first_name,c.last_name,c.company_name,c.phone,customerSelectionName(c)].some(x=>String(x||"").toLowerCase().includes(q))).slice(0,12) : [];
+  matches.innerHTML="";
+  found.forEach(c=>{
+    const b=document.createElement("button"); b.type="button";b.className="suggestion";
+    b.textContent=customerSelectionName(c)+(c.phone?" · "+c.phone:"");
+    b.onclick=()=>officeSelectCustomer(c);
+    matches.appendChild(b);
+  });
+  const add=document.createElement("button");add.type="button";add.className="suggestion";
+  add.textContent="+ Create new customer"+(q?": "+input.value.trim():"");
+  add.onclick=()=>officeSelectCustomer(null);
+  matches.appendChild(add);
+}
+
+async function officeSelectCustomer(customer){
+  officeChosenCustomer=customer;
+  const get=id=>document.getElementById(id);
+  get("officeMatches").innerHTML="";
+  get("officeNewCustomer").hidden=!!customer;
+  get("officeSearch").required=false;
+  if(customer){
+    get("officeSearch").value=customerSelectionName(customer);
+    get("officeChosen").textContent="Existing customer selected"+(customer.phone?" · "+customer.phone:"");
+  } else {
+    const search=get("officeSearch").value.trim();
+    get("officeChosen").textContent="New customer · will be created when you save";
+    if(search && !get("officeFirst").value && !get("officeLast").value && !get("officeCompany").value){
+      const parts=search.split(/\s+/);get("officeFirst").value=parts.shift()||"";get("officeLast").value=parts.join(" ");
+    }
+  }
+  await officeLoadLocations(customer?.id||null);
+  if(customer)get("officeLocation").focus(); else get("officeFirst").focus();
+}
+
+async function officeLoadLocations(customerId){
+  const select=document.getElementById("officeLocation");
+  officeLocations=[];officeChosenLocation=null;
+  if(customerId){
+    const {data,error}=await db.from("locations").select("id,address,city,state,zip").eq("customer_id",customerId).order("address");
+    if(error){document.getElementById("officeFeedback").textContent=error.message;return;}
+    officeLocations=data||[];
+  }
+  select.innerHTML='<option value="">Select service address</option>';
+  officeLocations.forEach(l=>{const option=document.createElement("option");option.value=l.id;option.textContent=[l.address,l.city,l.state,l.zip].filter(Boolean).join(", ");select.appendChild(option);});
+  const add=document.createElement("option");add.value="new";add.textContent="+ Enter new service address";select.appendChild(add);
+  if(!officeLocations.length){select.value="new";officeChosenLocation="new";document.getElementById("officeNewLocation").hidden=false;}
+  else document.getElementById("officeNewLocation").hidden=true;
+}
+
+async function officeSaveIntake(event){
+  event.preventDefault();
+  const get=id=>document.getElementById(id);
+  const button=get("officeSave");
+  if(button.disabled)return;
+  const creatingCustomer=!officeChosenCustomer;
+  const first=get("officeFirst").value.trim(),last=get("officeLast").value.trim(),company=get("officeCompany").value.trim();
+  if(creatingCustomer && !first && !last && !company){get("officeFeedback").textContent="Enter a customer name or company.";get("officeFirst").focus();return;}
+  if(!creatingCustomer && get("officeSearch").value !== customerSelectionName(officeChosenCustomer)){get("officeFeedback").textContent="Please select a customer from the matching list.";get("officeSearch").focus();return;}
+  const newAddress=get("officeLocation").value==="new";
+  if(newAddress && !get("officeAddress").value.trim()){get("officeFeedback").textContent="Enter the street address.";get("officeAddress").focus();return;}
+  if(!newAddress && !get("officeLocation").value){get("officeFeedback").textContent="Choose a service address.";get("officeLocation").focus();return;}
+  button.disabled=true;button.textContent="Saving...";get("officeFeedback").textContent="";
+  try {
+    let customerId=officeChosenCustomer?.id;
+    if(!customerId){
+      const {data,error}=await db.from("customers").insert({first_name:first||null,last_name:last||null,company_name:company||null,phone:get("officePhone").value.trim()||null,email:get("officeEmail").value.trim()||null}).select("id").single();
+      if(error)throw error;customerId=data.id;
+    }
+    let locationId=get("officeLocation").value;
+    if(newAddress){
+      const {data,error}=await db.from("locations").insert({customer_id:customerId,address:get("officeAddress").value.trim(),city:get("officeCity").value.trim()||null,state:get("officeState").value.trim()||null,zip:get("officeZip").value.trim()||null}).select("id").single();
+      if(error)throw error;locationId=data.id;
+    }
+    const {error}=await db.from("service_calls").insert({customer_id:customerId,locations_id:locationId,work_type:get("officeType").value,priority:get("officePriority").value,description:get("officeDescription").value.trim(),status:"open",released:false,assigned_technician_id:null,scheduled_at:null});
+    if(error)throw error;
+    showMessage("Work order created and awaiting dispatch.");
+    await showWorkOrders();
+  } catch(error){console.error("Office intake:",error);get("officeFeedback").textContent="Unable to save: "+error.message+". Any customer/address already created was retained; check before retrying.";button.disabled=false;button.textContent="Create Work Order";}
+}
+
+  // ============================================
+  // AUTH
+  // ============================================
+
+  async function requireLogin() {
+
+    const {
+      data: {
+        session
+      }
+    } = await db.auth.getSession();
+
+    if (!session) {
+
+      window.location.href =
+        "login.html";
+
+      return false;
+    }
+
+    currentUser =
+      session.user;
+
+    return true;
+  }
+
+
+  async function loadUserProfile() {
+
+    const {
+      data,
+      error
+    } = await db
+      .from("users")
+      .select("*")
+      .eq(
+        "auth_user_id",
+        currentUser.id
+      )
+      .single();
+
+    if (error) {
+
+      console.error(error);
+
+      showMessage(
+        "Unable to load your Signature profile.",
+        true
+      );
+
+      return false;
+    }
+
+    currentProfile =
+      data;
+
+    document.getElementById("userName")
+      .textContent =
+      `${data.first_name || ""} ${data.last_name || ""}`.trim();
+
+    document.getElementById("userRole")
+      .textContent =
+      data.role || "";
+
+    return true;
+  }
+
+
+  // ============================================
+  // SCHEDULE
+  // ============================================
+
+  async function showSchedule() {
+
+    setActiveNav("schedule");
+
+    const main =
+      document.getElementById("mainContent");
+
+    main.innerHTML = `
+
+      <div class="page-head">
+
+        <div>
+          <h1>Schedule</h1>
+          <p>Office schedule for the selected day.</p>
+        </div>
+
+        <button
+          class="primary"
+          id="newWorkOrderButton"
+        >
+          + New Work Order
+        </button>
+
+      </div>
+
+      <div class="card">
+
+        <div class="card-head">
+
+          <div class="date-controls">
+
+            <button id="previousDay">‹</button>
+
+            <strong id="scheduleDate">
+              ${formatDate(currentDate)}
+            </strong>
+
+            <button id="nextDay">›</button>
+
+            <button id="todayButton">
+              Today
+            </button>
+
+          </div>
+
+        </div>
+
+        <div
+          class="schedule-list"
+          id="scheduleList"
+        >
+          <div class="empty">
+            Loading schedule...
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    document.getElementById("previousDay")
+      .addEventListener("click", () => {
+
+        currentDate.setDate(
+          currentDate.getDate() - 1
+        );
+
+        showSchedule();
+      });
+
+
+    document.getElementById("nextDay")
+      .addEventListener("click", () => {
+
+        currentDate.setDate(
+          currentDate.getDate() + 1
+        );
+
+        showSchedule();
+      });
+
+
+    document.getElementById("todayButton")
+      .addEventListener("click", () => {
+
+        currentDate =
+          new Date();
+
+        showSchedule();
+      });
+
+
+    document.getElementById("newWorkOrderButton")
+      .addEventListener(
+        "click",
+        () => showOfficeIntake()
+      );
+
+
+    await loadSchedule();
+  }
+
+
+  async function loadSchedule() {
+
+    const list =
+      document.getElementById("scheduleList");
+
+    const start =
+      new Date(currentDate);
+
+    start.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+
+    const end =
+      new Date(currentDate);
+
+    end.setHours(
+      23,
+      59,
+      59,
+      999
+    );
+
+    const {
+      data,
+      error
+    } = await db
+      .from("service_calls")
+      .select(`
+        *,
+        customers (
+          first_name,
+          last_name,
+          company_name
+        ),
+        locations (
+          address,
+          city,
+          state
+        ),
+        technicians (
+          first_name,
+          last_name
+        )
+      `)
+      .gte(
+        "scheduled_at",
+        start.toISOString()
+      )
+      .lte(
+        "scheduled_at",
+        end.toISOString()
+      )
+      .order(
+        "scheduled_at",
+        {
+          ascending: true
+        }
+      );
+
+    if (error) {
+
+      console.error(error);
+
+      list.innerHTML = `
+        <div class="empty">
+          Unable to load the schedule.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      `;
+
+      return;
+    }
+
+    if (!data || data.length === 0) {
+
+      list.innerHTML = `
+        <div class="empty">
+          No work is scheduled for this day.
+        </div>
+      `;
+
+      return;
+    }
+
+    list.innerHTML =
+      data.map(call => {
+
+        const scheduled =
+          new Date(call.scheduled_at);
+
+        const customer =
+          customerName(call.customers);
+
+        const technician =
+          technicianName(call.technicians);
+
+        const location =
+          call.locations
+            ? `${call.locations.address || ""}, ${call.locations.city || ""}, ${call.locations.state || ""}`
+            : "No location";
+
+        const releasedClass =
+          call.released
+            ? "released"
+            : "unreleased";
+
+        const releasedText =
+          call.released
+            ? "Released"
+            : "Not Released";
+
+        return `
+
+          <div class="schedule-item">
+
+            <div class="schedule-time">
+              ${scheduled.toLocaleTimeString(
+                "en-US",
+                {
+                  hour: "numeric",
+                  minute: "2-digit"
+                }
+              )}
+            </div>
+
+            <div>
+
+              <div class="schedule-description">
+                ${escapeHtml(
+                  call.description ||
+                  customer
+                )}
+              </div>
+
+              <div class="schedule-meta">
+
+                <span class="type-badge">
+                  ${escapeHtml(
+                    workTypeLabel(call.work_type)
+                  )}
+                </span>
+
+                ${escapeHtml(customer)}
+
+                &nbsp; · &nbsp;
+
+                ${escapeHtml(technician)}
+
+                &nbsp; · &nbsp;
+
+                ${escapeHtml(location)}
+
+                <br>
+
+                ${escapeHtml(
+                  call.priority || "normal"
+                )}
+
+              </div>
+
+            </div>
+
+            <div class="schedule-actions">
+
+              <span class="release-badge ${releasedClass}">
+                ${releasedText}
+              </span>
+
+              <br><br>
+
+              <button
+                class="row-button"
+                onclick="showWorkOrderDetail('${call.id}')"
+              >
+                Open
+              </button>
+
+            </div>
+
+          </div>
+        `;
+
+      }).join("");
+  }
+
+
+  // ============================================
+  // WORK ORDERS
+  // ============================================
+
+  async function showWorkOrders(
+    filter = currentWorkOrderFilter
+  ) {
+
+    currentWorkOrderFilter =
+      filter;
+
+    setActiveNav("work-orders");
+
+    const main =
+      document.getElementById("mainContent");
+
+    main.innerHTML = `
+
+      <div class="page-head">
+
+        <div>
+          <h1>Work Orders</h1>
+
+          <p>
+            All office work orders, including those awaiting dispatch.
+          </p>
+        </div>
+
+        <button
+          class="primary"
+          id="newWorkOrderButton"
+        >
+          + New Work Order
+        </button>
+
+      </div>
+
+      <div class="card">
+
+        <div class="filter-bar">
+
+          ${filterButton("all", "All")}
+          ${filterButton("service", "Service")}
+          ${filterButton("install", "Installation")}
+          ${filterButton("checkout", "Check-Out")}
+          ${filterButton("upcoming", "Upcoming")}
+          ${filterButton("in_progress", "Current / In Progress")}
+          ${filterButton("completed", "Completed")}
+          ${filterButton("cancelled", "Cancelled")}
+
+        </div>
+
+        ${dispatchSearchField("work-orders")}
+
+        <div class="table-wrap">
+
+          <table>
+
+            <thead>
+              <tr>
+                <th>Work Order</th>
+                <th>Type</th>
+                <th>Customer</th>
+                <th>Description</th>
+                <th>Location</th>
+                <th>Scheduled</th>
+                <th>Technician</th>
+                <th>Status</th>
+                <th>Release</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody id="workOrdersBody">
+
+              <tr>
+                <td colspan="10">
+                  <div class="empty">
+                    Loading work orders...
+                  </div>
+                </td>
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+    `;
+
+
+    document.getElementById("newWorkOrderButton")
+      .addEventListener(
+        "click",
+        () => showOfficeIntake()
+      );
+
+
+    document.querySelectorAll(".filter-button")
+      .forEach(button => {
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            showWorkOrders(
+              button.dataset.filter
+            );
+
+          }
+        );
+
+      });
+
+
+    setupDispatchSearch("work-orders", "workOrdersBody");
+    await loadWorkOrders();
+  }
+
+
+  function filterButton(
+    value,
+    label
+  ) {
+
+    return `
+      <button
+        class="filter-button ${currentWorkOrderFilter === value ? "active" : ""}"
+        data-filter="${value}"
+      >
+        ${label}
+      </button>
+    `;
+  }
+
+
+  async function loadWorkOrders() {
+
+    const body =
+      document.getElementById("workOrdersBody");
+
+    let query =
+      db
+        .from("service_calls")
+        .select(`
+          *,
+          customers (
+            first_name,
+            last_name,
+            company_name
+          ),
+          locations (
+            address,
+            city,
+            state
+          ),
+          technicians (
+            first_name,
+            last_name
+          )
+        `)
+        .order(
+          "scheduled_at",
+          {
+            ascending: true,
+            nullsFirst: false
+          }
+        );
+
+
+    if (
+      currentWorkOrderFilter === "service" ||
+      currentWorkOrderFilter === "install" ||
+       currentWorkOrderFilter === "checkout"
+    ) {
+
+      query =
+        query.eq(
+          "work_type",
+          currentWorkOrderFilter
+        );
+    }
+
+
+    if (
+      currentWorkOrderFilter === "in_progress"
+    ) {
+
+      query =
+        query.eq(
+          "status",
+          "in_progress"
+        );
+    }
+
+
+    if (
+      currentWorkOrderFilter === "completed"
+    ) {
+
+      query =
+        query.eq(
+          "status",
+          "completed"
+        );
+    }
+
+
+    if (
+      currentWorkOrderFilter === "cancelled"
+    ) {
+
+      query =
+        query.eq(
+          "status",
+          "cancelled"
+        );
+    }
+
+
+    if (
+      currentWorkOrderFilter === "upcoming"
+    ) {
+
+      query =
+        query
+          .gte(
+            "scheduled_at",
+            new Date().toISOString()
+          )
+          .neq(
+            "status",
+            "completed"
+          )
+          .neq(
+            "status",
+            "cancelled"
+          );
+    }
+
+
+    const {
+      data,
+      error
+    } = await query;
+
+
+    if (error) {
+
+      console.error(error);
+
+      body.innerHTML = `
+        <tr>
+          <td colspan="10">
+
+            <div class="empty">
+              Unable to load work orders.<br><br>
+              ${escapeHtml(error.message)}
+            </div>
+
+          </td>
+        </tr>
+      `;
+
+      return;
+    }
+
+
+    if (!data || data.length === 0) {
+
+      body.innerHTML = `
+        <tr>
+          <td colspan="10">
+
+            <div class="empty">
+              No work orders match this view.
+            </div>
+
+          </td>
+        </tr>
+      `;
+
+      return;
+    }
+
+
+    body._dispatchRecords =
+      data.map(call => {
+
+        const scheduled =
+          call.scheduled_at
+            ? new Date(
+                call.scheduled_at
+              ).toLocaleString(
+                "en-US",
+                {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit"
+                }
+              )
+            : "Not scheduled";
+
+
+        const location =
+          call.locations
+            ? `${call.locations.city || ""}, ${call.locations.state || ""}`
+            : "—";
+
+
+        const search = dispatchSearchText(call, [
+          technicianName(call.technicians), call.status,
+          call.locations?.city, call.locations?.state
+        ]);
+        const html = `
+
+          <tr>
+
+            <td><strong>${escapeHtml(workOrderLabel(call))}</strong></td>
+            <td>
+              <span class="type-badge">
+                ${escapeHtml(
+                  workTypeLabel(call.work_type)
+                )}
+              </span>
+            </td>
+
+            <td>
+              ${escapeHtml(
+                customerName(call.customers)
+              )}
+            </td>
+
+            <td title="${escapeAttribute(call.description || "")}">
+              ${escapeHtml(descriptionPreview(call.description))}
+            </td>
+            <td>
+              ${escapeHtml(location)}
+            </td>
+
+            <td>
+              ${escapeHtml(scheduled)}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                technicianName(call.technicians)
+              )}
+            </td>
+
+            <td>
+              <span class="status">
+                ${escapeHtml(
+                  statusLabel(call.status)
+                )}
+              </span>
+            </td>
+
+            <td>
+
+              <span
+                class="release-badge ${call.released ? "released" : "unreleased"}"
+              >
+                ${call.released ? "Released" : "Not Released"}
+              </span>
+
+            </td>
+
+            <td>
+
+              <button
+                class="row-button"
+                onclick="showWorkOrderDetail('${call.id}')"
+              >
+                Open
+              </button>
+
+            </td>
+
+          </tr>
+        `;
+        return { html, search };
+
+      });
+    applyDispatchSearch("work-orders", "workOrdersBody");
+  }
+
+
+  // ============================================
+  // WORK ORDER DETAIL
+  // ============================================
+
+  async function showWorkOrderDetail(id) {
+
+    const {
+      data: call,
+      error
+    } = await db
+      .from("service_calls")
+      .select(`
+        *,
+        customers (
+          first_name,
+          last_name,
+          company_name,
+          phone,
+          email
+        ),
+        locations (
+          address,
+          city,
+          state,
+          zip,
+          notes
+        ),
+        technicians (
+          first_name,
+          last_name,
+          phone,
+          email
+        )
+      `)
+      .eq(
+        "id",
+        id
+      )
+      .single();
+
+
+    if (error) {
+
+      console.error(error);
+
+      showMessage(
+        error.message,
+        true
+      );
+
+      return;
+    }
+
+
+    const main =
+      document.getElementById("mainContent");
+
+
+    main.innerHTML = `
+
+      <div class="page-head">
+
+        <div>
+
+          <h1>${escapeHtml(workOrderLabel(call))}</h1>
+
+          <p>
+            ${escapeHtml(
+              workTypeLabel(call.work_type)
+            )}
+            &nbsp; · &nbsp;
+            ${escapeHtml(
+              statusLabel(call.status)
+            )}
+          </p>
+
+        </div>
+
+        <div>
+
+          <button
+            class="secondary"
+            id="backToWorkOrders"
+          >
+            Back
+          </button>
+
+          <button
+            class="primary"
+            id="editWorkOrder"
+          >
+            Edit Work Order
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="card">
+
+        <div class="card-head">
+
+          <h2>
+            ${escapeHtml(
+              customerName(call.customers)
+            )}
+          </h2>
+
+          <span class="release-badge ${call.released ? "released" : "unreleased"}">
+            ${call.released ? "Released to Technician" : "Not Released"}
+          </span>
+
+        </div>
+
+        <div class="card-body">
+
+          <div class="detail-grid">
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Work Type
+              </div>
+
+              <div class="detail-value">
+                ${escapeHtml(
+                  workTypeLabel(call.work_type)
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Status
+              </div>
+
+              <div class="detail-value">
+                ${escapeHtml(
+                  statusLabel(call.status)
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Scheduled
+              </div>
+
+              <div class="detail-value">
+                ${
+                  call.scheduled_at
+                    ? escapeHtml(
+                        new Date(
+                          call.scheduled_at
+                        ).toLocaleString()
+                      )
+                    : "Not scheduled"
+                }
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Priority
+              </div>
+
+              <div class="detail-value">
+                ${escapeHtml(
+                  call.priority || "normal"
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Technician
+              </div>
+
+              <div class="detail-value">
+                ${escapeHtml(
+                  technicianName(call.technicians)
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Location
+              </div>
+
+              <div class="detail-value">
+                ${
+                  call.locations
+                    ? escapeHtml(
+                        `${call.locations.address || ""}, ${call.locations.city || ""}, ${call.locations.state || ""} ${call.locations.zip || ""}`
+                      )
+                    : "No location"
+                }
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Customer Phone
+              </div>
+
+              <div class="detail-value">
+                ${escapeHtml(
+                  call.customers?.phone || "—"
+                )}
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">
+                Customer Email
+              </div>
+
+              <div class="detail-value">
+                ${escapeHtml(
+                  call.customers?.email || "—"
+                )}
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="card">
+
+        <div class="card-head">
+          <h2>Description</h2>
+        </div>
+
+        <div class="card-body">
+
+          ${
+            call.description
+              ? escapeHtml(call.description)
+              : '<span style="color:#6b7075;">No description.</span>'
+          }
+
+        </div>
+
+      </div>
+
+      <div class="card"><div class="card-head"><h2>Parts</h2><button class="row-button" id="detailAddPart">+ Add Part</button></div>
+        <div class="card-body" id="detailParts">Loading parts...</div></div>
+      <div class="card"><div class="card-head"><h2>Notes</h2><button class="row-button" id="detailAddNote">+ Add Note</button></div>
+        <div class="card-body" id="detailNotes">Loading notes...</div></div>
+      <div class="card"><div class="card-head"><h2>Photos</h2><button class="row-button" id="detailAddPhoto">+ Add Photo</button></div>
+        <div class="card-body" id="detailPhotos">Loading photos...</div></div>
+    `;
+
+    document.getElementById("detailAddPart").addEventListener("click", () => showPartForm(null, call.id));
+    document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm(null, call.id));
+    document.getElementById("detailAddPhoto").addEventListener("click", () => showPhotoForm(null, call.id));
+    await loadWorkOrderRelated(call.id);
+
+    document.getElementById("backToWorkOrders")
+      .addEventListener(
+        "click",
+        () => showWorkOrders()
+      );
+
+
+    document.getElementById("editWorkOrder")
+      .addEventListener(
+        "click",
+        () => showWorkOrderForm(call)
+      );
+  }
+
+
+
+  async function loadWorkOrderRelated(id) {
+    const queries = await Promise.all([
+      db.from("parts").select("*").eq("service_call_id",id).order("created_at",{ascending:false}),
+      db.from("service_call_notes").select("*").eq("service_call_id",id).order("created_at",{ascending:false}),
+      db.from("service_call_photos").select("*").eq("service_call_id",id).order("created_at",{ascending:false})
+    ]);
+    const [parts,notes,photos]=queries;
+    const elPart=document.getElementById("detailParts");
+    const elNote=document.getElementById("detailNotes");
+    const elPhoto=document.getElementById("detailPhotos");
+    if (!elPart || !elNote || !elPhoto) return;
+    const buttons=(kind,item)=>`<button class="row-button" onclick="show${kind}Form('${item.id}', '${id}')">Edit</button>
+      <button class="danger" onclick="deleteRelatedRecord('${kind}','${item.id}','${id}')">Delete</button>`;
+    const render=(el,result,headings,rows,empty)=>{
+      if(result.error){el.textContent="Unable to load: "+result.error.message;return;}
+      el.innerHTML=result.data.length
+        ? `<div class="table-wrap"><table><thead><tr>${headings.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`
+        : `<span class="small-muted">${empty}</span>`;
+    };
+    render(elPart,parts,["Part Number","Description","Quantity","Unit Price",""],(parts.data||[]).map(p=>
+      `<tr><td>${escapeHtml(p.part_number||"—")}</td><td>${escapeHtml(p.description||"—")}</td>
+       <td>${escapeHtml(p.quantity??0)}</td><td>$${escapeHtml(Number(p.unit_cost||0).toFixed(2))}</td>
+       <td>${buttons("Part",p)}</td></tr>`),"No parts recorded.");
+    render(elNote,notes,["Note","Created",""],(notes.data||[]).map(n=>
+      `<tr><td>${escapeHtml(n.note||"")}</td><td>${escapeHtml(n.created_at?new Date(n.created_at).toLocaleString():"—")}</td>
+       <td>${buttons("Note",n)}</td></tr>`),"No notes recorded.");
+    if(photos.error){elPhoto.textContent="Unable to load: "+photos.error.message;return;}
+    const photoRows=await Promise.all((photos.data||[]).map(async p=>{
+      let url="";
+      if(p.file_path){
+        if(/^https?:\/\//i.test(p.file_path)) url=p.file_path;
+        else {
+          const signed=await db.storage.from("dispatch-photos").createSignedUrl(p.file_path,3600);
+          if(signed.error)console.error("Photo access:",signed.error);
+          else url=signed.data.signedUrl;
+        }
+      }
+      return `<tr><td>${url?`<a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">
+        <img class="photo-preview" src="${escapeAttribute(url)}" alt="${escapeAttribute(p.caption||"Photo")}"></a>`:"—"}</td>
+        <td>${escapeHtml(p.caption||"—")}</td><td>${buttons("Photo",p)}</td></tr>`;
+    }));
+    render(elPhoto,photos,["Photo","Caption",""],photoRows,"No photos recorded.");
+  }
+
+  async function deleteRelatedRecord(kind,id,workOrderId) {
+    if(!confirmDelete(`Delete this ${kind.toLowerCase()}?`))return;
+    const table={Part:"parts",Note:"service_call_notes",Photo:"service_call_photos"}[kind];
+    if(!table)return;
+    if(kind==="Photo"){
+      const {data,error}=await db.from(table).select("file_path").eq("id",id).single();
+      if(error)return showMessage(error.message,true);
+      if(data.file_path && !/^https?:\/\//i.test(data.file_path)){
+        const {error:storageError}=await db.storage.from("dispatch-photos").remove([data.file_path]);
+        if(storageError)return showMessage(storageError.message,true);
+      }
+    }
+    const {error}=await db.from(table).delete().eq("id",id);
+    if(error)return showMessage(error.message,true);
+    showMessage(kind+" deleted.");
+    await loadWorkOrderRelated(workOrderId);
+  }
+
+  // ============================================
+  // NEW / EDIT WORK ORDER
+  // ============================================
+
+  async function showWorkOrderForm(
+    existing = null
+  ) {
+    if (!existing) return showOfficeIntake();
+
+    const editing =
+      !!existing;
+
+    const main =
+      document.getElementById("mainContent");
+
+    main.innerHTML = `
+
+      <div class="page-head">
+
+        <div>
+
+          <h1>
+            ${editing
+              ? "Edit Work Order"
+              : "New Work Order"}
+          </h1>
+
+          <p>
+            ${editing
+              ? "Update the work order and release status."
+              : "Create work for Dispatch. It remains unreleased until you release it to the technician."}
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="card">
+
+        <div class="card-body">
+
+          <form id="workOrderForm">
+
+            <div class="form-grid">
+
+              <div class="form-group">
+
+                <label for="customer">
+                  Customer
+                </label>
+
+                <select
+                  id="customer"
+                  required
+                >
+                  <option value="">
+                    Loading customers...
+                  </option>
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="location">
+                  Location
+                </label>
+
+                <select
+                  id="location"
+                  required
+                >
+                  <option value="">
+                    Select a customer first
+                  </option>
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="workType">
+                  Work Type
+                </label>
+
+                <select id="workType">
+
+                  <option value="service">
+                    Service
+                  </option>
+
+                  <option value="install">
+                    Installation
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="technician">
+                  Technician
+                </label>
+
+                <select id="technician">
+
+                  <option value="">
+                    Unassigned
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="scheduledAt">
+                  Scheduled
+                </label>
+
+                <input
+                  type="datetime-local"
+                  id="scheduledAt"
+                >
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="priority">
+                  Priority
+                </label>
+
+                <select id="priority">
+
+                  <option value="normal">
+                    Normal
+                  </option>
+
+                  <option value="low">
+                    Low
+                  </option>
+
+                  <option value="high">
+                    High
+                  </option>
+
+                  <option value="urgent">
+                    Urgent
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <label for="status">
+                  Status
+                </label>
+
+                <select id="status">
+
+                  <option value="open">
+                    Open
+                  </option>
+
+                  <option value="scheduled">
+                    Scheduled
+                  </option>
+
+                  <option value="in_progress">
+                    In Progress
+                  </option>
+
+                  <option value="completed">
+                    Completed
+                  </option>
+
+                  <option value="cancelled">
+                    Cancelled
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="form-group">
+
+                <div class="checkbox-row">
+
+                  <input
+                    type="checkbox"
+                    id="released"
+                  >
+
+                  <label
+                    for="released"
+                    style="margin:0;"
+                  >
+                    Release this work order to the technician
+                  </label>
+
+                </div>
+
+              </div>
+
+
+              <div class="form-group full">
+
+                <label for="description">
+                  Description
+                </label>
+
+                <textarea
+                  id="description"
+                  placeholder="Describe the work..."
+                ></textarea>
+
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelWorkOrder"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${editing
+              ? "Save Work Order"
+              : "Create Work Order"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadCustomersForForm(
+  existing?.customer_id || null
+);
+
+await loadTechniciansForForm(
+  existing?.assigned_technician_id || null
+);
+
+
+if (existing) {
+
+  document.getElementById("customer").value =
+    existing.customer_id || "";
+
+  await loadLocationsForSelectedCustomer(
+    existing.locations_id || null
+  );
+
+  document.getElementById("workType").value =
+    existing.work_type || "service";
+
+  document.getElementById("scheduledAt").value =
+    existing.scheduled_at
+      ? localDateTimeValue(
+          existing.scheduled_at
+        )
+      : "";
+
+  document.getElementById("priority").value =
+    existing.priority || "normal";
+
+  document.getElementById("status").value =
+    existing.status || "open";
+
+  document.getElementById("released").checked =
+    existing.released === true;
+
+  document.getElementById("description").value =
+    existing.description || "";
+}
+
+
+document.getElementById("customer")
+  .addEventListener(
+    "change",
+    () => loadLocationsForSelectedCustomer()
+  );
+
+
+document.getElementById("cancelWorkOrder")
+  .addEventListener(
+    "click",
+    () => showWorkOrders()
+  );
+
+
+document.getElementById("workOrderForm")
+  .addEventListener(
+    "submit",
+    event =>
+      saveWorkOrder(
+        event,
+        existing?.id || null
+      )
+  );
+
+
+}
+
+async function loadCustomersForForm(
+selectedId = null
+) {
+
+
+const select =
+  document.getElementById("customer");
+
+const {
+  data,
+  error
+} = await db
+  .from("customers")
+  .select("*")
+  .order("last_name");
+
+if (error) {
+
+  console.error(error);
+
+  select.innerHTML = `
+    <option value="">
+      Unable to load customers
+    </option>
+  `;
+
+  return;
+}
+
+select.innerHTML =
+  `<option value="">Select customer</option>`;
+
+data.forEach(customer => {
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    customer.id;
+
+  option.textContent =
+    customerSelectionName(customer);
+
+  select.appendChild(option);
+});
+
+
+if (selectedId) {
+  select.value =
+    selectedId;
+}
+
+
+}
+
+async function loadLocationsForSelectedCustomer(
+selectedLocationId = null
+) {
+
+
+const customerId =
+  document.getElementById("customer").value;
+
+const select =
+  document.getElementById("location");
+
+if (!customerId) {
+
+  select.innerHTML =
+    `<option value="">
+      Select a customer first
+    </option>`;
+
+  return;
+}
+
+const {
+  data,
+  error
+} = await db
+  .from("locations")
+  .select("*")
+  .eq(
+    "customer_id",
+    customerId
+  )
+  .order("address");
+
+if (error) {
+
+  console.error(error);
+
+  select.innerHTML =
+    `<option value="">
+      Unable to load locations
+    </option>`;
+
+  return;
+}
+
+select.innerHTML =
+  `<option value="">
+    Select location
+  </option>`;
+
+data.forEach(location => {
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    location.id;
+
+  option.textContent =
+    `${location.address || ""}, ${location.city || ""}, ${location.state || ""} ${location.zip || ""}`;
+
+  select.appendChild(option);
+});
+
+
+if (selectedLocationId) {
+  select.value =
+    selectedLocationId;
+}
+
+
+}
+
+async function loadTechniciansForForm(
+selectedId = null
+) {
+
+
+const select =
+  document.getElementById("technician");
+
+const {
+  data,
+  error
+} = await db
+  .from("technicians")
+  .select("*")
+  .eq(
+    "active",
+    true
+  )
+  .order("last_name");
+
+if (error) {
+
+  console.error(error);
+
+  return;
+}
+
+select.innerHTML =
+  `<option value="">Unassigned</option>`;
+
+data.forEach(technician => {
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    technician.id;
+
+  option.textContent =
+    `${technician.first_name || ""} ${technician.last_name || ""}`.trim();
+
+  select.appendChild(option);
+});
+
+
+if (selectedId) {
+  select.value =
+    selectedId;
+}
+
+
+}
+
+async function saveWorkOrder(
+event,
+existingId
+) {
+
+
+event.preventDefault();
+
+const customerId =
+  document.getElementById("customer").value;
+
+const locationId =
+  document.getElementById("location").value;
+
+const technicianId =
+  document.getElementById("technician").value ||
+  null;
+
+const workType =
+  document.getElementById("workType").value;
+
+const scheduledAt =
+  document.getElementById("scheduledAt").value;
+
+const priority =
+  document.getElementById("priority").value;
+
+const status =
+  document.getElementById("status").value;
+
+const released =
+  document.getElementById("released").checked;
+
+const description =
+  document.getElementById("description")
+    .value
+    .trim();
+
+if (!customerId || !locationId) {
+
+  showMessage(
+    "Customer and location are required.",
+    true
+  );
+
+  return;
+}
+
+const payload = {
+
+  customer_id:
+    customerId,
+
+  locations_id:
+    locationId,
+
+  assigned_technician_id:
+    technicianId,
+
+  work_type:
+    workType,
+
+  released:
+    released,
+
+  status:
+    status,
+
+  priority:
+    priority,
+
+  description:
+    description,
+
+  scheduled_at:
+    scheduledAt
+      ? new Date(
+          scheduledAt
+        ).toISOString()
+      : null
+};
+
+
+let error;
+
+
+if (existingId) {
+
+  ({
+    error
+  } =
+    await db
+      .from("service_calls")
+      .update(payload)
+      .eq(
+        "id",
+        existingId
+      ));
+
+} else {
+
+  ({
+    error
+  } =
+    await db
+      .from("service_calls")
+      .insert(payload));
+}
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  existingId
+    ? "Work order saved."
+    : "Work order created."
+);
+
+
+await showWorkOrders();
+
+
+}
+
+// ============================================
+// CUSTOMERS
+// ============================================
+
+async function showCustomers() {
+
+
+setActiveNav("customers");
+
+const main =
+  document.getElementById("mainContent");
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Customers</h1>
+
+      <p>
+        Customer records used by Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newCustomerButton"
+    >
+      + New Customer
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    ${dispatchSearchField("customers")}
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+          <tr>
+            <th>Name / Company</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody id="customersBody">
+
+          <tr>
+            <td colspan="4">
+              <div class="empty">
+                Loading customers...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newCustomerButton")
+  .addEventListener(
+    "click",
+    () => showCustomerForm()
+  );
+
+
+setupDispatchSearch("customers", "customersBody");
+
+await loadCustomersPage();
+
+
+}
+
+async function loadCustomersPage() {
+
+
+const body =
+  document.getElementById("customersBody");
+
+const {
+  data,
+  error
+} = await db
+  .from("customers")
+  .select("*")
+  .order("last_name");
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="4">
+        <div class="empty">
+          Unable to load customers.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="4">
+        <div class="empty">
+          No customers yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body._dispatchRecords =
+  data.map(customer => ({
+    search: directorySearchText(customer, "customers"),
+    html: `
+
+    <tr>
+
+      <td>
+        ${customerDisplayHtml(customer)}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          customer.phone || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          customer.email || "—"
+        )}
+      </td>
+
+      <td>
+
+        <button
+          class="row-button"
+          onclick="showCustomerForm('${customer.id}')"
+        >
+          Edit
+        </button>
+
+      </td>
+
+    </tr>
+
+  `
+  }));
+applyDispatchSearch("customers", "customersBody");
+
+
+}
+
+async function showCustomerForm(
+id = null
+) {
+
+
+let customer = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("customers")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  customer =
+    data;
+}
+
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${customer
+          ? "Edit Customer"
+          : "New Customer"}
+      </h1>
+
+      <p>
+        Customer information.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="customerForm">
+
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label>First Name</label>
+
+            <input
+              id="firstName"
+              value="${escapeAttribute(
+                customer?.first_name || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Last Name</label>
+
+            <input
+              id="lastName"
+              value="${escapeAttribute(
+                customer?.last_name || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Company Name</label>
+
+            <input
+              id="companyName"
+              value="${escapeAttribute(
+                customer?.company_name || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Phone</label>
+
+            <input
+              id="phone"
+              value="${escapeAttribute(
+                customer?.phone || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Email</label>
+
+            <input
+              type="email"
+              id="email"
+              value="${escapeAttribute(
+                customer?.email || ""
+              )}"
+            >
+          </div>
+
+          <div class="form-group full">
+
+            <label>Notes</label>
+
+            <textarea id="notes">${escapeHtml(
+              customer?.notes || ""
+            )}</textarea>
+
+          </div>
+
+        </div>
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelCustomer"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${customer
+              ? "Save Customer"
+              : "Create Customer"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("cancelCustomer")
+  .addEventListener(
+    "click",
+    showCustomers
+  );
+
+
+document.getElementById("customerForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        first_name:
+          document.getElementById("firstName")
+            .value
+            .trim(),
+
+        last_name:
+          document.getElementById("lastName")
+            .value
+            .trim(),
+
+        company_name:
+          document.getElementById("companyName")
+            .value
+            .trim(),
+
+        phone:
+          document.getElementById("phone")
+            .value
+            .trim(),
+
+        email:
+          document.getElementById("email")
+            .value
+            .trim(),
+
+        notes:
+          document.getElementById("notes")
+            .value
+            .trim()
+      };
+
+
+      const wasEditing = Boolean(customer);
+      let error;
+      let savedRows = null;
+
+      if (wasEditing) {
+        const result = await db
+          .from("customers")
+          .update(payload)
+          .eq("id", customer.id)
+          .select("id");
+        error = result.error;
+        savedRows = result.data;
+        if (!error && (!savedRows || savedRows.length === 0)) {
+          error = new Error("Customer was not updated. Check your customer UPDATE policy.");
+        }
+      } else {
+        const result = await db
+          .from("customers")
+          .insert(payload)
+          .select("id");
+        error = result.error;
+        savedRows = result.data;
+        if (!error && (!savedRows || savedRows.length === 0)) {
+          error = new Error("Customer was not created. Check your customer INSERT policy.");
+        }
+      }
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+      showMessage(wasEditing ? "Customer saved." : "Customer created.");
+
+      await showCustomers();
+
+
+
+    }
+  );
+
+
+}
+
+// ============================================
+// LOCATIONS
+// ============================================
+
+async function showLocations() {
+
+
+setActiveNav("locations");
+
+const main =
+  document.getElementById("mainContent");
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+      <h1>Locations</h1>
+      <p>Customer service locations used by Work Orders.</p>
+    </div>
+
+    <button
+      class="primary"
+      id="newLocationButton"
+    >
+      + New Location
+    </button>
+
+  </div>
+
+  <div class="card">
+
+    ${dispatchSearchField("locations")}
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Customer</th>
+            <th>Address</th>
+            <th>City</th>
+            <th>State</th>
+            <th>ZIP</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="locationsBody">
+
+          <tr>
+            <td colspan="6">
+              <div class="empty">
+                Loading locations...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newLocationButton")
+  .addEventListener(
+    "click",
+    () => showLocationForm()
+  );
+
+
+setupDispatchSearch("locations", "locationsBody");
+
+await loadLocationsPage();
+
+
+}
+
+async function loadLocationsPage() {
+
+
+const body =
+  document.getElementById("locationsBody");
+
+const {
+  data,
+  error
+} = await db
+  .from("locations")
+  .select(`
+    *,
+    customers (
+      first_name,
+      last_name,
+      company_name
+    )
+  `)
+  .order("address");
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          Unable to load locations.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          No locations yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body._dispatchRecords =
+  data.map(location => ({
+    search: directorySearchText(location, "locations"),
+    html: `
+
+    <tr>
+
+      <td>
+        ${escapeHtml(
+          customerName(location.customers)
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          location.address || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          location.city || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          location.state || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          location.zip || "—"
+        )}
+      </td>
+
+      <td>
+
+        <button
+          class="row-button"
+          onclick="showLocationForm('${location.id}')"
+        >
+          Edit
+        </button>
+
+        <button
+          class="danger"
+          onclick="deleteLocation('${location.id}')"
+        >
+          Delete
+        </button>
+
+      </td>
+
+    </tr>
+
+  `
+  }));
+applyDispatchSearch("locations", "locationsBody");
+
+
+}
+
+async function showLocationForm(
+id = null
+) {
+
+
+let location = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("locations")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  location =
+    data;
+}
+
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${location
+          ? "Edit Location"
+          : "New Location"}
+      </h1>
+
+      <p>
+        Customer service location.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="locationForm">
+
+        <div class="form-grid">
+
+          <div class="form-group full">
+
+            <label for="locationCustomer">
+              Customer
+            </label>
+
+            <select
+              id="locationCustomer"
+              required
+            >
+              <option value="">
+                Loading customers...
+              </option>
+            </select>
+
+          </div>
+
+          <div class="form-group full">
+
+            <label for="locationAddress">
+              Address
+            </label>
+
+            <input
+              id="locationAddress"
+              value="${escapeAttribute(
+                location?.address || ""
+              )}"
+              required
+            >
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="locationCity">
+              City
+            </label>
+
+            <input
+              id="locationCity"
+              value="${escapeAttribute(
+                location?.city || ""
+              )}"
+            >
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="locationState">
+              State
+            </label>
+
+            <input
+              id="locationState"
+              value="${escapeAttribute(
+                location?.state || ""
+              )}"
+            >
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="locationZip">
+              ZIP
+            </label>
+
+            <input
+              id="locationZip"
+              value="${escapeAttribute(
+                location?.zip || ""
+              )}"
+            >
+
+          </div>
+
+          <div class="form-group full">
+
+            <label for="locationNotes">
+              Notes
+            </label>
+
+            <textarea
+              id="locationNotes"
+            >${escapeHtml(
+              location?.notes || ""
+            )}</textarea>
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelLocation"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${location
+              ? "Save Location"
+              : "Create Location"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadCustomerOptions(
+  "locationCustomer",
+  location?.customer_id || null
+);
+
+
+document.getElementById("cancelLocation")
+  .addEventListener(
+    "click",
+    showLocations
+  );
+
+
+document.getElementById("locationForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        customer_id:
+          document.getElementById(
+            "locationCustomer"
+          ).value,
+
+        address:
+          document.getElementById(
+            "locationAddress"
+          ).value.trim(),
+
+        city:
+          document.getElementById(
+            "locationCity"
+          ).value.trim(),
+
+        state:
+          document.getElementById(
+            "locationState"
+          ).value.trim(),
+
+        zip:
+          document.getElementById(
+            "locationZip"
+          ).value.trim(),
+
+        notes:
+          document.getElementById(
+            "locationNotes"
+          ).value.trim()
+      };
+
+
+      if (!payload.customer_id) {
+
+        showMessage(
+          "A customer is required.",
+          true
+        );
+
+        return;
+      }
+
+
+      let error;
+
+
+      if (location) {
+
+        ({
+          error
+        } =
+          await db
+            .from("locations")
+            .update(payload)
+            .eq(
+              "id",
+              location.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("locations")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        location
+          ? "Location saved."
+          : "Location created."
+      );
+
+
+      await showLocations();
+
+    }
+  );
+
+
+}
+
+async function deleteLocation(id) {
+
+
+if (!confirmDelete(
+  "Delete this location?"
+)) {
+  return;
+}
+
+
+const {
+  error
+} = await db
+  .from("locations")
+  .delete()
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  "Location deleted."
+);
+
+
+await showLocations();
+
+
+}
+
+async function loadCustomerOptions(
+elementId,
+selectedId = null
+) {
+
+
+const select =
+  document.getElementById(elementId);
+
+
+const {
+  data,
+  error
+} = await db
+  .from("customers")
+  .select("*")
+  .order("last_name");
+
+
+if (error) {
+
+  console.error(error);
+
+  select.innerHTML =
+    `<option value="">
+      Unable to load customers
+    </option>`;
+
+  return;
+}
+
+
+select.innerHTML =
+  `<option value="">
+    Select customer
+  </option>`;
+
+
+data.forEach(customer => {
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    customer.id;
+
+  option.textContent =
+    customerName(customer);
+
+  select.appendChild(option);
+
+});
+
+
+if (selectedId) {
+  select.value =
+    selectedId;
+}
+
+
+}
+
+// ============================================
+// TECHNICIANS
+// ============================================
+
+async function showTechnicians() {
+
+
+setActiveNav("technicians");
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Technicians</h1>
+
+      <p>
+        Technician records available for Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newTechnicianButton"
+    >
+      + New Technician
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    ${dispatchSearchField("technicians")}
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Name</th>
+            <th>Title</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="techniciansBody">
+
+          <tr>
+            <td colspan="6">
+              <div class="empty">
+                Loading technicians...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newTechnicianButton")
+  .addEventListener(
+    "click",
+    () => showTechnicianForm()
+  );
+
+
+setupDispatchSearch("technicians", "techniciansBody");
+
+await loadTechniciansPage();
+
+
+}
+
+async function loadTechniciansPage() {
+
+
+const body =
+  document.getElementById(
+    "techniciansBody"
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("technicians")
+  .select("*")
+  .order("last_name");
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          Unable to load technicians.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          No technicians yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body._dispatchRecords =
+  data.map(technician => ({
+    search: directorySearchText(technician, "technicians"),
+    html: `
+
+    <tr>
+
+      <td>
+        ${escapeHtml(
+          technicianName(technician)
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(technician.title || "—")}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          technician.phone || "—"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          technician.email || "—"
+        )}
+      </td>
+
+      <td>
+
+        <span class="release-badge ${
+          technician.active
+            ? "released"
+            : "unreleased"
+        }">
+
+          ${technician.active
+            ? "Active"
+            : "Inactive"}
+
+        </span>
+
+      </td>
+
+      <td>
+
+        <button
+          class="row-button"
+          onclick="showTechnicianForm('${technician.id}')"
+        >
+          Edit
+        </button>
+
+        <button
+          class="row-button"
+          onclick="toggleTechnician('${technician.id}', ${!technician.active})"
+        >
+          ${technician.active
+            ? "Deactivate"
+            : "Activate"}
+        </button>
+
+      </td>
+
+    </tr>
+
+  `
+  }));
+applyDispatchSearch("technicians", "techniciansBody");
+
+
+}
+
+async function showTechnicianForm(
+id = null
+) {
+
+
+let technician = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("technicians")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  technician =
+    data;
+}
+
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${technician
+          ? "Edit Technician"
+          : "New Technician"}
+      </h1>
+
+      <p>
+        Technician information.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="technicianForm">
+
+        <div class="form-grid">
+
+          <div class="form-group">
+
+            <label for="technicianFirstName">
+              First Name
+            </label>
+
+            <input
+              id="technicianFirstName"
+              value="${escapeAttribute(
+                technician?.first_name || ""
+              )}"
+              required
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="technicianLastName">
+              Last Name
+            </label>
+
+            <input
+              id="technicianLastName"
+              value="${escapeAttribute(
+                technician?.last_name || ""
+              )}"
+              required
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="technicianTitle">Title</label>
+
+            <input
+              id="technicianTitle"
+              placeholder="e.g. Lead Technician"
+              value="${escapeAttribute(technician?.title || "")}"
+            >
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="technicianPhone">
+              Phone
+            </label>
+
+            <input
+              id="technicianPhone"
+              value="${escapeAttribute(
+                technician?.phone || ""
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="technicianEmail">
+              Email
+            </label>
+
+            <input
+              type="email"
+              id="technicianEmail"
+              value="${escapeAttribute(
+                technician?.email || ""
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="technicianNotes">
+              Notes
+            </label>
+
+            <textarea
+              id="technicianNotes"
+            >${escapeHtml(
+              technician?.notes || ""
+            )}</textarea>
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelTechnician"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${technician
+              ? "Save Technician"
+              : "Create Technician"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById(
+  "cancelTechnician"
+)
+  .addEventListener(
+    "click",
+    showTechnicians
+  );
+
+
+document.getElementById(
+  "technicianForm"
+)
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        first_name:
+          document.getElementById(
+            "technicianFirstName"
+          ).value.trim(),
+
+        last_name:
+          document.getElementById(
+            "technicianLastName"
+          ).value.trim(),
+
+        title:
+          document.getElementById(
+            "technicianTitle"
+          ).value.trim(),
+
+        phone:
+          document.getElementById(
+            "technicianPhone"
+          ).value.trim(),
+
+        email:
+          document.getElementById(
+            "technicianEmail"
+          ).value.trim(),
+
+        notes:
+          document.getElementById(
+            "technicianNotes"
+          ).value.trim()
+      };
+
+
+      let error;
+
+
+      if (technician) {
+
+        ({
+          error
+        } =
+          await db
+            .from("technicians")
+            .update(payload)
+            .eq(
+              "id",
+              technician.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("technicians")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        technician
+          ? "Technician saved."
+          : "Technician created."
+      );
+
+
+      await showTechnicians();
+
+    }
+  );
+
+
+}
+
+async function toggleTechnician(
+id,
+active
+) {
+
+
+const {
+  error
+} = await db
+  .from("technicians")
+  .update({
+    active: active
+  })
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  active
+    ? "Technician activated."
+    : "Technician deactivated."
+);
+
+
+await showTechnicians();
+
+
+}
+
+// ============================================
+// PARTS
+// ============================================
+
+async function showParts() {
+
+
+setActiveNav("parts");
+
+const main =
+  document.getElementById("mainContent");
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Parts</h1>
+
+      <p>
+        Parts used on Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newPartButton"
+    >
+      + Add Part
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    ${dispatchSearchField("parts")}
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Work Order</th>
+            <th>Type</th>
+            <th>Work Description</th>
+            <th>Part Number</th>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th>Unit Price</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="partsBody">
+
+          <tr>
+            <td colspan="8">
+              <div class="empty">
+                Loading parts...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newPartButton")
+  .addEventListener(
+    "click",
+    () => showPartForm()
+  );
+
+
+setupDispatchSearch("parts", "partsBody");
+
+await loadPartsPage();
+
+
+}
+
+async function loadPartsPage() {
+
+
+const body =
+  document.getElementById(
+    "partsBody"
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("parts")
+  .select(`
+    *,
+    service_calls (
+      id,
+      work_order_number,
+      work_type,
+      description,
+      customers (
+        first_name,
+        last_name,
+        company_name
+      )
+    )
+  `)
+  .order(
+    "created_at",
+    {
+      ascending: false
+    }
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="8">
+        <div class="empty">
+          Unable to load parts.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="8">
+        <div class="empty">
+          No parts yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body._dispatchRecords =
+  data.map(part => {
+
+    const workOrder =
+      part.service_calls;
+
+    const workOrderLabel =
+      workOrder
+        ? customerName(
+            workOrder.customers
+          )
+        : "Work Order";
+
+
+    const search = dispatchSearchText(part, [part.part_number, part.description, part.quantity]);
+    const html = `
+
+      <tr>
+
+        <td>
+          ${relatedWorkOrderCell(part.service_calls)}
+        </td>
+        <td>
+          ${relatedWorkTypeCell(part.service_calls)}
+        </td>
+        <td>
+          ${relatedDescriptionCell(part.service_calls)}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            part.part_number || "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            part.description || "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            part.quantity ?? 0
+          )}
+        </td>
+
+        <td>
+          $${escapeHtml(
+            Number(
+              part.unit_cost || 0
+            ).toFixed(2)
+          )}
+        </td>
+
+        <td>
+
+          <button
+            class="row-button"
+            onclick="showPartForm('${part.id}')"
+          >
+            Edit
+          </button>
+
+          <button
+            class="danger"
+            onclick="deletePart('${part.id}')"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+    `;
+    return { html, search };
+  });
+  applyDispatchSearch("parts", "partsBody");
+
+
+}
+
+async function showPartForm(
+id = null,
+contextWorkOrderId = null
+) {
+
+
+let part = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("parts")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  part =
+    data;
+}
+
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${part
+          ? "Edit Part"
+          : "Add Part"}
+      </h1>
+
+      <p>
+        Part information for a Work Order.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="partForm">
+
+        <div class="form-grid">
+
+          <div class="form-group full">
+
+            <label for="partWorkOrder">
+              Work Order
+            </label>
+
+            <select
+              id="partWorkOrder"
+              required
+            >
+              <option value="">
+                Loading Work Orders...
+              </option>
+            </select>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="partNumber">
+              Part Number
+            </label>
+
+            <input
+              id="partNumber"
+              value="${escapeAttribute(
+                part?.part_number || ""
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="partQuantity">
+              Quantity
+            </label>
+
+            <input
+              type="number"
+              min="1"
+              id="partQuantity"
+              value="${escapeAttribute(
+                part?.quantity ?? 1
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="partDescription">
+              Description
+            </label>
+
+            <input
+              id="partDescription"
+              value="${escapeAttribute(
+                part?.description || ""
+              )}"
+            >
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="partUnitCost">
+              Unit Price
+            </label>
+
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              id="partUnitCost"
+              value="${escapeAttribute(
+                part?.unit_cost ?? 0
+              )}"
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelPart"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${part
+              ? "Save Part"
+              : "Add Part"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadWorkOrderOptions(
+  "partWorkOrder",
+  contextWorkOrderId || part?.service_call_id || null
+);
+
+
+// When opened from a work order, keep the association fixed.
+if (contextWorkOrderId) {
+  const orderSelect = document.getElementById("partWorkOrder");
+  if (orderSelect.value !== contextWorkOrderId) {
+    showMessage("The selected work order could not be loaded.", true);
+    return;
+  }
+  orderSelect.disabled = true;
+}
+
+document.getElementById("cancelPart")
+  .addEventListener(
+    "click",
+    () => contextWorkOrderId ? showWorkOrderDetail(contextWorkOrderId) : showParts()
+  );
+
+
+document.getElementById("partForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        service_call_id:
+          (contextWorkOrderId || document.getElementById(
+            "partWorkOrder"
+          ).value),
+
+        part_number:
+          document.getElementById(
+            "partNumber"
+          ).value.trim(),
+
+        description:
+          document.getElementById(
+            "partDescription"
+          ).value.trim(),
+
+        quantity:
+          Number(
+            document.getElementById(
+              "partQuantity"
+            ).value
+          ) || 1,
+
+        unit_cost:
+          Number(
+            document.getElementById(
+              "partUnitCost"
+            ).value
+          ) || 0
+      };
+
+
+      let error;
+
+
+      if (part) {
+
+        ({
+          error
+        } =
+          await db
+            .from("parts")
+            .update(payload)
+            .eq(
+              "id",
+              part.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("parts")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        part
+          ? "Part saved."
+          : "Part added."
+      );
+
+
+      if (contextWorkOrderId) await showWorkOrderDetail(contextWorkOrderId);
+      else await showParts();
+
+    }
+  );
+
+
+}
+
+async function deletePart(id) {
+
+
+if (!confirmDelete(
+  "Delete this part?"
+)) {
+  return;
+}
+
+
+const {
+  error
+} = await db
+  .from("parts")
+  .delete()
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  "Part deleted."
+);
+
+
+await showParts();
+
+
+}
+
+// ============================================
+// NOTES
+// ============================================
+
+async function showNotes() {
+
+
+setActiveNav("notes");
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Notes</h1>
+
+      <p>
+        Notes attached to Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newNoteButton"
+    >
+      + Add Note
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    ${dispatchSearchField("notes")}
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Work Order</th>
+            <th>Type</th>
+            <th>Work Description</th>
+            <th>Note</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="notesBody">
+
+          <tr>
+            <td colspan="6">
+              <div class="empty">
+                Loading notes...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newNoteButton")
+  .addEventListener(
+    "click",
+    () => showNoteForm()
+  );
+
+
+setupDispatchSearch("notes", "notesBody");
+
+await loadNotesPage();
+
+
+}
+
+async function loadNotesPage() {
+
+
+const body =
+  document.getElementById(
+    "notesBody"
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("service_call_notes")
+  .select(`
+    *,
+    service_calls (
+      id,
+      work_order_number,
+      work_type,
+      description,
+      customers (
+        first_name,
+        last_name,
+        company_name
+      )
+    )
+  `)
+  .order(
+    "created_at",
+    {
+      ascending: false
+    }
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          Unable to load notes.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6">
+        <div class="empty">
+          No notes yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body._dispatchRecords =
+  data.map(note => {
+
+    const workOrder =
+      note.service_calls;
+
+    const workOrderName =
+      workOrder
+        ? customerName(
+            workOrder.customers
+          )
+        : "Work Order";
+
+
+    const created =
+      note.created_at
+        ? new Date(
+            note.created_at
+          ).toLocaleString()
+        : "—";
+
+
+    const search = dispatchSearchText(note, [note.note]);
+    const html = `
+
+      <tr>
+
+        <td>
+          ${relatedWorkOrderCell(note.service_calls)}
+        </td>
+        <td>
+          ${relatedWorkTypeCell(note.service_calls)}
+        </td>
+        <td>
+          ${relatedDescriptionCell(note.service_calls)}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            note.note || ""
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(created)}
+        </td>
+
+        <td>
+
+          <button
+            class="row-button"
+            onclick="showNoteForm('${note.id}')"
+          >
+            Edit
+          </button>
+
+          <button
+            class="danger"
+            onclick="deleteNote('${note.id}')"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+    `;
+    return { html, search };
+  });
+  applyDispatchSearch("notes", "notesBody");
+
+
+}
+
+async function showNoteForm(
+id = null,
+contextWorkOrderId = null
+) {
+
+
+let note = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("service_call_notes")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  note =
+    data;
+}
+
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${note
+          ? "Edit Note"
+          : "Add Note"}
+      </h1>
+
+      <p>
+        Work Order note.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="noteForm">
+
+        <div class="form-grid">
+
+          <div class="form-group full">
+
+            <label for="noteWorkOrder">
+              Work Order
+            </label>
+
+            <select
+              id="noteWorkOrder"
+              required
+            >
+              <option value="">
+                Loading Work Orders...
+              </option>
+            </select>
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="noteText">
+              Note
+            </label>
+
+            <textarea
+              id="noteText"
+              required
+            >${escapeHtml(
+              note?.note || ""
+            )}</textarea>
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelNote"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${note
+              ? "Save Note"
+              : "Add Note"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadWorkOrderOptions(
+  "noteWorkOrder",
+  contextWorkOrderId || note?.service_call_id || null
+);
+
+
+// When opened from a work order, keep the association fixed.
+if (contextWorkOrderId) {
+  const orderSelect = document.getElementById("noteWorkOrder");
+  if (orderSelect.value !== contextWorkOrderId) {
+    showMessage("The selected work order could not be loaded.", true);
+    return;
+  }
+  orderSelect.disabled = true;
+}
+
+document.getElementById("cancelNote")
+  .addEventListener(
+    "click",
+    () => contextWorkOrderId ? showWorkOrderDetail(contextWorkOrderId) : showNotes()
+  );
+
+
+document.getElementById("noteForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const payload = {
+
+        service_call_id:
+          (contextWorkOrderId || document.getElementById(
+            "noteWorkOrder"
+          ).value),
+
+        note:
+          document.getElementById(
+            "noteText"
+          ).value.trim()
+      };
+
+
+      if (
+        !payload.service_call_id ||
+        !payload.note
+      ) {
+
+        showMessage(
+          "Work Order and note are required.",
+          true
+        );
+
+        return;
+      }
+
+
+      let error;
+
+
+      if (note) {
+
+        ({
+          error
+        } =
+          await db
+            .from("service_call_notes")
+            .update(payload)
+            .eq(
+              "id",
+              note.id
+            ));
+
+      } else {
+
+        payload.user_id =
+          currentProfile.id;
+
+        ({
+          error
+        } =
+          await db
+            .from("service_call_notes")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        note
+          ? "Note saved."
+          : "Note added."
+      );
+
+
+      if (contextWorkOrderId) await showWorkOrderDetail(contextWorkOrderId);
+      else await showNotes();
+
+    }
+  );
+
+
+}
+
+async function deleteNote(id) {
+
+
+if (!confirmDelete(
+  "Delete this note?"
+)) {
+  return;
+}
+
+
+const {
+  error
+} = await db
+  .from("service_call_notes")
+  .delete()
+  .eq(
+    "id",
+    id
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  showMessage(
+    error.message,
+    true
+  );
+
+  return;
+}
+
+
+showMessage(
+  "Note deleted."
+);
+
+
+await showNotes();
+
+
+}
+
+// ============================================
+// PHOTOS
+// ============================================
+
+async function showPhotos() {
+
+
+setActiveNav("photos");
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>Photos</h1>
+
+      <p>
+        Photos attached to Work Orders.
+      </p>
+
+    </div>
+
+    <button
+      class="primary"
+      id="newPhotoButton"
+    >
+      + Add Photo
+    </button>
+
+  </div>
+
+
+  <div class="card">
+
+    ${dispatchSearchField("photos")}
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>Work Order</th>
+            <th>Type</th>
+            <th>Work Description</th>
+            <th>Photo</th>
+            <th>Caption</th>
+            <th>Added</th>
+            <th></th>
+          </tr>
+
+        </thead>
+
+        <tbody id="photosBody">
+
+          <tr>
+            <td colspan="7">
+              <div class="empty">
+                Loading photos...
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+`;
+
+
+document.getElementById("newPhotoButton")
+  .addEventListener(
+    "click",
+    () => showPhotoForm()
+  );
+
+
+setupDispatchSearch("photos", "photosBody");
+
+await loadPhotosPage();
+
+
+}
+
+async function loadPhotosPage() {
+
+
+const body =
+  document.getElementById(
+    "photosBody"
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("service_call_photos")
+  .select(`
+    *,
+    service_calls (
+      id,
+      work_order_number,
+      work_type,
+      description,
+      customers (
+        first_name,
+        last_name,
+        company_name
+      )
+    )
+  `)
+  .order(
+    "created_at",
+    {
+      ascending: false
+    }
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="7">
+        <div class="empty">
+          Unable to load photos.<br><br>
+          ${escapeHtml(error.message)}
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+if (!data || data.length === 0) {
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="7">
+        <div class="empty">
+          No photos yet.
+        </div>
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+
+body._dispatchRecords =
+  await Promise.all(data.map(async photo => {
+
+    const workOrder =
+      photo.service_calls;
+
+    const workOrderName =
+      workOrder
+        ? customerName(
+            workOrder.customers
+          )
+        : "Work Order";
+
+
+    const created =
+      photo.created_at
+        ? new Date(
+            photo.created_at
+          ).toLocaleString()
+        : "—";
+
+
+    let photoUrl = "";
+    if (photo.file_path) {
+      if (/^https?:\/\//i.test(photo.file_path)) {
+        photoUrl = photo.file_path;
+      } else {
+        const signed = await db.storage.from("dispatch-photos").createSignedUrl(photo.file_path, 3600);
+        if (signed.error) console.error("Photo access:", signed.error);
+        else photoUrl = signed.data.signedUrl;
+      }
+    }
+
+    const image =
+      photoUrl
+        ? `
+          <a
+            href="${escapeAttribute(
+              photoUrl
+            )}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img
+              class="photo-preview"
+              src="${escapeAttribute(
+                photoUrl
+              )}"
+              alt="${escapeAttribute(
+                photo.caption || "Work Order photo"
+              )}"
+            >
+          </a>
+        `
+        : "—";
+
+
+    const search = dispatchSearchText(photo, [photo.caption]);
+    const html = `
+
+      <tr>
+
+        <td>
+          ${relatedWorkOrderCell(photo.service_calls)}
+        </td>
+        <td>
+          ${relatedWorkTypeCell(photo.service_calls)}
+        </td>
+        <td>
+          ${relatedDescriptionCell(photo.service_calls)}
+        </td>
+
+        <td>
+          ${image}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            photo.caption || "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(created)}
+        </td>
+
+        <td>
+
+          <button
+            class="row-button"
+            onclick="showPhotoForm('${photo.id}')"
+          >
+            Edit
+          </button>
+
+          <button
+            class="danger"
+            onclick="deletePhoto('${photo.id}')"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+    `;
+    return { html, search };
+  }));
+  applyDispatchSearch("photos", "photosBody");
+
+
+}
+
+async function showPhotoForm(
+id = null,
+contextWorkOrderId = null
+) {
+
+
+let photo = null;
+
+
+if (id) {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("service_call_photos")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .single();
+
+
+  if (error) {
+
+    showMessage(
+      error.message,
+      true
+    );
+
+    return;
+  }
+
+  photo =
+    data;
+}
+
+
+const main =
+  document.getElementById(
+    "mainContent"
+  );
+
+
+main.innerHTML = `
+
+  <div class="page-head">
+
+    <div>
+
+      <h1>
+        ${photo
+          ? "Edit Photo"
+          : "Add Photo"}
+      </h1>
+
+      <p>
+        Attach a photo to a Work Order.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="card-body">
+
+      <form id="photoForm">
+
+        <div class="form-grid">
+
+          <div class="form-group full">
+
+            <label for="photoWorkOrder">
+              Work Order
+            </label>
+
+            <select
+              id="photoWorkOrder"
+              required
+            >
+              <option value="">
+                Loading Work Orders...
+              </option>
+            </select>
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="photoUpload">Upload Photo</label>
+            <input id="photoUpload" type="file" accept="image/*">
+            <div class="small-muted">Choose an image from your phone or computer (max 10 MB). Alternatively, use a URL below.</div>
+            <label for="photoPath" style="margin-top:14px;">Existing Photo URL / File Path</label>
+
+            <input
+              id="photoPath"
+              value="${escapeAttribute(
+                photo?.file_path || ""
+              )}"
+              placeholder="Optional if uploading a photo"
+            >
+
+            <div class="small-muted">
+              Enter the image URL or stored file path.
+            </div>
+
+          </div>
+
+
+          <div class="form-group full">
+
+            <label for="photoCaption">
+              Caption
+            </label>
+
+            <input
+              id="photoCaption"
+              value="${escapeAttribute(
+                photo?.caption || ""
+              )}"
+              placeholder="Describe the photo..."
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            type="button"
+            class="secondary"
+            id="cancelPhoto"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary"
+          >
+            ${photo
+              ? "Save Photo"
+              : "Add Photo"}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+`;
+
+
+await loadWorkOrderOptions(
+  "photoWorkOrder",
+  contextWorkOrderId || photo?.service_call_id || null
+);
+
+
+// When opened from a work order, keep the association fixed.
+if (contextWorkOrderId) {
+  const orderSelect = document.getElementById("photoWorkOrder");
+  if (orderSelect.value !== contextWorkOrderId) {
+    showMessage("The selected work order could not be loaded.", true);
+    return;
+  }
+  orderSelect.disabled = true;
+}
+
+document.getElementById("cancelPhoto")
+  .addEventListener(
+    "click",
+    () => contextWorkOrderId ? showWorkOrderDetail(contextWorkOrderId) : showPhotos()
+  );
+
+
+document.getElementById("photoForm")
+  .addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const selectedFile = document.getElementById("photoUpload").files[0];
+      let uploadedPath = document.getElementById("photoPath").value.trim();
+      const workOrderId = contextWorkOrderId || document.getElementById("photoWorkOrder").value;
+      if (selectedFile) {
+        if (!selectedFile.type.startsWith("image/") || selectedFile.size > 10 * 1024 * 1024) {
+          showMessage("Select an image smaller than 10 MB.", true);
+          return;
+        }
+        if (!workOrderId) {
+          showMessage("Select a work order before uploading.", true);
+          return;
+        }
+        const extension = (selectedFile.name.split(".").pop() || "jpg").toLowerCase();
+        const storagePath = `${workOrderId}/${crypto.randomUUID()}.${extension}`;
+        const uploadResult = await db.storage.from("dispatch-photos")
+          .upload(storagePath, selectedFile, { contentType: selectedFile.type, upsert: false });
+        if (uploadResult.error) {
+          showMessage("Photo upload failed: " + uploadResult.error.message, true);
+          return;
+        }
+        uploadedPath = storagePath;
+      }
+
+      const payload = {
+
+        service_call_id:
+          (contextWorkOrderId || document.getElementById(
+            "photoWorkOrder"
+          ).value),
+
+        file_path: uploadedPath,
+
+        caption:
+          document.getElementById(
+            "photoCaption"
+          ).value.trim()
+      };
+
+
+      if (
+        !payload.service_call_id ||
+        !payload.file_path
+      ) {
+
+        showMessage(
+          "Work Order and photo path are required.",
+          true
+        );
+
+        return;
+      }
+
+
+      let error;
+
+
+      if (photo) {
+
+        ({
+          error
+        } =
+          await db
+            .from("service_call_photos")
+            .update(payload)
+            .eq(
+              "id",
+              photo.id
+            ));
+
+      } else {
+
+        ({
+          error
+        } =
+          await db
+            .from("service_call_photos")
+            .insert(payload));
+      }
+
+
+      if (error) {
+
+        console.error(error);
+
+        showMessage(
+          error.message,
+          true
+        );
+
+        return;
+      }
+
+
+      showMessage(
+        photo
+          ? "Photo saved."
+          : "Photo added."
+      );
+
+
+      if (contextWorkOrderId) await showWorkOrderDetail(contextWorkOrderId);
+      else await showPhotos();
+
+    }
+  );
+
+
+}
+
+async function deletePhoto(id) {
+  if (!confirmDelete("Permanently delete this photo and its stored image?")) return;
+  const { data: photo, error: readError } = await db
+    .from("service_call_photos").select("id,file_path").eq("id", id).single();
+  if (readError) { showMessage(readError.message, true); return; }
+  // Delete the database record first. If forbidden, do not touch Storage.
+  const { data: deleted, error } = await db.from("service_call_photos")
+    .delete().eq("id", id).select("id");
+  if (error || !deleted?.length) {
+    showMessage(error?.message || "You do not have permission to delete this photo.", true);
+    return;
+  }
+  if (photo.file_path && !/^https?:\/\//i.test(photo.file_path)) {
+    const result = await db.storage.from("dispatch-photos").remove([photo.file_path]);
+    if (result.error) {
+      console.error("Storage deletion:", result.error);
+      showMessage("Photo record removed, but storage cleanup failed: " + result.error.message, true);
+      await showPhotos();
+      return;
+    }
+  }
+  showMessage("Photo deleted.");
+  await showPhotos();
+}
+
+// ============================================
+// WORK ORDER OPTIONS
+// ============================================
+
+async function loadWorkOrderOptions(
+elementId,
+selectedId = null
+) {
+
+
+const select =
+  document.getElementById(
+    elementId
+  );
+
+
+const {
+  data,
+  error
+} = await db
+  .from("service_calls")
+  .select(`
+    id,
+    work_order_number,
+    work_type,
+    description,
+    scheduled_at,
+    customers (
+      first_name,
+      last_name,
+      company_name
+    )
+  `)
+  .order(
+    "scheduled_at",
+    {
+      ascending: false,
+      nullsFirst: false
+    }
+  );
+
+
+if (error) {
+
+  console.error(error);
+
+  select.innerHTML =
+    `<option value="">
+      Unable to load Work Orders
+    </option>`;
+
+  return;
+}
+
+
+select.innerHTML =
+  `<option value="">
+    Select Work Order
+  </option>`;
+
+
+data.forEach(call => {
+
+  const option =
+    document.createElement(
+      "option"
+    );
+
+
+  const customer =
+    customerName(
+      call.customers
+    );
+
+
+  const date =
+    call.scheduled_at
+      ? new Date(
+          call.scheduled_at
+        ).toLocaleDateString()
+      : "Unscheduled";
+
+
+  option.value =
+    call.id;
+
+
+  option.textContent =
+    `${workOrderLabel(call)} · ${workTypeLabel(call.work_type)} · ${customer} · ${date} · ${descriptionPreview(call.description, 65)}`;
+
+
+  select.appendChild(
+    option
+  );
+
+});
+
+
+if (selectedId) {
+
+  select.value =
+    selectedId;
+}
+
+
+}
+
+// ============================================
+// NAVIGATION
+// ============================================
+
+function setActiveNav(page) {
+
+
+document.querySelectorAll(
+  ".nav-button"
+)
+  .forEach(button => {
+
+    button.classList.toggle(
+      "active",
+      button.dataset.page === page
+    );
+
+  });
+
+
+}
+
+document.querySelectorAll(
+".nav-button"
+)
+.forEach(button => {
+
+
+  button.addEventListener(
+    "click",
+    async () => {
+
+      const page =
+        button.dataset.page;
+
+
+      if (page === "intake") {
+        await showOfficeIntake();
+      } else if (page === "schedule") {
+
+        await showSchedule();
+
+      } else if (
+        page === "work-orders"
+      ) {
+
+        await showWorkOrders();
+
+      } else if (
+        page === "customers"
+      ) {
+
+        await showCustomers();
+
+      } else if (
+        page === "locations"
+      ) {
+
+        await showLocations();
+
+      } else if (
+        page === "technicians"
+      ) {
+
+        await showTechnicians();
+
+      } else if (
+        page === "parts"
+      ) {
+
+        await showParts();
+
+      } else if (
+        page === "notes"
+      ) {
+
+        await showNotes();
+
+      } else if (
+        page === "photos"
+      ) {
+
+        await showPhotos();
+
+      }
+
+    }
+  );
+
+});
+
+
+// ============================================
+// SIGN OUT
+// ============================================
+
+document.getElementById(
+"signOutButton"
+)
+.addEventListener(
+"click",
+async () => {
+
+    await db.auth.signOut();
+
+    window.location.href =
+      "login.html";
+
+  }
+);
+
+
+// ============================================
+// START
+// ============================================
+
+async function startApp() {
+
+
+const loggedIn =
+  await requireLogin();
+
+if (!loggedIn) {
+  return;
+}
+
+
+const profileLoaded =
+  await loadUserProfile();
+
+if (!profileLoaded) {
+  return;
+}
+
+
+await showWorkOrders();
+
+
+}
+
+startApp();
+
+</script>
+
+</body>
+</html>
