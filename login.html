@@ -1,269 +1,100 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Signature Dispatch — Sign In</title>
-
+  <title>Signature — Sign In</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f4f5f7;
-      font-family: Arial, Helvetica, sans-serif;
-      color: #222;
-    }
-
-    .login-box {
-      width: min(92%, 400px);
-      background: #ffffff;
-      padding: 40px;
-      border-radius: 10px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-    }
-
-    .brand {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-
-    .brand h1 {
-      margin: 0;
-      font-size: 30px;
-      font-weight: 700;
-      letter-spacing: 1px;
-    }
-
-    .brand p {
-      margin: 8px 0 0;
-      color: #666;
-      font-size: 14px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 7px;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    input {
-      width: 100%;
-      padding: 13px 14px;
-      margin-bottom: 20px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 16px;
-      outline: none;
-    }
-
-    input:focus {
-      border-color: #555;
-    }
-
-    button {
-      width: 100%;
-      padding: 13px;
-      border: none;
-      border-radius: 6px;
-      background: #222;
-      color: #fff;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #000;
-    }
-
-    button:disabled {
-      background: #999;
-      cursor: not-allowed;
-    }
-
-    .message {
-      min-height: 20px;
-      margin-top: 18px;
-      text-align: center;
-      font-size: 14px;
-    }
-
-    .error {
-      color: #b00020;
-    }
-
-    .success {
-      color: #267326;
-    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f4f5f7; font-family: Arial, Helvetica, sans-serif; color: #222; }
+    .login-box { width: min(92%, 400px); background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.08); }
+    .brand { text-align: center; margin-bottom: 32px; }
+    .brand h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: 1px; }
+    .brand p { margin: 8px 0 0; color: #666; font-size: 14px; }
+    label { display: block; margin-bottom: 7px; font-size: 14px; font-weight: 600; }
+    input { width: 100%; padding: 13px 14px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; outline: none; }
+    input:focus { border-color: #555; }
+    button { width: 100%; padding: 13px; border: none; border-radius: 6px; background: #222; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #000; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    .message { min-height: 20px; margin-top: 18px; text-align: center; font-size: 14px; }
+    .error { color: #b00020; }
+    .success { color: #267326; }
   </style>
-
 </head>
-
 <body>
-
   <main class="login-box">
-
-```
-<div class="brand">
-  <h1>Signature</h1>
-  <p>Dispatch</p>
-</div>
-
-<form id="loginForm">
-
-  <label for="email">Email</label>
-
-  <input
-    type="email"
-    id="email"
-    autocomplete="email"
-    required
-  >
-
-  <label for="password">Password</label>
-
-  <input
-    type="password"
-    id="password"
-    autocomplete="current-password"
-    required
-  >
-
-  <button type="submit" id="loginButton">
-    Sign In
-  </button>
-
-  <div id="message" class="message"></div>
-
-</form>
-```
-
+    <div class="brand">
+      <h1>SIGNATURE</h1>
+      <p>SIGN IN</p>
+    </div>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="email" required>
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" required>
+      <button type="submit" id="loginButton">Sign In</button>
+      <div id="message" class="message" role="status" aria-live="polite"></div>
+    </form>
   </main>
-
   <script>
+    'use strict';
+    const SUPABASE_URL = 'https://zpawrfdfutswbvhlwvqf.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const loginForm = document.getElementById('loginForm');
+    const loginButton = document.getElementById('loginButton');
+    const message = document.getElementById('message');
 
-    // ============================================
-    // SUPABASE CONNECTION
-    // ============================================
+    function setMessage(text, error = false) {
+      message.textContent = text;
+      message.className = 'message ' + (error ? 'error' : 'success');
+    }
 
-    const SUPABASE_URL =
-      "https://zpawrfdfutswbvhlwvqf.supabase.co";
+    async function routeAuthenticatedUser(user) {
+      const { data: profile, error } = await db
+        .from('users')
+        .select('role, active')
+        .eq('auth_user_id', user.id)
+        .single();
 
-    const SUPABASE_ANON_KEY =
-      "sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68";
+      if (error) throw new Error('Unable to load your Signature account: ' + error.message);
+      if (!profile || !profile.active) throw new Error('Your Signature account is not active. Contact Dispatch.');
 
-    const { createClient } = supabase;
-
-    const db = createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
-
-
-    // ============================================
-    // LOGIN
-    // ============================================
-
-    const loginForm =
-      document.getElementById("loginForm");
-
-    const loginButton =
-      document.getElementById("loginButton");
-
-    const message =
-      document.getElementById("message");
-
-
-    loginForm.addEventListener(
-      "submit",
-      async function (event) {
-
-        event.preventDefault();
-
-        message.textContent = "";
-        message.className = "message";
-
-        const email =
-          document.getElementById("email").value.trim();
-
-        const password =
-          document.getElementById("password").value;
-
-
-        loginButton.disabled = true;
-        loginButton.textContent = "Signing in...";
-
-
-        const { data, error } =
-          await db.auth.signInWithPassword({
-            email: email,
-            password: password
-          });
-
-
-        if (error) {
-
-          message.textContent =
-            error.message;
-
-          message.className =
-            "message error";
-
-          loginButton.disabled = false;
-          loginButton.textContent = "Sign In";
-
-          return;
-        }
-
-
-        if (data.session) {
-
-          message.textContent =
-            "Signed in successfully.";
-
-          message.className =
-            "message success";
-
-
-          /*
-            Temporary destination.
-
-            We will replace this with the
-            actual Dispatch application once
-            we build it.
-          */
-
-          window.location.href =
-            "dispatch.html";
-
-        } else {
-
-          message.textContent =
-            "Sign-in succeeded, but no session was created.";
-
-          message.className =
-            "message error";
-
-          loginButton.disabled = false;
-          loginButton.textContent = "Sign In";
-        }
-
+      const role = String(profile.role || '').trim().toLowerCase();
+      if (role === 'technician') {
+        window.location.replace('technician.html');
+      } else if (role === 'dispatcher' || role === 'secretary') {
+        window.location.replace('dispatch.html');
+      } else if (role === 'management') {
+        throw new Error('Management sign-in is recognized, but the read-only management page has not been built yet.');
+      } else {
+        throw new Error('No supported Signature role is assigned to this account.');
       }
-    );
+    }
 
+    loginForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      loginButton.disabled = true;
+      loginButton.textContent = 'Signing in...';
+      setMessage('');
+      try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const { data, error } = await db.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        if (!data.session || !data.user) throw new Error('Sign-in succeeded, but no session was created.');
+        setMessage('Signed in. Opening your workspace...');
+        await routeAuthenticatedUser(data.user);
+      } catch (error) {
+        console.error('Signature sign-in:', error);
+        setMessage(error.message || 'Unable to sign in.', true);
+      } finally {
+        loginButton.disabled = false;
+        loginButton.textContent = 'Sign In';
+      }
+    });
   </script>
-
 </body>
 </html>
