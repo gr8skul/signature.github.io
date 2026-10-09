@@ -251,6 +251,7 @@ function teamSection(o){
   return `<div class="section"><h3>ASSIGNED TEAM</h3><div class="team-members">${members.map(m=>`<span class="team-member ${m.technician_id===tech.id?'self':''}">${esc(m.display_name)}${m.technician_id===tech.id?' (You)':''}${o.lead_technician_id===m.technician_id?' · Lead':''}</span>`).join('')}</div></div>`;
 }
 function detail(o){
+ const lead=isLead(o);
  const tel=o.customers?.phone||'';
  const addr=address(o.locations);
  const map=addr?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr):'';
