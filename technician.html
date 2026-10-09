@@ -4,13 +4,13 @@
 <style>
 :root{--bg:#f4f5f7;--surface:#fff;--ink:#202326;--muted:#697078;--line:#dfe2e6;--green:#356b45;--red:#a52a2a}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:var(--ink)}button,input,textarea,select{font:inherit}button{cursor:pointer}header{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--line);padding:14px max(16px,calc((100vw - 850px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px}
+body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:var(--ink)}button,input,textarea,select{font:inherit}button{cursor:pointer}header{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--line);padding:9px max(16px,calc((100vw - 850px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px}
 .brand{font-size:19px;font-weight:800;letter-spacing:.7px}
 .brand small{display:block;font-size:11px;color:var(--muted);letter-spacing:1px;margin-top:3px}
-.user{font-size:12px;text-align:right;color:var(--muted)}main{max-width:850px;margin:0 auto;padding:20px 16px 90px}
-.title{font-size:25px;margin:5px 0}
+.user{font-size:12px;text-align:right;color:var(--muted)}main{max-width:850px;margin:0 auto;padding:8px 16px 90px}
+.title{font-size:23px;margin:2px 0 6px}
 .sub{color:var(--muted);margin:5px 0 20px}
-.tabs{display:flex;gap:7px;overflow-x:auto;padding-bottom:10px;margin-bottom:8px}
+.tabs{display:flex;gap:7px;overflow-x:auto;padding-bottom:5px;margin-bottom:5px}
 .tab{white-space:nowrap;background:#fff;border:1px solid var(--line);padding:11px 14px;border-radius:7px}
 .tab.active,.dark{background:#222;color:#fff;border-color:#222}
 .card{background:#fff;border:1px solid var(--line);border-radius:9px;padding:17px;margin:12px 0}
@@ -38,7 +38,7 @@ body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:va
 @media(max-width:550px){.grid{grid-template-columns:1fr}
 .actions .btn{flex:1}
 .user{max-width:135px;overflow-wrap:anywhere}
-.card{padding:14px}main{padding:16px 12px 80px}}
+.card{padding:14px}main{padding:8px 12px 80px}}
 </style></head><body>
 <header><div class="brand">SIGNATURE<small>TECHNICIAN PORTAL</small></div><div class="user"><div id="who">Signing in...</div><button class="btn" id="signout" style="margin-top:6px;padding:6px 10px;min-height:30px">Sign Out</button></div></header>
 <main><div id="app" class="empty">Loading your schedule...</div></main><div id="toast" role="status" aria-live="polite"></div>
@@ -142,7 +142,7 @@ async function loadRequests(){
   }catch(e){requests=[];console.warn(e);toast('Requests unavailable: '+e.message,true)}
 }
 function requestsView(){
- return `<h1 class="title">My Schedule Requests</h1>
+ return `<h1 class="title">Work Orders</h1>
  <div class="actions">${btn('newRequest','+ New Request','dark')}${btn('refresh','↻ Refresh')}</div>
  ${requests.length?requests.map(r=>`<article class="card">
  <span class="pill">${esc(label(r.status))}</span><span class="pill">${esc(label(r.request_type))}</span>
@@ -246,12 +246,12 @@ function render(){
  if(tab==='requests'){app.innerHTML=requestsView().replace('<div class="actions">',topTabs()+'<div class="actions">');return}
  if(tab==='schedule'){
   const items=scheduleItems();
-  app.innerHTML=`<h1 class="title">My Schedule</h1>
+  app.innerHTML=`<h1 class="title">Work Orders</h1>
   ${topTabs()}<div class="actions">${btn('refresh','↻ Refresh')}</div>
   ${items.length?items.map(x=>x.kind==='block'?blockCard(x.item):orderCard(x.item)).join(''):'<div class="empty">Nothing on your schedule yet.</div>'}`;
   return;
  }
- app.innerHTML=`<h1 class="title">My Work Orders</h1>
+ app.innerHTML=`<h1 class="title">Work Orders</h1>
  ${topTabs()}<div class="actions">${btn('refresh','↻ Refresh')}</div>
  ${filtered().length?filtered().map(orderCard).join(''):'<div class="empty">No work orders in this section.</div>'}`;
 }
