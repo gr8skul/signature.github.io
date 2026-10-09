@@ -1938,6 +1938,16 @@
             </div>
 
             <div class="detail-item">
+              <div class="detail-label">Billing Method</div>
+              <div class="detail-value">${call.billing_method === "quoted" ? "Quoted" : "Standard — Labor & Parts"}</div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">Lead Technician</div>
+              <div class="detail-value">${escapeHtml((call._assignments || []).find(a => a.technician_id === (call.lead_technician_id || (call._assignments?.length === 1 ? call._assignments[0].technician_id : null)))?.technicians ? technicianName((call._assignments || []).find(a => a.technician_id === (call.lead_technician_id || (call._assignments?.length === 1 ? call._assignments[0].technician_id : null))).technicians) : "Not designated")}</div>
+            </div>
+
+            <div class="detail-item">
               <div class="detail-label">
                 Status
               </div>
@@ -2253,6 +2263,20 @@
 
 
               <div class="form-group">
+                <label for="billingMethod">Billing Method</label>
+                <select id="billingMethod">
+                  <option value="standard">Standard — Labor &amp; Parts</option>
+                  <option value="quoted">Quoted</option>
+                </select>
+              </div>
+
+              <div class="form-group" id="leadTechnicianGroup" style="display:none;">
+                <label for="leadTechnician">Lead Technician</label>
+                <select id="leadTechnician"><option value="">Select lead technician</option></select>
+                <div class="small-muted">Required when two or more technicians are assigned. Solo technicians are automatically lead.</div>
+              </div>
+
+              <div class="form-group">
 
                 <label>Technicians</label>
                 <div class="small-muted" style="margin-bottom:8px;">Select one, several, or all technicians.</div>
@@ -2417,11 +2441,26 @@ await loadCustomersForForm(
 
 await loadTechniciansForForm(existing);
 
+function refreshLeadChoices() {
+  const checked = [...document.querySelectorAll(".technician-choice:checked")];
+  const group = document.getElementById("leadTechnicianGroup");
+  const select = document.getElementById("leadTechnician");
+  const previous = select.value || existing?.lead_technician_id || "";
+  group.style.display = checked.length >= 2 ? "flex" : "none";
+  select.innerHTML = '<option value="">Select lead technician</option>' +
+    checked.map(c => `<option value="${escapeAttribute(c.value)}">${escapeHtml(c.closest("label")?.innerText?.trim() || "Technician")}</option>`).join("");
+  select.value = checked.some(c => c.value === previous) ? previous : "";
+}
+document.getElementById("technicianChoices").addEventListener("change", refreshLeadChoices);
+refreshLeadChoices();
+
 document.getElementById("selectAllTechnicians").addEventListener("click", () => {
   document.querySelectorAll(".technician-choice").forEach(c => c.checked = true);
+  refreshLeadChoices();
 });
 document.getElementById("clearTechnicians").addEventListener("click", () => {
   document.querySelectorAll(".technician-choice").forEach(c => c.checked = false);
+  refreshLeadChoices();
 });
 
 
@@ -2436,6 +2475,9 @@ if (existing) {
 
   document.getElementById("workType").value =
     existing.work_type || "service";
+
+  document.getElementById("billingMethod").value =
+    existing.billing_method || "standard";
 
   document.getElementById("scheduledAt").value =
     existing.scheduled_at
@@ -2651,6 +2693,14 @@ const locationId =
 const technicianIds = [...document.querySelectorAll(".technician-choice:checked")]
   .map(c => c.value);
 const technicianId = technicianIds[0] || null;
+const billingMethod = document.getElementById("billingMethod").value;
+const leadTechnicianId = technicianIds.length === 1
+  ? technicianIds[0]
+  : technicianIds.length > 1 ? document.getElementById("leadTechnician").value : null;
+if (technicianIds.length > 1 && !leadTechnicianId) {
+  showMessage("Select a lead technician when assigning two or more technicians.", true);
+  return;
+}
 
 const workType =
   document.getElementById("workType").value;
@@ -2695,6 +2745,9 @@ const payload = {
 
   work_type:
     workType,
+
+  billing_method: billingMethod,
+  lead_technician_id: leadTechnicianId,
 
   released:
     released,
