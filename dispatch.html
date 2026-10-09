@@ -659,6 +659,8 @@
   Work Orders
 </button>
 
+<button class="nav-button" data-page="schedule-blocks">Schedule Blocks</button>
+
 <button class="nav-button" data-page="customers">
   Customers
 </button>
@@ -715,6 +717,7 @@
   let currentProfile = null;
   let currentDate = new Date();
   let currentWorkOrderFilter = "all";
+  let currentBlockFilter = "active";
   let workOrderSort = { field: "created_at", ascending: false };
   const dispatchSearch = { "work-orders": "", parts: "", notes: "", photos: "",
     customers: "", locations: "", technicians: "" };
@@ -1125,6 +1128,7 @@
         >
           + New Work Order
         </button>
+        <button class="secondary" id="newScheduleBlockButton">+ Schedule Block</button>
 
       </div>
 
@@ -1201,6 +1205,7 @@
       );
 
 
+    document.getElementById("newScheduleBlockButton").addEventListener("click", () => showScheduleBlockForm());
     await loadSchedule();
   }
 
@@ -1281,27 +1286,18 @@
       return;
     }
 
-    if (!data || data.length === 0) {
 
-      list.innerHTML = `
-        <div class="empty">
-          No work is scheduled for this day.
-        </div>
-      `;
-
-      return;
-    }
 
     try {
-      const assignments = await fetchAssignmentMap(data);
-      data.forEach(call => call._assignments = assignments.get(call.id) || []);
+      const assignments = await fetchAssignmentMap(data || []);
+      (data || []).forEach(call => call._assignments = assignments.get(call.id) || []);
     } catch (e) {
       console.error(e);
       showMessage("Technician assignments unavailable; showing existing work orders.", true);
     }
 
     list.innerHTML =
-      data.map(call => {
+      (data || []).map(call => {
 
         const scheduled =
           new Date(call.scheduled_at);
@@ -1399,6 +1395,7 @@
         `;
 
       }).join("");
+    await appendScheduleBlocks(list, start, end);
   }
 
 
@@ -1525,6 +1522,7 @@
     updateWorkOrderSortHeaders();
     setupDispatchSearch("work-orders", "workOrdersBody");
     await loadWorkOrders();
+    await appendWorkOrderBlockPanel();
   }
 
 
@@ -6273,6 +6271,142 @@ if (selectedId) {
 
 }
 
+
+// ============================================
+// SCHEDULE BLOCKS — separate records, shared views
+// ============================================
+const blockTypes = ['vacation','time_off','appointment','training','meeting','lunch','unavailable','other'];
+function blockStatus(b){return b.status==='pending'?'Pending Approval':b.status==='approved'&&b.released?'Released':statusLabel(b.status)}
+function blockDate(x){return x?new Date(x).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):''}
+function blockTechnicians(b){return (b.schedule_block_technicians||[]).map(x=>technicianName(x.technicians)).join(', ')}
+function blockTag(b){return `<span class="type-badge">SCHEDULE BLOCK</span> <span class="status">${escapeHtml(blockStatus(b))}</span>`}
+function blockCard(b){
+ const team=blockTechnicians(b);
+ return `<div class="schedule-item" style="border-left:4px solid #8a641f">
+   <div class="schedule-time">${escapeHtml(new Date(b.starts_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}))}</div>
+   <div><div class="schedule-description">${escapeHtml(b.title)}</div>
+   <div class="schedule-meta">${blockTag(b)} · ${escapeHtml(statusLabel(b.block_type))}
+   ${team?' · '+escapeHtml(team):''}<br>${escapeHtml(blockDate(b.starts_at))} – ${escapeHtml(blockDate(b.ends_at))}
+   ${b.description?'<br>'+escapeHtml(b.description):''}</div></div>
+   <div class="schedule-actions"><button class="row-button" onclick="showScheduleBlockDetail('${b.id}')">Open</button></div>
+ </div>`;
+}
+async function fetchBlocks(){
+ const {data,error}=await db.from('schedule_blocks').select('*,schedule_block_technicians(technician_id,technicians(first_name,last_name))').order('starts_at',{ascending:true});
+ if(error)throw error;
+ return data||[];
+}
+async function fetchRequests(){
+ const {data,error}=await db.from('schedule_block_requests').select('*').order('created_at',{ascending:false});
+ if(error)throw error;
+ return data||[];
+}
+async function appendScheduleBlocks(list,start,end){
+ try{
+   const blocks=(await fetchBlocks()).filter(b=>!['cancelled','declined'].includes(b.status)&&new Date(b.starts_at)<=end&&new Date(b.ends_at)>start);
+   if(!list.isConnected)return;
+   list.innerHTML=(list.innerHTML||'')+blocks.map(blockCard).join('');
+   if(!list.innerHTML.trim())list.innerHTML='<div class="empty">No work orders or schedule blocks for this day.</div>';
+ }catch(e){console.error(e);if(list.isConnected)list.insertAdjacentHTML('beforeend',`<div class="empty">Schedule blocks unavailable: ${escapeHtml(e.message)}</div>`)}
+}
+async function appendWorkOrderBlockPanel(){
+ const main=document.getElementById('mainContent');
+ if(!main.querySelector('#workOrdersBody'))return;
+ const box=document.createElement('section');box.className='card';box.id='workOrderBlockPanel';
+ box.innerHTML='<div class="card-head"><h2>Schedule Blocks</h2><button class="row-button" id="viewAllBlocks">View All / Manage</button></div><div id="workOrderBlocks" class="schedule-list"><div class="empty">Loading...</div></div>';
+ main.appendChild(box);
+ box.querySelector('#viewAllBlocks').onclick=showScheduleBlocks;
+ try{const blocks=(await fetchBlocks()).filter(b=>!['cancelled','declined'].includes(b.status));
+  if(!box.isConnected)return;
+  box.querySelector('#workOrderBlocks').innerHTML=blocks.length?blocks.map(blockCard).join(''):'<div class="empty">No active schedule blocks.</div>';
+ }catch(e){box.querySelector('#workOrderBlocks').textContent='Unable to load schedule blocks: '+e.message;}
+}
+async function showScheduleBlocks(){
+ setActiveNav('schedule-blocks');
+ const main=document.getElementById('mainContent');
+ main.innerHTML=`<div class="page-head"><div><h1>Schedule Blocks</h1><p>Pending requests and confirmed non-work time, separate from work orders.</p></div><button class="primary" id="addBlock">+ Schedule Block</button></div>
+ <div class="card"><div class="card-head"><h2>Pending Requests</h2></div><div id="pendingRequests" class="card-body">Loading...</div></div>
+ <div class="card"><div class="card-head"><h2>All Schedule Blocks</h2></div><div id="allScheduleBlocks" class="schedule-list">Loading...</div></div>`;
+ document.getElementById('addBlock').onclick=()=>showScheduleBlockForm();
+ try{
+  const [blocks,requests]=await Promise.all([fetchBlocks(),fetchRequests()]);
+  if(!document.getElementById('pendingRequests'))return;
+  const pending=requests.filter(r=>r.status==='pending');
+  const map=new Map(blocks.map(b=>[b.id,b]));
+  document.getElementById('pendingRequests').innerHTML=pending.length?pending.map(r=>{
+   const b=map.get(r.schedule_block_id);
+   return `<div class="detail-item" style="padding:12px 0"><strong>${escapeHtml(statusLabel(r.request_type))} request: ${escapeHtml(r.title||b?.title||'Schedule Block')}</strong>
+    <div class="small-muted">${escapeHtml(b?blockTechnicians(b):'')} · ${escapeHtml(blockDate(r.proposed_starts_at||b?.starts_at))} – ${escapeHtml(blockDate(r.proposed_ends_at||b?.ends_at))}</div>
+    ${r.reason?`<p>${escapeHtml(r.reason)}</p>`:''}
+    <div class="form-actions" style="justify-content:flex-start"><button class="primary" onclick="reviewBlockRequest('${r.id}',true)">Approve / Release</button><button class="secondary" onclick="reviewBlockRequest('${r.id}',false)">Decline</button></div></div>`;
+  }).join(''):'<div class="small-muted">No requests awaiting review.</div>';
+  document.getElementById('allScheduleBlocks').innerHTML=blocks.length?blocks.map(blockCard).join(''):'<div class="empty">No schedule blocks yet.</div>';
+ }catch(e){console.error(e);showMessage(e.message,true);}
+}
+async function reviewBlockRequest(id,approve){
+ const note=prompt(approve?'Optional approval note:':'Reason for declining (optional):');
+ if(note===null)return;
+ const {error}=await db.rpc('review_schedule_block_request',{p_request_id:id,p_approve:approve,p_review_note:note||null});
+ if(error)return showMessage(error.message,true);
+ showMessage(approve?'Request approved and released.':'Request declined.');await showScheduleBlocks();
+}
+async function showScheduleBlockDetail(id){
+ try{
+  const blocks=await fetchBlocks();const b=blocks.find(x=>x.id===id);if(!b)throw Error('Schedule block not found.');
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-head"><div><h1>${escapeHtml(b.title)}</h1><p>Schedule Block · ${escapeHtml(blockStatus(b))}</p></div><button class="secondary" id="backBlocks">Back to Blocks</button></div>
+  <div class="card"><div class="card-body"><div class="detail-grid">
+  ${[['Type',statusLabel(b.block_type)],['Starts',blockDate(b.starts_at)],['Ends',blockDate(b.ends_at)],['Assigned Technicians',blockTechnicians(b)],['Description',b.description],['Location',b.location],['Review Note',b.review_note]].filter(x=>x[1]).map(([a,v])=>`<div class="detail-item"><div class="detail-label">${escapeHtml(a)}</div><div class="detail-value">${escapeHtml(v)}</div></div>`).join('')}
+  </div><div class="form-actions"><button class="primary" id="editBlock">Edit Block</button>${b.status!=='cancelled'?'<button class="danger" id="cancelBlock">Cancel Block</button>':''}</div></div></div>`;
+  document.getElementById('backBlocks').onclick=showScheduleBlocks;
+  document.getElementById('editBlock').onclick=()=>showScheduleBlockForm(b);
+  const cancel=document.getElementById('cancelBlock');if(cancel)cancel.onclick=async()=>{
+   if(!confirm('Cancel this schedule block? This will remain in the history.'))return;
+   const {error}=await db.from('schedule_blocks').update({status:'cancelled',released:false,updated_at:new Date().toISOString()}).eq('id',b.id);
+   if(error)return showMessage(error.message,true);showMessage('Schedule block cancelled.');await showScheduleBlocks();
+  };
+ }catch(e){showMessage(e.message,true)}
+}
+async function showScheduleBlockForm(existing=null){
+ const main=document.getElementById('mainContent');
+ const {data:techs,error}=await db.from('technicians').select('id,first_name,last_name,active').eq('active',true).order('first_name');
+ if(error)return showMessage(error.message,true);
+ const chosen=new Set((existing?.schedule_block_technicians||[]).map(a=>a.technician_id));
+ const now=new Date();now.setMinutes(0,0,0);now.setHours(now.getHours()+1);
+ const later=new Date(now.getTime()+3600000);
+ main.innerHTML=`<div class="page-head"><div><h1>${existing?'Edit':'New'} Schedule Block</h1><p>Dispatch and Secretary coordinate confirmed time.</p></div></div>
+ <div class="card"><div class="card-body"><form id="blockForm"><div class="form-grid">
+ <div class="form-group full"><label>Title</label><input name="title" required value="${escapeAttribute(existing?.title||'')}"></div>
+ <div class="form-group"><label>Block Type</label><select name="block_type">${blockTypes.map(t=>`<option value="${t}" ${existing?.block_type===t?'selected':''}>${escapeHtml(statusLabel(t))}</option>`).join('')}</select></div>
+ <div class="form-group"><label>Status</label><select name="status"><option value="pending" ${existing?.status==='pending'?'selected':''}>Pending Approval</option><option value="approved" ${!existing||existing.status==='approved'?'selected':''}>Approved</option><option value="declined" ${existing?.status==='declined'?'selected':''}>Declined</option><option value="cancelled" ${existing?.status==='cancelled'?'selected':''}>Cancelled</option></select></div>
+ <div class="form-group"><label>Start</label><input name="starts_at" type="datetime-local" required value="${escapeAttribute(localDateTimeValue(existing?.starts_at||now))}"></div>
+ <div class="form-group"><label>End</label><input name="ends_at" type="datetime-local" required value="${escapeAttribute(localDateTimeValue(existing?.ends_at||later))}"></div>
+ <div class="form-group full"><label>Technicians</label><div style="display:flex;flex-wrap:wrap;gap:12px">${(techs||[]).map(t=>`<label style="font-weight:normal"><input style="width:auto" type="checkbox" name="technician" value="${t.id}" ${chosen.has(t.id)?'checked':''}> ${escapeHtml(technicianName(t))}</label>`).join('')}</div></div>
+ <div class="form-group full"><label>Description (optional)</label><textarea name="description">${escapeHtml(existing?.description||'')}</textarea></div>
+ <div class="form-group"><label>Location (optional)</label><input name="location" value="${escapeAttribute(existing?.location||'')}"></div>
+ <div class="form-group"><label style="font-weight:normal"><input type="checkbox" name="all_day" style="width:auto" ${existing?.all_day?'checked':''}> All day</label></div>
+ </div><div class="form-actions"><button type="button" class="secondary" id="cancelBlockForm">Back</button><button type="submit" class="primary" id="saveBlock">Save Schedule Block</button></div></form></div></div>`;
+ document.getElementById('cancelBlockForm').onclick=showScheduleBlocks;
+ document.getElementById('blockForm').onsubmit=async ev=>{
+  ev.preventDefault();const f=new FormData(ev.currentTarget);const start=new Date(f.get('starts_at')),end=new Date(f.get('ends_at'));
+  if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<=start)return showMessage('End must be later than start.',true);
+  const ids=f.getAll('technician');if(!ids.length)return showMessage('Select at least one technician.',true);
+  const status=String(f.get('status'));const payload={title:String(f.get('title')).trim(),block_type:f.get('block_type'),description:f.get('description')||null,location:f.get('location')||null,starts_at:start.toISOString(),ends_at:end.toISOString(),all_day:f.has('all_day'),status,released:status==='approved',updated_at:new Date().toISOString()};
+  const button=document.getElementById('saveBlock');button.disabled=true;
+  try{
+   let blockId=existing?.id;
+   if(existing){const {error}=await db.from('schedule_blocks').update(payload).eq('id',blockId);if(error)throw error;}
+   else{const {data,error}=await db.from('schedule_blocks').insert({...payload,created_by_user_id:currentProfile.id}).select('id').single();if(error)throw error;blockId=data.id;}
+   const {data:links,error:le}=await db.from('schedule_block_technicians').select('technician_id').eq('schedule_block_id',blockId);if(le)throw le;
+   const old=new Set((links||[]).map(x=>x.technician_id));const want=new Set(ids);
+   const add=ids.filter(x=>!old.has(x));const remove=[...old].filter(x=>!want.has(x));
+   if(add.length){const {error}=await db.from('schedule_block_technicians').insert(add.map(technician_id=>({schedule_block_id:blockId,technician_id})));if(error)throw error;}
+   if(remove.length){const {error}=await db.from('schedule_block_technicians').delete().eq('schedule_block_id',blockId).in('technician_id',remove);if(error)throw error;}
+   showMessage('Schedule block saved.');await showScheduleBlocks();
+  }catch(e){console.error(e);showMessage(e.message,true)}finally{if(button.isConnected)button.disabled=false;}
+ };
+}
+
 // ============================================
 // NAVIGATION
 // ============================================
@@ -6319,6 +6453,8 @@ document.querySelectorAll(
 
         await showWorkOrders();
 
+      } else if (page === "schedule-blocks") {
+        await showScheduleBlocks();
       } else if (
         page === "customers"
       ) {
