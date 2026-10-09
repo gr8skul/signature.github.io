@@ -41,13 +41,13 @@ body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:va
 .card{padding:14px}main{padding:16px 12px 80px}}
 </style></head><body>
 <header><div class="brand">SIGNATURE<small>TECHNICIAN PORTAL</small></div><div class="user"><div id="who">Signing in...</div><button class="btn" id="signout" style="margin-top:6px;padding:6px 10px;min-height:30px">Sign Out</button></div></header>
-<main><div id="app" class="empty">Loading technician work orders...</div></main><div id="toast" role="status" aria-live="polite"></div>
+<main><div id="app" class="empty">Loading your schedule...</div></main><div id="toast" role="status" aria-live="polite"></div>
 <script>
 'use strict';
 const SUPABASE_URL='https://zpawrfdfutswbvhlwvqf.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-let profile=null,tech=null,orders=[],blocks=[],requests=[],tab='upcoming',selected=null,busy=false,teamMap={};
+let profile=null,tech=null,orders=[],blocks=[],requests=[],tab='schedule',selected=null,busy=false,teamMap={};
 const app=document.getElementById('app');
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const contactName=c=>[c?.first_name,c?.last_name].filter(Boolean).join(' ').trim();
@@ -155,7 +155,7 @@ function requestForm(b=null){
  const changing=!!b;
  const d=x=>{if(!x)return '';const z=new Date(x);const p=n=>String(n).padStart(2,'0');return `${z.getFullYear()}-${p(z.getMonth()+1)}-${p(z.getDate())}T${p(z.getHours())}:${p(z.getMinutes())}`};
  const types=['vacation','time_off','appointment','meeting','training','other'];
- app.innerHTML=`<div class="back">${btn(changing?'backBlocks':'backRequests','← Back')}</div>
+ app.innerHTML=`<div class="back">${btn(changing?'backSchedule':'backRequests','← Back')}</div>
  <div class="card"><h1 class="title">${changing?'Request Schedule Change':'New Schedule Request'}</h1>
  <form id="scheduleRequestForm">
  ${changing?`<div class="field"><label>Request</label><select name="request_type" id="requestType"><option value="modify">Change this block</option><option value="cancel">Cancel this block</option></select></div>`:''}
@@ -169,7 +169,7 @@ function requestForm(b=null){
  <div class="actions"><button class="btn dark" id="saveRequest" type="submit">Submit to Dispatch</button></div>
  </form></div>`;
  const sel=document.getElementById('requestType');
- if(sel)sel.onchange=()=>{const hide=sel.value==='cancel';for(const n of ['title','block_type','starts_at','ends_at','all_day','location','description']){const el=document.querySelector(`[name="${n}"]`);if(el){el.disabled=hide;if(el.closest('.field'))el.closest('.field').style.display=hide?'none':''}}};
+ if(sel)sel.onchange=()=>{const hide=sel.value==='cancel';for(const n of ['title','block_type','starts_at','ends_at','location','description']){const el=document.querySelector(`[name="${n}"]`);if(el){el.disabled=hide;if(el.closest('.field'))el.closest('.field').style.display=hide?'none':''}}};
  document.getElementById('scheduleRequestForm').onsubmit=async e=>{
   e.preventDefault();if(busy)return;
   const f=new FormData(e.target),cancel=changing&&f.get('request_type')==='cancel';
@@ -183,12 +183,12 @@ function requestForm(b=null){
     p_starts_at:cancel?null:new Date(start).toISOString(),
     p_ends_at:cancel?null:new Date(end).toISOString(),
     p_description:cancel?null:f.get('description'),p_location:cancel?null:f.get('location'),
-    p_all_day:cancel?null:f.has('all_day'),p_reason:f.get('reason')
+    p_all_day:cancel?null:false,p_reason:f.get('reason')
    }:{
     p_title:String(f.get('title')).trim(),p_block_type:f.get('block_type'),
     p_starts_at:new Date(start).toISOString(),p_ends_at:new Date(end).toISOString(),
     p_description:f.get('description'),p_location:f.get('location'),
-    p_all_day:f.has('all_day'),p_reason:f.get('reason')
+    p_all_day:false,p_reason:f.get('reason')
    };
    const {error}=await db.rpc(changing?'technician_request_schedule_change':'technician_submit_schedule_block',args);
    if(error)throw error;
@@ -196,50 +196,55 @@ function requestForm(b=null){
   }catch(err){fail(err)}finally{busy=false;const el=document.getElementById('saveRequest');if(el)el.disabled=false}
  };
 }
-function blockList(){
-  const upcoming=blocks.filter(b=>new Date(b.ends_at)>=new Date());
-  const past=blocks.filter(b=>new Date(b.ends_at)<new Date());
-  return `<h1 class="title">My Schedule Blocks</h1>
-    <p class="sub">Approved, released schedule blocks assigned to you by Dispatch.</p>
-    <div class="actions">${btn('refresh','↻ Refresh')}</div>
-    <div class="section"><h3>Upcoming / Current (${upcoming.length})</h3>
-    ${upcoming.length?upcoming.map(blockCard).join(''):'<div class="empty">No upcoming schedule blocks.</div>'}</div>
-    <div class="section"><h3>Past (${past.length})</h3>
-    ${past.length?past.map(blockCard).join(''):'<div class="empty">No past schedule blocks.</div>'}</div>`;
-}
 function blockCard(b){
-  return `<article class="card"><span class="pill released">Released</span>
-    <span class="pill">${esc(label(b.block_type))}</span>
-    <h2>${esc(b.title)}</h2>
-    <div class="meta">${esc(date(b.starts_at))} – ${esc(date(b.ends_at))}
-    ${b.all_day?' · All day':''}</div>
-    ${b.location?`<p class="meta">Location: ${esc(b.location)}</p>`:''}
-    ${b.description?`<p>${esc(b.description)}</p>`:''}<div class="actions">${btn('changeBlock:'+b.id,'Request Change / Cancellation')}</div></article>`;
+ return `<article class="card"><span class="pill released">Schedule Block</span>
+ <span class="pill">${esc(label(b.block_type))}</span>
+ <h2>${esc(b.title)}</h2>
+ <div class="meta">${esc(date(b.starts_at))} – ${esc(date(b.ends_at))}</div>
+ ${b.location?`<p class="meta">Location: ${esc(b.location)}</p>`:''}
+ ${b.description?`<p>${esc(b.description)}</p>`:''}
+ <div class="actions">${btn('changeBlock:'+b.id,'Request Change / Cancel')}</div></article>`;
+}
+function orderCard(o){
+ return `<article class="card"><div class="meta"><b>${esc(wo(o))}</b>${o.scheduled_at?` · ${esc(date(o.scheduled_at))}`:''}</div>
+ <span class="pill">${esc(label(o.status))}</span>
+ <span class="pill">${esc(o.work_type==='checkout'?'Check-Out':o.work_type==='install'?'Installation':'Service')}</span>
+ <h2>${esc(preview(o.description)||'Work Order')}</h2>
+ <div class="meta">${customerLines(o.customers)}${address(o.locations)?`<div>${esc(address(o.locations))}</div>`:''}</div>
+ <div class="actions">${btn('open:'+o.id,'Open Work Order','dark')}</div></article>`;
 }
 function topTabs(){
- const counts={upcoming:orders.filter(o=>['scheduled','open'].includes(o.status)).length,
- current:orders.filter(o=>o.status==='in_progress').length,
- completed:orders.filter(o=>o.status==='completed').length,
- blocks:blocks.length,requests:requests.length};
- return `<div class="tabs">${[['upcoming','Upcoming'],['current','Current'],['completed','Completed'],['blocks','Schedule Blocks'],['requests','My Requests']].map(([k,n])=>
- `<button class="tab ${tab===k?'active':''}" data-tab="${k}">${n} (${counts[k]})</button>`).join('')}</div>`;
+ const pending=requests.filter(r=>r.status==='pending').length;
+ return `<div class="tabs">${[['schedule','My Schedule'],['upcoming','Upcoming'],['current','Current'],['completed','Completed'],['requests',`My Requests${pending?' ('+pending+')':''}`]].map(([k,n])=>
+ `<button class="tab ${tab===k?'active':''}" data-tab="${k}">${n}</button>`).join('')}</div>`;
 }
 function filtered(){
-  if(tab==='upcoming')return orders.filter(o=>o.status==='scheduled'||o.status==='open');
-  if(tab==='current')return orders.filter(o=>o.status==='in_progress');
-  return orders.filter(o=>o.status==='completed');
+ if(tab==='upcoming')return orders.filter(o=>['scheduled','open'].includes(o.status));
+ if(tab==='current')return orders.filter(o=>o.status==='in_progress');
+ return orders.filter(o=>o.status==='completed');
+}
+function scheduleItems(){
+ const work=orders.filter(o=>o.status!=='cancelled').map(o=>({kind:'work',date:o.scheduled_at||null,item:o}));
+ const time=blocks.map(b=>({kind:'block',date:b.starts_at||null,item:b}));
+ return [...work,...time].sort((a,b)=>{
+  if(!a.date)return 1;if(!b.date)return -1;
+  return new Date(a.date)-new Date(b.date);
+ });
 }
 function render(){
-  if(selected){const o=orders.find(x=>x.id===selected);if(o)return detail(o)}
-  if(tab==='blocks'){app.innerHTML=topTabs()+blockList();return}
-  if(tab==='requests'){app.innerHTML=topTabs()+requestsView();return}
-  app.innerHTML=`<h1 class="title">My Work Orders</h1>
-  <p class="sub">Assigned and released by Dispatch.</p>${topTabs()}
-  <div class="actions" style="margin-bottom:12px">${btn('refresh','↻ Refresh')}</div>
-  ${filtered().length?filtered().map(o=>`<article class="card"><div class="meta"><b>${esc(wo(o))}</b>${o.scheduled_at?` · ${esc(date(o.scheduled_at))}`:''}</div>
-  <span class="pill">${esc(label(o.status))}</span><span class="pill">${esc(o.work_type==='checkout'?'Check-Out':o.work_type==='install'?'Installation':'Service')}</span><h2>${esc(preview(o.description)||'Work Order')}</h2>
-  <div class="meta">${customerLines(o.customers)}${address(o.locations)?`<div>${esc(address(o.locations))}</div>`:""}</div>
-  <div class="actions">${btn('open:'+o.id,'Open Work Order','dark')}</div></article>`).join(''):'<div class="empty">No work orders in this section.</div>'}`;
+ if(selected){const o=orders.find(x=>x.id===selected);if(o)return detail(o)}
+ if(tab==='requests'){app.innerHTML=topTabs()+requestsView();return}
+ if(tab==='schedule'){
+  const items=scheduleItems();
+  app.innerHTML=`<h1 class="title">My Schedule</h1>
+  <p class="sub">Your assigned, released Work Orders and Schedule Blocks, in date order.</p>
+  ${topTabs()}<div class="actions">${btn('newRequest','+ My Request','dark')}${btn('refresh','↻ Refresh')}</div>
+  ${items.length?items.map(x=>x.kind==='block'?blockCard(x.item):orderCard(x.item)).join(''):'<div class="empty">Nothing on your schedule yet.</div>'}`;
+  return;
+ }
+ app.innerHTML=`<h1 class="title">My Work Orders</h1><p class="sub">Assigned and released by Dispatch.</p>
+ ${topTabs()}<div class="actions">${btn('newRequest','+ My Request')}${btn('refresh','↻ Refresh')}</div>
+ ${filtered().length?filtered().map(orderCard).join(''):'<div class="empty">No work orders in this section.</div>'}`;
 }
 function teamSection(o){
   const members=teamMap[o.id]||[];
@@ -250,7 +255,7 @@ function detail(o){
  const tel=o.customers?.phone||'';
  const addr=address(o.locations);
  const map=addr?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr):'';
- app.innerHTML=`<div class="back">${btn('back','← Work Orders')}</div>
+ app.innerHTML=`<div class="back">${btn('back','← My Schedule')}</div>
  <div class="card"><h1 class="title">${esc(wo(o))}</h1>
  <span class="pill">${esc(label(o.status))}</span><span class="pill">${esc(o.work_type==='checkout'?'Check-Out':o.work_type==='install'?'Installation':'Service')}</span>
  ${customerLines(o.customers)||addr||tel?`<div class="section"><h3>CUSTOMER / LOCATION</h3>${customerLines(o.customers)}${addr?`<div class="meta">${esc(addr)}</div>`:''}
@@ -278,6 +283,6 @@ function photoForm(){form('Add Photo',`<div class="field"><label for="photoFile"
 function completionForm(){form('Complete Work Order',`<p class="meta">A completion note is required. This note becomes part of the permanent work-order record.</p>`+area('note','Completion Note','',true),async f=>{const note=String(f.get('note')).trim();if(!note)throw Error('Completion note is required.');const {error}=await db.rpc('technician_complete_work_order',{p_work_order_id:selected,p_completion_note:note});if(error)throw error})}
 async function changeStatus(status){if(busy)return;busy=true;try{const {error}=await db.from('service_calls').update({status}).eq('id',selected);if(error)throw error;await refresh();toast('Status updated.')}catch(e){fail(e)}finally{busy=false}}
 async function remove(table,id){if(!confirm('Delete this item?'))return;try{const x=await getRow(table,id);if(table==='service_call_notes'&&x.is_completion_note)throw Error('Completion notes cannot be deleted.');if(table==='service_call_photos'&&x.file_path&&!/^https?:\/\//i.test(x.file_path)){const {error}=await db.storage.from('dispatch-photos').remove([x.file_path]);if(error)throw error}const {error}=await db.from(table).delete().eq('id',id).eq('service_call_id',selected);if(error)throw error;await refresh();toast('Deleted.')}catch(e){fail(e)}}
-app.addEventListener('click',async e=>{const t=e.target.closest('[data-tab],[data-act]');if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;selected=null;render();return}const act=t.dataset.act;if(!act)return;const [cmd,arg]=act.split(':');if(cmd==='back'){selected=null;render()}else if(cmd==='backDetail'){render()}else if(cmd==='refresh'){await refresh()}else if(cmd==='newRequest'){requestForm()}else if(cmd==='backRequests'){tab='requests';render()}else if(cmd==='backBlocks'){tab='blocks';render()}else if(cmd==='changeBlock'){const b=blocks.find(x=>x.id===arg);if(b)requestForm(b)}else if(cmd==='withdraw'){if(confirm('Withdraw this pending request?')){const {error}=await db.rpc('technician_withdraw_schedule_request',{p_request_id:arg});if(error)fail(error);else{await refresh();toast('Request withdrawn.')}}}else if(cmd==='open'){selected=arg;render()}else if(cmd==='status'){await changeStatus(arg)}else if(cmd==='complete'){completionForm()}else if(cmd==='partForm'){await partForm()}else if(cmd==='noteForm'){await noteForm()}else if(cmd==='photoForm'){photoForm()}else if(cmd==='editPart'){await partForm(arg)}else if(cmd==='editNote'){await noteForm(arg)}else if(cmd==='delPart'){await remove('parts',arg)}else if(cmd==='delNote'){await remove('service_call_notes',arg)}else if(cmd==='delPhoto'){await remove('service_call_photos',arg)}});
+app.addEventListener('click',async e=>{const t=e.target.closest('[data-tab],[data-act]');if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;selected=null;render();return}const act=t.dataset.act;if(!act)return;const [cmd,arg]=act.split(':');if(cmd==='back'){selected=null;render()}else if(cmd==='backDetail'){render()}else if(cmd==='refresh'){await refresh()}else if(cmd==='newRequest'){requestForm()}else if(cmd==='backRequests'){tab='requests';render()}else if(cmd==='backSchedule'){tab='schedule';render()}else if(cmd==='changeBlock'){const b=blocks.find(x=>x.id===arg);if(b)requestForm(b)}else if(cmd==='withdraw'){if(confirm('Withdraw this pending request?')){const {error}=await db.rpc('technician_withdraw_schedule_request',{p_request_id:arg});if(error)fail(error);else{await refresh();toast('Request withdrawn.')}}}else if(cmd==='open'){selected=arg;render()}else if(cmd==='status'){await changeStatus(arg)}else if(cmd==='complete'){completionForm()}else if(cmd==='partForm'){await partForm()}else if(cmd==='noteForm'){await noteForm()}else if(cmd==='photoForm'){photoForm()}else if(cmd==='editPart'){await partForm(arg)}else if(cmd==='editNote'){await noteForm(arg)}else if(cmd==='delPart'){await remove('parts',arg)}else if(cmd==='delNote'){await remove('service_call_notes',arg)}else if(cmd==='delPhoto'){await remove('service_call_photos',arg)}});
 document.getElementById('signout').addEventListener('click',async()=>{await db.auth.signOut();location.replace('login.html')});init();
 </script></body></html>
