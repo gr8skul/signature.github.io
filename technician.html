@@ -47,7 +47,7 @@ body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:va
 const SUPABASE_URL='https://zpawrfdfutswbvhlwvqf.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-let profile=null,tech=null,orders=[],blocks=[],requests=[],tab='schedule',selected=null,selectedBlock=null,busy=false,teamMap={};
+let profile=null,tech=null,orders=[],blocks=[],requests=[],tab='schedule',selected=null,selectedBlock=null,busy=false,teamMap={},blockTeamMap={};
 const app=document.getElementById('app');
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const contactName=c=>[c?.first_name,c?.last_name].filter(Boolean).join(' ').trim();
@@ -116,6 +116,7 @@ async function refresh(){
 
 async function loadScheduleBlocks(){
   blocks=[];
+  blockTeamMap={};
   try{
     const {data:links,error:le}=await db.from('schedule_block_technicians')
       .select('schedule_block_id').eq('technician_id',tech.id);
@@ -128,6 +129,20 @@ async function loadScheduleBlocks(){
         .order('starts_at',{ascending:true});
       if(error)throw error;
       blocks=data||[];
+      if(blocks.length){
+        const {data:members,error:teamError}=await db.rpc('technician_schedule_block_team',{
+          p_block_ids:blocks.map(b=>b.id)
+        });
+        if(teamError){
+          console.warn('Schedule Block team unavailable:',teamError.message);
+          toast('Assigned technician names could not be loaded. Check the Schedule Block team function.',true);
+        }else{
+          for(const member of members||[]){
+            if(!blockTeamMap[member.schedule_block_id])blockTeamMap[member.schedule_block_id]=[];
+            blockTeamMap[member.schedule_block_id].push(member);
+          }
+        }
+      }
     }
   }catch(e){console.warn('Schedule blocks unavailable:',e);toast('Schedule blocks could not be loaded: '+e.message,true)}
 }
@@ -195,12 +210,20 @@ function requestForm(b=null){
   }catch(err){fail(err)}finally{busy=false;const el=document.getElementById('saveRequest');if(el)el.disabled=false}
  };
 }
+function blockTeamSection(b){
+  const members=blockTeamMap[b.id]||[];
+  if(!members.length)return '';
+  return `<div class="section"><h3>ASSIGNED TECHNICIANS</h3>
+    <div class="team-members">${members.map(m=>`<span class="team-member ${m.technician_id===tech.id?'self':''}">${esc(m.display_name)}${m.technician_id===tech.id?' (You)':''}</span>`).join('')}</div></div>`;
+}
+
 function blockCard(b){
  return `<article class="card"><span class="pill released">Schedule Block</span>
   <h2>${esc(b.title)}</h2>
   <div class="meta">${esc(date(b.starts_at))} – ${esc(date(b.ends_at))}</div>
   ${b.location?`<p class="meta">Location: ${esc(b.location)}</p>`:''}
   ${b.description?`<p>${esc(preview(b.description))}</p>`:''}
+  ${blockTeamSection(b)}
   <div class="actions">${btn('openBlock:'+b.id,'Open Schedule Block','dark')}${btn('changeBlock:'+b.id,'Request Change / Cancel')}</div></article>`;
 }
 function blockDetail(b){
@@ -212,6 +235,7 @@ function blockDetail(b){
  ${b.all_day?'<div class="meta">All day</div>':''}
  ${b.location?`<div class="section"><h3>LOCATION</h3><p>${esc(b.location)}</p></div>`:''}
  ${b.description?`<div class="section"><h3>DESCRIPTION</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(b.description)}</p></div>`:''}
+ ${blockTeamSection(b)}
  <div class="actions">${btn('changeBlock:'+b.id,'Request Change / Cancel')}</div></div>`;
 }
 function orderCard(o){
