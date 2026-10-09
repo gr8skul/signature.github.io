@@ -6409,7 +6409,6 @@ async function showScheduleBlockForm(existing=null){
  main.innerHTML=`<div class="page-head"><div><h1>${existing?'Edit':'New'} Schedule Block</h1><p>Dispatch and Secretary coordinate confirmed time.</p></div></div>
  <div class="card"><div class="card-body"><form id="blockForm"><div class="form-grid">
  <div class="form-group full"><label>Title</label><input name="title" required value="${escapeAttribute(existing?.title||'')}"></div>
- <div class="form-group"><label>Block Type</label><select name="block_type">${blockTypes.map(t=>`<option value="${t}" ${existing?.block_type===t?'selected':''}>${escapeHtml(statusLabel(t))}</option>`).join('')}</select></div>
  <div class="form-group"><label>Status</label><select name="status"><option value="pending" ${existing?.status==='pending'?'selected':''}>Pending Approval</option><option value="approved" ${!existing||existing.status==='approved'?'selected':''}>Approved</option><option value="declined" ${existing?.status==='declined'?'selected':''}>Declined</option><option value="cancelled" ${existing?.status==='cancelled'?'selected':''}>Cancelled</option></select></div>
  <div class="form-group full"><label style="font-weight:normal"><input type="checkbox" name="released" style="width:auto" ${existing?.released?'checked':''}> Release approved block to assigned technicians immediately</label><div class="small-muted">Leave unchecked to save without releasing. Only approved blocks can be released.</div></div>
  <div class="form-group"><label>Start</label><input name="starts_at" type="datetime-local" required value="${escapeAttribute(localDateTimeValue(existing?.starts_at||now))}"></div>
@@ -6417,14 +6416,13 @@ async function showScheduleBlockForm(existing=null){
  <div class="form-group full"><label>Technicians</label><div style="display:flex;flex-wrap:wrap;gap:12px">${(techs||[]).map(t=>`<label style="font-weight:normal"><input style="width:auto" type="checkbox" name="technician" value="${t.id}" ${chosen.has(t.id)?'checked':''}> ${escapeHtml(technicianName(t))}</label>`).join('')}</div></div>
  <div class="form-group full"><label>Description (optional)</label><textarea name="description">${escapeHtml(existing?.description||'')}</textarea></div>
  <div class="form-group"><label>Location (optional)</label><input name="location" value="${escapeAttribute(existing?.location||'')}"></div>
- <div class="form-group"><label style="font-weight:normal"><input type="checkbox" name="all_day" style="width:auto" ${existing?.all_day?'checked':''}> All day</label></div>
  </div><div class="form-actions"><button type="button" class="secondary" id="cancelBlockForm">Back</button><button type="submit" class="primary" id="saveBlock">Save Schedule Block</button></div></form></div></div>`;
  document.getElementById('cancelBlockForm').onclick=showScheduleBlocks;
  document.getElementById('blockForm').onsubmit=async ev=>{
   ev.preventDefault();const f=new FormData(ev.currentTarget);const start=new Date(f.get('starts_at')),end=new Date(f.get('ends_at'));
   if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<=start)return showMessage('End must be later than start.',true);
   const ids=f.getAll('technician');if(!ids.length)return showMessage('Select at least one technician.',true);
-  const status=String(f.get('status'));const payload={title:String(f.get('title')).trim(),block_type:f.get('block_type'),description:f.get('description')||null,location:f.get('location')||null,starts_at:start.toISOString(),ends_at:end.toISOString(),all_day:f.has('all_day'),status,released:status==='approved'&&f.has('released'),updated_at:new Date().toISOString()};
+  const status=String(f.get('status'));const payload={title:String(f.get('title')).trim(),block_type:existing?.block_type||'other',description:f.get('description')||null,location:f.get('location')||null,starts_at:start.toISOString(),ends_at:end.toISOString(),all_day:false,status,released:status==='approved'&&f.has('released'),updated_at:new Date().toISOString()};
   const button=document.getElementById('saveBlock');button.disabled=true;
   try{
    let blockId=existing?.id;
