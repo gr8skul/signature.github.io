@@ -61,7 +61,38 @@ function toast(s,bad=false){const t=document.getElementById('toast');t.textConte
 function fail(e){console.error(e);toast(e?.message||String(e),true)}
 function btn(id,text,klass=''){return `<button class="btn ${klass}" data-act="${id}">${esc(text)}</button>`}
 async function init(){try{const {data:{session},error:e}=await db.auth.getSession();if(e)throw e;if(!session){location.replace('login.html');return}const {data:u,error:ue}=await db.from('users').select('id,first_name,last_name,role,active').eq('auth_user_id',session.user.id).single();if(ue)throw ue;if(u?.role!=='technician'||!u.active)throw Error('This page is for active technician accounts. Please sign in with a technician account.');profile=u;const {data:t,error:te}=await db.from('technicians').select('id,first_name,last_name,active').eq('user_id',u.id).single();if(te)throw te;if(!t?.active)throw Error('Technician profile is inactive.');tech=t;document.getElementById('who').textContent=[t.first_name,t.last_name].filter(Boolean).join(' ');await refresh()}catch(e){console.error(e);app.innerHTML=`<div class="notice error">${esc(e.message||'Unable to load account.')}</div>`}}
-async function refresh(){const {data,error}=await db.from('service_calls').select('id,work_order_number,work_type,status,priority,description,scheduled_at,started_at,completed_at,released,assigned_technician_id,customers(first_name,last_name,company_name,phone,email),locations(address,city,state,zip,notes)').eq('assigned_technician_id',tech.id).eq('released',true).order('scheduled_at',{ascending:true,nullsFirst:false});if(error){fail(error);app.innerHTML=`<div class="notice error">Unable to load work orders: ${esc(error.message)}</div>`;return}orders=data||[];if(selected&&!orders.some(o=>o.id===selected)){selected=null;toast('This work order is no longer available.')}render()}
+async function refresh(){
+  // Assignments are now many-to-many: a work order may have several technicians.
+  const {data:links,error:linkError}=await db.from('service_call_technicians')
+    .select('service_call_id').eq('technician_id',tech.id);
+  if(linkError){
+    fail(linkError);
+    app.innerHTML=`<div class="notice error">Unable to load technician assignments: ${esc(linkError.message)}</div>`;
+    return;
+  }
+  const ids=[...new Set((links||[]).map(x=>x.service_call_id).filter(Boolean))];
+  if(!ids.length){
+    orders=[];
+    if(selected){selected=null;toast('This work order is no longer available.');}
+    render();
+    return;
+  }
+  const {data,error}=await db.from('service_calls')
+    .select('id,work_order_number,work_type,status,priority,description,scheduled_at,started_at,completed_at,released,assigned_technician_id,customers(first_name,last_name,company_name,phone,email),locations(address,city,state,zip,notes)')
+    .in('id',ids).eq('released',true)
+    .order('scheduled_at',{ascending:true,nullsFirst:false});
+  if(error){
+    fail(error);
+    app.innerHTML=`<div class="notice error">Unable to load work orders: ${esc(error.message)}</div>`;
+    return;
+  }
+  orders=data||[];
+  if(selected&&!orders.some(o=>o.id===selected)){
+    selected=null;
+    toast('This work order is no longer available.');
+  }
+  render();
+}
 function filtered(){
   if(tab==='upcoming')return orders.filter(o=>o.status==='scheduled'||o.status==='open');
   if(tab==='current')return orders.filter(o=>o.status==='in_progress');
