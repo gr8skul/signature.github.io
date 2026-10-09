@@ -4,7 +4,7 @@
 <style>
 :root{--bg:#f4f5f7;--surface:#fff;--ink:#202326;--muted:#697078;--line:#dfe2e6;--green:#356b45;--red:#a52a2a}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:var(--ink)}button,input,textarea{font:inherit}button{cursor:pointer}header{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--line);padding:14px max(16px,calc((100vw - 850px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px}
+body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:var(--ink)}button,input,textarea,select{font:inherit}button{cursor:pointer}header{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--line);padding:14px max(16px,calc((100vw - 850px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px}
 .brand{font-size:19px;font-weight:800;letter-spacing:.7px}
 .brand small{display:block;font-size:11px;color:var(--muted);letter-spacing:1px;margin-top:3px}
 .user{font-size:12px;text-align:right;color:var(--muted)}main{max-width:850px;margin:0 auto;padding:20px 16px 90px}
@@ -26,7 +26,7 @@ body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:va
 .btn.danger{color:var(--red)}
 .section{margin:20px 0}
 .section h3{font-size:16px;margin:0 0 10px}
-.field{margin:12px 0}label{display:block;font-size:13px;font-weight:bold;margin-bottom:6px}input,textarea{width:100%;padding:12px;border:1px solid #cfd3d7;border-radius:6px;background:white}textarea{min-height:95px;resize:vertical}
+.field{margin:12px 0}label{display:block;font-size:13px;font-weight:bold;margin-bottom:6px}input,textarea,select{width:100%;padding:12px;border:1px solid #cfd3d7;border-radius:6px;background:white}textarea{min-height:95px;resize:vertical}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .item{padding:12px 0;border-bottom:1px solid #eceef0;overflow-wrap:anywhere}
 .item:last-child{border:0}
@@ -76,6 +76,7 @@ async function refresh(){
     orders=[];
     if(selected){selected=null;toast('This work order is no longer available.');}
     await loadScheduleBlocks();
+    await loadRequests();
     render();
     return;
   }
@@ -105,6 +106,7 @@ async function refresh(){
     toast('This work order is no longer available.');
   }
   await loadScheduleBlocks();
+  await loadRequests();
   render();
 }
 
@@ -125,6 +127,75 @@ async function loadScheduleBlocks(){
     }
   }catch(e){console.warn('Schedule blocks unavailable:',e);toast('Schedule blocks could not be loaded: '+e.message,true)}
 }
+
+async function loadRequests(){
+  try{
+    const {data,error}=await db.from('schedule_block_requests')
+      .select('id,requested_by_user_id,request_type,title,block_type,description,location,proposed_starts_at,proposed_ends_at,proposed_all_day,reason,status,review_note,created_at,schedule_block_id')
+      .eq('requested_by_user_id',profile.id).order('created_at',{ascending:false});
+    if(error)throw error;
+    requests=data||[];
+  }catch(e){requests=[];console.warn(e);toast('Requests unavailable: '+e.message,true)}
+}
+function requestsView(){
+ return `<h1 class="title">My Schedule Requests</h1>
+ <p class="sub">Submit time off or other schedule requests to Dispatch. Only Dispatch can approve them.</p>
+ <div class="actions">${btn('newRequest','+ New Request','dark')}${btn('refresh','↻ Refresh')}</div>
+ ${requests.length?requests.map(r=>`<article class="card">
+ <span class="pill">${esc(label(r.status))}</span><span class="pill">${esc(label(r.request_type))}</span>
+ <h2>${esc(r.title||'Schedule Block Change')}</h2>
+ <div class="meta">Submitted ${esc(date(r.created_at))}</div>
+ ${r.proposed_starts_at?`<div class="meta">${esc(date(r.proposed_starts_at))} – ${esc(date(r.proposed_ends_at))}</div>`:''}
+ ${r.reason?`<p>${esc(r.reason)}</p>`:''}
+ ${r.review_note?`<p class="meta"><b>Dispatch response:</b> ${esc(r.review_note)}</p>`:''}
+ ${r.status==='pending'?`<div class="actions">${btn('withdraw:'+r.id,'Withdraw Request','danger')}</div>`:''}
+ </article>`).join(''):'<div class="empty">No schedule requests yet.</div>'}`;
+}
+function requestForm(b=null){
+ const changing=!!b;
+ const d=x=>{if(!x)return '';const z=new Date(x);const p=n=>String(n).padStart(2,'0');return `${z.getFullYear()}-${p(z.getMonth()+1)}-${p(z.getDate())}T${p(z.getHours())}:${p(z.getMinutes())}`};
+ const types=['vacation','time_off','appointment','meeting','training','other'];
+ app.innerHTML=`<div class="back">${btn(changing?'backBlocks':'backRequests','← Back')}</div>
+ <div class="card"><h1 class="title">${changing?'Request Schedule Change':'New Schedule Request'}</h1>
+ <form id="scheduleRequestForm">
+ ${changing?`<div class="field"><label>Request</label><select name="request_type" id="requestType"><option value="modify">Change this block</option><option value="cancel">Cancel this block</option></select></div>`:''}
+ ${field('title','Title',b?.title||'', 'text',true)}
+ <div class="field"><label>Type</label><select name="block_type">${types.map(t=>`<option value="${t}" ${b?.block_type===t?'selected':''}>${esc(label(t))}</option>`).join('')}</select></div>
+ <div class="grid">${field('starts_at','Start',d(b?.starts_at),'datetime-local',true)}${field('ends_at','End',d(b?.ends_at),'datetime-local',true)}</div>
+ <div class="field"><label><input type="checkbox" name="all_day" style="width:auto" ${b?.all_day?'checked':''}> All day</label></div>
+ ${field('location','Location',b?.location||'')}
+ ${area('description','Description',b?.description||'')}
+ ${area('reason','Reason for Request','',true)}
+ <div class="actions"><button class="btn dark" id="saveRequest" type="submit">Submit to Dispatch</button></div>
+ </form></div>`;
+ const sel=document.getElementById('requestType');
+ if(sel)sel.onchange=()=>{const hide=sel.value==='cancel';for(const n of ['title','block_type','starts_at','ends_at','all_day','location','description']){const el=document.querySelector(`[name="${n}"]`);if(el){el.disabled=hide;if(el.closest('.field'))el.closest('.field').style.display=hide?'none':''}}};
+ document.getElementById('scheduleRequestForm').onsubmit=async e=>{
+  e.preventDefault();if(busy)return;
+  const f=new FormData(e.target),cancel=changing&&f.get('request_type')==='cancel';
+  const start=f.get('starts_at'),end=f.get('ends_at');
+  if(!cancel&&(!start||!end||new Date(end)<=new Date(start)))return toast('End must be after start.',true);
+  busy=true;document.getElementById('saveRequest').disabled=true;
+  try{
+   const args=changing?{
+    p_block_id:b.id,p_request_type:cancel?'cancel':'modify',
+    p_title:cancel?null:String(f.get('title')).trim(),p_block_type:cancel?null:f.get('block_type'),
+    p_starts_at:cancel?null:new Date(start).toISOString(),
+    p_ends_at:cancel?null:new Date(end).toISOString(),
+    p_description:cancel?null:f.get('description'),p_location:cancel?null:f.get('location'),
+    p_all_day:cancel?null:f.has('all_day'),p_reason:f.get('reason')
+   }:{
+    p_title:String(f.get('title')).trim(),p_block_type:f.get('block_type'),
+    p_starts_at:new Date(start).toISOString(),p_ends_at:new Date(end).toISOString(),
+    p_description:f.get('description'),p_location:f.get('location'),
+    p_all_day:f.has('all_day'),p_reason:f.get('reason')
+   };
+   const {error}=await db.rpc(changing?'technician_request_schedule_change':'technician_submit_schedule_block',args);
+   if(error)throw error;
+   tab='requests';selected=null;await refresh();toast('Request submitted to Dispatch.');
+  }catch(err){fail(err)}finally{busy=false;const el=document.getElementById('saveRequest');if(el)el.disabled=false}
+ };
+}
 function blockList(){
   const upcoming=blocks.filter(b=>new Date(b.ends_at)>=new Date());
   const past=blocks.filter(b=>new Date(b.ends_at)<new Date());
@@ -143,14 +214,14 @@ function blockCard(b){
     <div class="meta">${esc(date(b.starts_at))} – ${esc(date(b.ends_at))}
     ${b.all_day?' · All day':''}</div>
     ${b.location?`<p class="meta">Location: ${esc(b.location)}</p>`:''}
-    ${b.description?`<p>${esc(b.description)}</p>`:''}</article>`;
+    ${b.description?`<p>${esc(b.description)}</p>`:''}<div class="actions">${btn('changeBlock:'+b.id,'Request Change / Cancellation')}</div></article>`;
 }
 function topTabs(){
  const counts={upcoming:orders.filter(o=>['scheduled','open'].includes(o.status)).length,
  current:orders.filter(o=>o.status==='in_progress').length,
  completed:orders.filter(o=>o.status==='completed').length,
- blocks:blocks.length};
- return `<div class="tabs">${[['upcoming','Upcoming'],['current','Current'],['completed','Completed'],['blocks','Schedule Blocks']].map(([k,n])=>
+ blocks:blocks.length,requests:requests.length};
+ return `<div class="tabs">${[['upcoming','Upcoming'],['current','Current'],['completed','Completed'],['blocks','Schedule Blocks'],['requests','My Requests']].map(([k,n])=>
  `<button class="tab ${tab===k?'active':''}" data-tab="${k}">${n} (${counts[k]})</button>`).join('')}</div>`;
 }
 function filtered(){
@@ -161,6 +232,7 @@ function filtered(){
 function render(){
   if(selected){const o=orders.find(x=>x.id===selected);if(o)return detail(o)}
   if(tab==='blocks'){app.innerHTML=topTabs()+blockList();return}
+  if(tab==='requests'){app.innerHTML=topTabs()+requestsView();return}
   app.innerHTML=`<h1 class="title">My Work Orders</h1>
   <p class="sub">Assigned and released by Dispatch.</p>${topTabs()}
   <div class="actions" style="margin-bottom:12px">${btn('refresh','↻ Refresh')}</div>
@@ -206,6 +278,6 @@ function photoForm(){form('Add Photo',`<div class="field"><label for="photoFile"
 function completionForm(){form('Complete Work Order',`<p class="meta">A completion note is required. This note becomes part of the permanent work-order record.</p>`+area('note','Completion Note','',true),async f=>{const note=String(f.get('note')).trim();if(!note)throw Error('Completion note is required.');const {error}=await db.rpc('technician_complete_work_order',{p_work_order_id:selected,p_completion_note:note});if(error)throw error})}
 async function changeStatus(status){if(busy)return;busy=true;try{const {error}=await db.from('service_calls').update({status}).eq('id',selected);if(error)throw error;await refresh();toast('Status updated.')}catch(e){fail(e)}finally{busy=false}}
 async function remove(table,id){if(!confirm('Delete this item?'))return;try{const x=await getRow(table,id);if(table==='service_call_notes'&&x.is_completion_note)throw Error('Completion notes cannot be deleted.');if(table==='service_call_photos'&&x.file_path&&!/^https?:\/\//i.test(x.file_path)){const {error}=await db.storage.from('dispatch-photos').remove([x.file_path]);if(error)throw error}const {error}=await db.from(table).delete().eq('id',id).eq('service_call_id',selected);if(error)throw error;await refresh();toast('Deleted.')}catch(e){fail(e)}}
-app.addEventListener('click',async e=>{const t=e.target.closest('[data-tab],[data-act]');if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;selected=null;render();return}const act=t.dataset.act;if(!act)return;const [cmd,arg]=act.split(':');if(cmd==='back'){selected=null;render()}else if(cmd==='backDetail'){render()}else if(cmd==='refresh'){await refresh()}else if(cmd==='open'){selected=arg;render()}else if(cmd==='status'){await changeStatus(arg)}else if(cmd==='complete'){completionForm()}else if(cmd==='partForm'){await partForm()}else if(cmd==='noteForm'){await noteForm()}else if(cmd==='photoForm'){photoForm()}else if(cmd==='editPart'){await partForm(arg)}else if(cmd==='editNote'){await noteForm(arg)}else if(cmd==='delPart'){await remove('parts',arg)}else if(cmd==='delNote'){await remove('service_call_notes',arg)}else if(cmd==='delPhoto'){await remove('service_call_photos',arg)}});
+app.addEventListener('click',async e=>{const t=e.target.closest('[data-tab],[data-act]');if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;selected=null;render();return}const act=t.dataset.act;if(!act)return;const [cmd,arg]=act.split(':');if(cmd==='back'){selected=null;render()}else if(cmd==='backDetail'){render()}else if(cmd==='refresh'){await refresh()}else if(cmd==='newRequest'){requestForm()}else if(cmd==='backRequests'){tab='requests';render()}else if(cmd==='backBlocks'){tab='blocks';render()}else if(cmd==='changeBlock'){const b=blocks.find(x=>x.id===arg);if(b)requestForm(b)}else if(cmd==='withdraw'){if(confirm('Withdraw this pending request?')){const {error}=await db.rpc('technician_withdraw_schedule_request',{p_request_id:arg});if(error)fail(error);else{await refresh();toast('Request withdrawn.')}}}else if(cmd==='open'){selected=arg;render()}else if(cmd==='status'){await changeStatus(arg)}else if(cmd==='complete'){completionForm()}else if(cmd==='partForm'){await partForm()}else if(cmd==='noteForm'){await noteForm()}else if(cmd==='photoForm'){photoForm()}else if(cmd==='editPart'){await partForm(arg)}else if(cmd==='editNote'){await noteForm(arg)}else if(cmd==='delPart'){await remove('parts',arg)}else if(cmd==='delNote'){await remove('service_call_notes',arg)}else if(cmd==='delPhoto'){await remove('service_call_photos',arg)}});
 document.getElementById('signout').addEventListener('click',async()=>{await db.auth.signOut();location.replace('login.html')});init();
 </script></body></html>
