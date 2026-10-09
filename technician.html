@@ -243,7 +243,7 @@ function scheduleItems(){
 function render(){
  if(selected){const o=orders.find(x=>x.id===selected);if(o)return detail(o)}
  if(selectedBlock){const b=blocks.find(x=>x.id===selectedBlock);if(b)return blockDetail(b)}
- if(tab==='requests'){app.innerHTML=requestsView()+topTabs();return}
+ if(tab==='requests'){app.innerHTML=requestsView().replace('<div class="actions">',topTabs()+'<div class="actions">');return}
  if(tab==='schedule'){
   const items=scheduleItems();
   app.innerHTML=`<h1 class="title">My Schedule</h1>
