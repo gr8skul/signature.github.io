@@ -816,6 +816,28 @@
   }
 
 
+  // Multiple technician assignments are stored in service_call_technicians.
+  async function fetchAssignmentMap(calls) {
+    const ids = [...new Set((calls || []).map(c => c.id).filter(Boolean))];
+    const map = new Map(ids.map(id => [id, []]));
+    if (!ids.length) return map;
+    const { data, error } = await db.from("service_call_technicians")
+      .select("service_call_id,technician_id,technicians(first_name,last_name)")
+      .in("service_call_id", ids);
+    if (error) throw error;
+    (data || []).forEach(a => map.get(a.service_call_id)?.push(a));
+    return map;
+  }
+
+  function assignedNames(call) {
+    if (Array.isArray(call._assignments)) {
+      return call._assignments.length
+        ? call._assignments.map(a => technicianName(a.technicians)).join(", ")
+        : "Unassigned";
+    }
+    return technicianName(call.technicians);
+  }
+
   function workOrderLabel(call) {
     return call.work_order_number != null
       ? `WO-${String(call.work_order_number).padStart(6, "0")}`
@@ -1270,6 +1292,15 @@
       return;
     }
 
+    try {
+      const assignments = await fetchAssignmentMap(data);
+      data.forEach(call => call._assignments = assignments.get(call.id) || []);
+    } catch (e) {
+      console.error(e);
+      list.innerHTML = `<div class="empty">Unable to load technician assignments: ${escapeHtml(e.message)}</div>`;
+      return;
+    }
+
     list.innerHTML =
       data.map(call => {
 
@@ -1280,7 +1311,7 @@
           customerName(call.customers);
 
         const technician =
-          technicianName(call.technicians);
+          assignedNames(call);
 
         const location =
           call.locations
@@ -1658,6 +1689,15 @@
     }
 
 
+    try {
+      const assignments = await fetchAssignmentMap(data);
+      data.forEach(call => call._assignments = assignments.get(call.id) || []);
+    } catch (e) {
+      console.error(e);
+      body.innerHTML = `<tr><td colspan="10">Unable to load technician assignments: ${escapeHtml(e.message)}</td></tr>`;
+      return;
+    }
+
     body._dispatchRecords =
       data.map(call => {
 
@@ -1685,7 +1725,7 @@
 
 
         const search = dispatchSearchText(call, [
-          technicianName(call.technicians), call.status,
+          assignedNames(call), call.status,
           call.locations?.city, call.locations?.state
         ]);
         const html = `
@@ -1720,7 +1760,7 @@
 
             <td>
               ${escapeHtml(
-                technicianName(call.technicians)
+                assignedNames(call)
               )}
             </td>
 
@@ -1815,6 +1855,15 @@
       return;
     }
 
+
+    try {
+      const assignments = await fetchAssignmentMap([call]);
+      call._assignments = assignments.get(call.id) || [];
+    } catch (e) {
+      console.error(e);
+      showMessage("Unable to load technician assignments: " + e.message, true);
+      return;
+    }
 
     const main =
       document.getElementById("mainContent");
@@ -1942,7 +1991,7 @@
 
               <div class="detail-value">
                 ${escapeHtml(
-                  technicianName(call.technicians)
+                  assignedNames(call)
                 )}
               </div>
             </div>
@@ -2210,17 +2259,16 @@
 
               <div class="form-group">
 
-                <label for="technician">
-                  Technician
-                </label>
-
-                <select id="technician">
-
-                  <option value="">
-                    Unassigned
-                  </option>
-
-                </select>
+                <label>Technicians</label>
+                <div class="small-muted" style="margin-bottom:8px;">Select one, several, or all technicians.</div>
+                <div style="margin-bottom:8px;display:flex;gap:8px;">
+                  <button type="button" class="secondary" id="selectAllTechnicians">Select All</button>
+                  <button type="button" class="secondary" id="clearTechnicians">Clear</button>
+                </div>
+                <div id="technicianChoices" role="group" aria-label="Assigned technicians"
+                     style="border:1px solid var(--border);border-radius:6px;padding:8px 12px;max-height:230px;overflow-y:auto;">
+                  Loading technicians...
+                </div>
 
               </div>
 
@@ -2372,9 +2420,14 @@ await loadCustomersForForm(
   existing?.customer_id || null
 );
 
-await loadTechniciansForForm(
-  existing?.assigned_technician_id || null
-);
+await loadTechniciansForForm(existing);
+
+document.getElementById("selectAllTechnicians").addEventListener("click", () => {
+  document.querySelectorAll(".technician-choice").forEach(c => c.checked = true);
+});
+document.getElementById("clearTechnicians").addEventListener("click", () => {
+  document.querySelectorAll(".technician-choice").forEach(c => c.checked = false);
+});
 
 
 if (existing) {
@@ -2565,57 +2618,25 @@ if (selectedLocationId) {
 
 }
 
-async function loadTechniciansForForm(
-selectedId = null
-) {
-
-
-const select =
-  document.getElementById("technician");
-
-const {
-  data,
-  error
-} = await db
-  .from("technicians")
-  .select("*")
-  .eq(
-    "active",
-    true
-  )
-  .order("last_name");
-
-if (error) {
-
-  console.error(error);
-
-  return;
-}
-
-select.innerHTML =
-  `<option value="">Unassigned</option>`;
-
-data.forEach(technician => {
-
-  const option =
-    document.createElement("option");
-
-  option.value =
-    technician.id;
-
-  option.textContent =
-    `${technician.first_name || ""} ${technician.last_name || ""}`.trim();
-
-  select.appendChild(option);
-});
-
-
-if (selectedId) {
-  select.value =
-    selectedId;
-}
-
-
+async function loadTechniciansForForm(existing = null) {
+  const container = document.getElementById("technicianChoices");
+  const { data, error } = await db.from("technicians").select("id,first_name,last_name,active")
+    .eq("active", true).order("last_name");
+  if (error) { container.textContent = "Unable to load technicians: " + error.message; return; }
+  let selected = [];
+  if (existing?.id) {
+    const { data: assigned, error: ae } = await db.from("service_call_technicians")
+      .select("technician_id").eq("service_call_id", existing.id);
+    if (ae) { container.textContent = "Unable to load assignments: " + ae.message; return; }
+    selected = (assigned || []).map(a => a.technician_id);
+    if (!selected.length && existing.assigned_technician_id) selected = [existing.assigned_technician_id];
+  }
+  container.innerHTML = data?.length ? data.map(t => `
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 3px;margin:0;font-weight:normal;cursor:pointer;">
+      <input type="checkbox" class="technician-choice" value="${escapeAttribute(t.id)}"
+        ${selected.includes(t.id) ? "checked" : ""} style="width:auto;flex:none;">
+      <span>${escapeHtml(technicianName(t))}</span>
+    </label>`).join("") : '<span class="small-muted">No active technicians.</span>';
 }
 
 async function saveWorkOrder(
@@ -2632,9 +2653,9 @@ const customerId =
 const locationId =
   document.getElementById("location").value;
 
-const technicianId =
-  document.getElementById("technician").value ||
-  null;
+const technicianIds = [...document.querySelectorAll(".technician-choice:checked")]
+  .map(c => c.value);
+const technicianId = technicianIds[0] || null;
 
 const workType =
   document.getElementById("workType").value;
@@ -2701,45 +2722,49 @@ const payload = {
 };
 
 
+// Keep the legacy primary technician field populated for older pages during migration.
+// Assignment rows are the authoritative multi-technician list.
+let workOrderId = existingId;
 let error;
-
-
 if (existingId) {
-
-  ({
-    error
-  } =
-    await db
-      .from("service_calls")
-      .update(payload)
-      .eq(
-        "id",
-        existingId
-      ));
-
+  ({ error } = await db.from("service_calls").update(payload).eq("id", existingId));
 } else {
-
-  ({
-    error
-  } =
-    await db
-      .from("service_calls")
-      .insert(payload));
+  const result = await db.from("service_calls").insert(payload).select("id").single();
+  error = result.error;
+  workOrderId = result.data?.id;
 }
-
-
-if (error) {
-
+if (error || !workOrderId) {
   console.error(error);
-
-  showMessage(
-    error.message,
-    true
-  );
-
+  showMessage(error?.message || "Could not save work order.", true);
   return;
 }
 
+// Add new assignments first; remove deselected assignments only after additions succeed.
+const { data: previous, error: readError } = await db.from("service_call_technicians")
+  .select("technician_id").eq("service_call_id", workOrderId);
+if (readError) {
+  showMessage("Work order saved, but assignments could not be read: " + readError.message, true);
+  return;
+}
+const oldIds = (previous || []).map(a => a.technician_id);
+const additions = technicianIds.filter(id => !oldIds.includes(id));
+const removals = oldIds.filter(id => !technicianIds.includes(id));
+if (additions.length) {
+  const { error: addError } = await db.from("service_call_technicians")
+    .insert(additions.map(technician_id => ({ service_call_id: workOrderId, technician_id })));
+  if (addError) {
+    showMessage("Work order saved, but technician assignments need attention: " + addError.message, true);
+    return;
+  }
+}
+if (removals.length) {
+  const { error: removeError } = await db.from("service_call_technicians")
+    .delete().eq("service_call_id", workOrderId).in("technician_id", removals);
+  if (removeError) {
+    showMessage("Work order saved, but old assignments could not be removed: " + removeError.message, true);
+    return;
+  }
+}
 
 showMessage(
   existingId
