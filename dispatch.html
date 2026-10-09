@@ -1297,8 +1297,7 @@
       data.forEach(call => call._assignments = assignments.get(call.id) || []);
     } catch (e) {
       console.error(e);
-      list.innerHTML = `<div class="empty">Unable to load technician assignments: ${escapeHtml(e.message)}</div>`;
-      return;
+      showMessage("Technician assignments unavailable; showing existing work orders.", true);
     }
 
     list.innerHTML =
@@ -1694,8 +1693,7 @@
       data.forEach(call => call._assignments = assignments.get(call.id) || []);
     } catch (e) {
       console.error(e);
-      body.innerHTML = `<tr><td colspan="10">Unable to load technician assignments: ${escapeHtml(e.message)}</td></tr>`;
-      return;
+      showMessage("Technician assignments unavailable; showing existing work orders.", true);
     }
 
     body._dispatchRecords =
@@ -1861,8 +1859,7 @@
       call._assignments = assignments.get(call.id) || [];
     } catch (e) {
       console.error(e);
-      showMessage("Unable to load technician assignments: " + e.message, true);
-      return;
+      showMessage("Technician assignments unavailable; showing existing work order.", true);
     }
 
     const main =
