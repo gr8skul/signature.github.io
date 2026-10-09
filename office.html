@@ -815,6 +815,28 @@
   }
 
 
+  // Multiple technician assignments are stored in service_call_technicians.
+  async function fetchAssignmentMap(calls) {
+    const ids = [...new Set((calls || []).map(c => c.id).filter(Boolean))];
+    const map = new Map(ids.map(id => [id, []]));
+    if (!ids.length) return map;
+    const { data, error } = await db.from("service_call_technicians")
+      .select("service_call_id,technician_id,technicians(first_name,last_name)")
+      .in("service_call_id", ids);
+    if (error) throw error;
+    (data || []).forEach(a => map.get(a.service_call_id)?.push(a));
+    return map;
+  }
+
+  function assignedNames(call) {
+    if (Array.isArray(call._assignments)) {
+      return call._assignments.length
+        ? call._assignments.map(a => technicianName(a.technicians)).join(", ")
+        : "Unassigned";
+    }
+    return technicianName(call.technicians);
+  }
+
   function workOrderLabel(call) {
     return call.work_order_number != null
       ? `WO-${String(call.work_order_number).padStart(6, "0")}`
@@ -1147,6 +1169,91 @@ async function officeSaveIntake(event){
     await showWorkOrders();
   } catch(error){console.error("Office intake:",error);get("officeFeedback").textContent="Unable to save: "+error.message+". Any customer/address already created was retained; check before retrying.";button.disabled=false;button.textContent="Create Work Order";}
 }
+
+  // Billing data is stored once on each Work Order, not on individual technicians.
+  function billingSummaryHtml(call) {
+    const quoted = call.billing_method === "quoted";
+    const hours = call.labor_hours;
+    const count = call.labor_technician_count;
+    const total = hours != null && count != null ? Number(hours) * Number(count) : null;
+    const item = (heading, value) => `<div class="detail-item"><div class="detail-label">${heading}</div><div class="detail-value">${escapeHtml(value)}</div></div>`;
+    return `<div class="card"><div class="card-head"><h2>Billing & Completion</h2></div><div class="card-body">
+      <div class="detail-grid">
+        ${item("Billing Method", quoted ? "Quoted" : "Standard")}
+        ${quoted ? item("Labor Billing", "Quoted — labor fields not required") : `
+          ${item("Service Classification", call.service_classification ? statusLabel(call.service_classification) : "Not submitted")}
+          ${item("Elapsed Labor Hours", hours == null ? "Not submitted" : hours)}
+          ${item("Technician Count", count == null ? "Not submitted" : count)}
+          ${item("Total Billable Labor-Hours", total == null ? "Not submitted" : total)}
+          ${item("Trip Charge", call.trip_charge == null ? "Not submitted" : call.trip_charge ? "Yes" : "No")}`}
+        ${item("Completed At", call.completed_at ? new Date(call.completed_at).toLocaleString() : "Not completed")}
+      </div>
+      ${currentProfile?.role === "dispatcher" || currentProfile?.role === "secretary" ?
+        `<div class="form-actions" style="justify-content:flex-start"><button class="secondary" id="editWorkOrderBilling">Edit Billing Details</button></div>` : ""}
+      <p class="small-muted">Completion notes appear in Notes below. Parts and unit prices appear in Parts.</p>
+    </div></div>`;
+  }
+
+  function showBillingEditForm(call) {
+    if (!["dispatcher", "secretary"].includes(currentProfile?.role)) return showMessage("Read-only access.", true);
+    const main = document.getElementById("mainContent");
+    const quoted = call.billing_method === "quoted";
+    main.innerHTML = `<div class="page-head"><h1>Billing Details — ${escapeHtml(workOrderLabel(call))}</h1></div>
+      <div class="card"><div class="card-body"><form id="billingEditForm">
+        <div class="form-grid">
+          <div class="form-group"><label for="billMethod">Billing Method</label><select id="billMethod">
+            <option value="standard" ${!quoted ? "selected" : ""}>Standard</option>
+            <option value="quoted" ${quoted ? "selected" : ""}>Quoted</option>
+          </select></div>
+          <div class="form-group bill-standard"><label for="billClassification">Service Classification</label>
+            <select id="billClassification"><option value="">Not submitted</option>
+            ${["residential", "commercial", "industrial"].map(v => `<option value="${v}" ${call.service_classification === v ? "selected" : ""}>${statusLabel(v)}</option>`).join("")}</select></div>
+          <div class="form-group bill-standard"><label for="billHours">Elapsed Labor Hours (whole number)</label>
+            <input id="billHours" type="number" min="0" step="1" value="${escapeAttribute(call.labor_hours ?? "")}"></div>
+          <div class="form-group bill-standard"><label for="billCount">Number of Technicians</label>
+            <input id="billCount" type="number" min="1" step="1" value="${escapeAttribute(call.labor_technician_count ?? "")}"></div>
+          <div class="form-group bill-standard"><label for="billTrip">Trip Charge</label>
+            <select id="billTrip"><option value="">Not submitted</option><option value="yes" ${call.trip_charge === true ? "selected" : ""}>Yes</option>
+            <option value="no" ${call.trip_charge === false ? "selected" : ""}>No</option></select></div>
+        </div>
+        <p class="small-muted">Shared labor is recorded once per Work Order. Quoted Work Orders do not require labor fields.</p>
+        <div class="form-actions"><button type="button" class="secondary" id="cancelBilling">Cancel</button>
+          <button type="submit" class="primary" id="saveBilling">Save Billing Details</button></div>
+      </form></div></div>`;
+    const method = document.getElementById("billMethod");
+    function toggle() { document.querySelectorAll(".bill-standard").forEach(el => el.style.display = method.value === "quoted" ? "none" : "flex"); }
+    method.addEventListener("change", toggle); toggle();
+    document.getElementById("cancelBilling").addEventListener("click", () => showWorkOrderDetail(call.id));
+    document.getElementById("billingEditForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const button = document.getElementById("saveBilling");
+      if (button.disabled) return;
+      const billing_method = method.value;
+      const valueOrNull = id => document.getElementById(id).value.trim() || null;
+      const hoursRaw = valueOrNull("billHours"), countRaw = valueOrNull("billCount");
+      const hours = hoursRaw === null ? null : Number(hoursRaw);
+      const count = countRaw === null ? null : Number(countRaw);
+      if (billing_method === "standard" &&
+          ((hours !== null && (!Number.isInteger(hours) || hours < 0)) ||
+           (count !== null && (!Number.isInteger(count) || count < 1)))) {
+        showMessage("Labor hours must be whole numbers ≥ 0, and technician count must be a whole number ≥ 1.", true); return;
+      }
+      const trip = valueOrNull("billTrip");
+      const payload = { billing_method };
+      if (billing_method === "standard") {
+        Object.assign(payload, {service_classification:valueOrNull("billClassification"),
+          labor_hours:hours, labor_technician_count:count,
+          trip_charge:trip === null ? null : trip === "yes"});
+      }
+      button.disabled = true;
+      try {
+        const {error} = await db.from("service_calls").update(payload).eq("id",call.id);
+        if (error) throw error;
+        showMessage("Billing details saved.");
+        await showWorkOrderDetail(call.id);
+      } catch (error) { console.error(error); showMessage(error.message || "Could not save billing details.",true); button.disabled = false; }
+    });
+  }
 
   // ============================================
   // AUTH
@@ -1945,7 +2052,7 @@ async function officeSaveIntake(event){
           zip,
           notes
         ),
-        technicians (
+        technicians!service_calls_assigned_technician_id_fkey (
           first_name,
           last_name,
           phone,
@@ -1971,6 +2078,14 @@ async function officeSaveIntake(event){
       return;
     }
 
+
+    try {
+      const assignments = await fetchAssignmentMap([call]);
+      call._assignments = assignments.get(call.id) || [];
+    } catch (e) {
+      console.error(e);
+      showMessage("Technician assignments unavailable; showing existing work order.", true);
+    }
 
     const main =
       document.getElementById("mainContent");
@@ -2050,6 +2165,16 @@ async function officeSaveIntake(event){
             </div>
 
             <div class="detail-item">
+              <div class="detail-label">Billing Method</div>
+              <div class="detail-value">${call.billing_method === "quoted" ? "Quoted" : "Standard — Labor & Parts"}</div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">Lead Technician</div>
+              <div class="detail-value">${escapeHtml((call._assignments || []).find(a => a.technician_id === (call.lead_technician_id || (call._assignments?.length === 1 ? call._assignments[0].technician_id : null)))?.technicians ? technicianName((call._assignments || []).find(a => a.technician_id === (call.lead_technician_id || (call._assignments?.length === 1 ? call._assignments[0].technician_id : null))).technicians) : "Not designated")}</div>
+            </div>
+
+            <div class="detail-item">
               <div class="detail-label">
                 Status
               </div>
@@ -2098,7 +2223,7 @@ async function officeSaveIntake(event){
 
               <div class="detail-value">
                 ${escapeHtml(
-                  technicianName(call.technicians)
+                  assignedNames(call)
                 )}
               </div>
             </div>
@@ -2150,6 +2275,8 @@ async function officeSaveIntake(event){
       </div>
 
 
+      ${billingSummaryHtml(call)}
+
       <div class="card">
 
         <div class="card-head">
@@ -2176,6 +2303,7 @@ async function officeSaveIntake(event){
         <div class="card-body" id="detailPhotos">Loading photos...</div></div>
     `;
 
+     document.getElementById("editWorkOrderBilling")?.addEventListener("click", () => showBillingEditForm(call));
     document.getElementById("detailAddPart").addEventListener("click", () => showPartForm(null, call.id));
     document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm(null, call.id));
     document.getElementById("detailAddPhoto").addEventListener("click", () => showPhotoForm(null, call.id));
@@ -2266,7 +2394,6 @@ async function officeSaveIntake(event){
   async function showWorkOrderForm(
     existing = null
   ) {
-    if (!existing) return showOfficeIntake();
 
     const editing =
       !!existing;
@@ -2356,6 +2483,9 @@ async function officeSaveIntake(event){
                   <option value="install">
                     Installation
                   </option>
+                  <option value="checkout">
+                    Check-Out
+                  </option>
 
                 </select>
 
@@ -2363,18 +2493,31 @@ async function officeSaveIntake(event){
 
 
               <div class="form-group">
-
-                <label for="technician">
-                  Technician
-                </label>
-
-                <select id="technician">
-
-                  <option value="">
-                    Unassigned
-                  </option>
-
+                <label for="billingMethod">Billing Method</label>
+                <select id="billingMethod">
+                  <option value="standard">Standard — Labor &amp; Parts</option>
+                  <option value="quoted">Quoted</option>
                 </select>
+              </div>
+
+              <div class="form-group" id="leadTechnicianGroup" style="display:none;">
+                <label for="leadTechnician">Lead Technician</label>
+                <select id="leadTechnician"><option value="">Select lead technician</option></select>
+                <div class="small-muted">Required when two or more technicians are assigned. Solo technicians are automatically lead.</div>
+              </div>
+
+              <div class="form-group">
+
+                <label>Technicians</label>
+                <div class="small-muted" style="margin-bottom:8px;">Select one, several, or all technicians.</div>
+                <div style="margin-bottom:8px;display:flex;gap:8px;">
+                  <button type="button" class="secondary" id="selectAllTechnicians">Select All</button>
+                  <button type="button" class="secondary" id="clearTechnicians">Clear</button>
+                </div>
+                <div id="technicianChoices" role="group" aria-label="Assigned technicians"
+                     style="border:1px solid var(--border);border-radius:6px;padding:8px 12px;max-height:230px;overflow-y:auto;">
+                  Loading technicians...
+                </div>
 
               </div>
 
@@ -2526,9 +2669,29 @@ await loadCustomersForForm(
   existing?.customer_id || null
 );
 
-await loadTechniciansForForm(
-  existing?.assigned_technician_id || null
-);
+await loadTechniciansForForm(existing);
+
+function refreshLeadChoices() {
+  const checked = [...document.querySelectorAll(".technician-choice:checked")];
+  const group = document.getElementById("leadTechnicianGroup");
+  const select = document.getElementById("leadTechnician");
+  const previous = select.value || existing?.lead_technician_id || "";
+  group.style.display = checked.length >= 2 ? "flex" : "none";
+  select.innerHTML = '<option value="">Select lead technician</option>' +
+    checked.map(c => `<option value="${escapeAttribute(c.value)}">${escapeHtml(c.closest("label")?.innerText?.trim() || "Technician")}</option>`).join("");
+  select.value = checked.some(c => c.value === previous) ? previous : "";
+}
+document.getElementById("technicianChoices").addEventListener("change", refreshLeadChoices);
+refreshLeadChoices();
+
+document.getElementById("selectAllTechnicians").addEventListener("click", () => {
+  document.querySelectorAll(".technician-choice").forEach(c => c.checked = true);
+  refreshLeadChoices();
+});
+document.getElementById("clearTechnicians").addEventListener("click", () => {
+  document.querySelectorAll(".technician-choice").forEach(c => c.checked = false);
+  refreshLeadChoices();
+});
 
 
 if (existing) {
@@ -2542,6 +2705,9 @@ if (existing) {
 
   document.getElementById("workType").value =
     existing.work_type || "service";
+
+  document.getElementById("billingMethod").value =
+    existing.billing_method || "standard";
 
   document.getElementById("scheduledAt").value =
     existing.scheduled_at
@@ -2719,57 +2885,25 @@ if (selectedLocationId) {
 
 }
 
-async function loadTechniciansForForm(
-selectedId = null
-) {
-
-
-const select =
-  document.getElementById("technician");
-
-const {
-  data,
-  error
-} = await db
-  .from("technicians")
-  .select("*")
-  .eq(
-    "active",
-    true
-  )
-  .order("last_name");
-
-if (error) {
-
-  console.error(error);
-
-  return;
-}
-
-select.innerHTML =
-  `<option value="">Unassigned</option>`;
-
-data.forEach(technician => {
-
-  const option =
-    document.createElement("option");
-
-  option.value =
-    technician.id;
-
-  option.textContent =
-    `${technician.first_name || ""} ${technician.last_name || ""}`.trim();
-
-  select.appendChild(option);
-});
-
-
-if (selectedId) {
-  select.value =
-    selectedId;
-}
-
-
+async function loadTechniciansForForm(existing = null) {
+  const container = document.getElementById("technicianChoices");
+  const { data, error } = await db.from("technicians").select("id,first_name,last_name,active")
+    .eq("active", true).order("last_name");
+  if (error) { container.textContent = "Unable to load technicians: " + error.message; return; }
+  let selected = [];
+  if (existing?.id) {
+    const { data: assigned, error: ae } = await db.from("service_call_technicians")
+      .select("technician_id").eq("service_call_id", existing.id);
+    if (ae) { container.textContent = "Unable to load assignments: " + ae.message; return; }
+    selected = (assigned || []).map(a => a.technician_id);
+    if (!selected.length && existing.assigned_technician_id) selected = [existing.assigned_technician_id];
+  }
+  container.innerHTML = data?.length ? data.map(t => `
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 3px;margin:0;font-weight:normal;cursor:pointer;">
+      <input type="checkbox" class="technician-choice" value="${escapeAttribute(t.id)}"
+        ${selected.includes(t.id) ? "checked" : ""} style="width:auto;flex:none;">
+      <span>${escapeHtml(technicianName(t))}</span>
+    </label>`).join("") : '<span class="small-muted">No active technicians.</span>';
 }
 
 async function saveWorkOrder(
@@ -2786,9 +2920,17 @@ const customerId =
 const locationId =
   document.getElementById("location").value;
 
-const technicianId =
-  document.getElementById("technician").value ||
-  null;
+const technicianIds = [...document.querySelectorAll(".technician-choice:checked")]
+  .map(c => c.value);
+const technicianId = technicianIds[0] || null;
+const billingMethod = document.getElementById("billingMethod").value;
+const leadTechnicianId = technicianIds.length === 1
+  ? technicianIds[0]
+  : technicianIds.length > 1 ? document.getElementById("leadTechnician").value : null;
+if (technicianIds.length > 1 && !leadTechnicianId) {
+  showMessage("Select a lead technician when assigning two or more technicians.", true);
+  return;
+}
 
 const workType =
   document.getElementById("workType").value;
@@ -2834,6 +2976,9 @@ const payload = {
   work_type:
     workType,
 
+  billing_method: billingMethod,
+  // Lead is saved after technician assignments have been synchronized.
+
   released:
     released,
 
@@ -2855,45 +3000,70 @@ const payload = {
 };
 
 
+// Keep the legacy primary technician field populated for older pages during migration.
+// Assignment rows are the authoritative multi-technician list.
+let workOrderId = existingId;
 let error;
-
-
 if (existingId) {
-
-  ({
-    error
-  } =
-    await db
-      .from("service_calls")
-      .update(payload)
-      .eq(
-        "id",
-        existingId
-      ));
-
+  ({ error } = await db.from("service_calls").update(payload).eq("id", existingId));
 } else {
-
-  ({
-    error
-  } =
-    await db
-      .from("service_calls")
-      .insert(payload));
+  const result = await db.from("service_calls").insert(payload).select("id").single();
+  error = result.error;
+  workOrderId = result.data?.id;
 }
-
-
-if (error) {
-
+if (error || !workOrderId) {
   console.error(error);
-
-  showMessage(
-    error.message,
-    true
-  );
-
+  showMessage(error?.message || "Could not save work order.", true);
   return;
 }
 
+// For edits, clear an old lead before removing that technician from the team.
+// The replacement lead is set after assignment synchronization below.
+if (existingId) {
+  const {data:oldCall,error:oldCallError} = await db.from("service_calls")
+    .select("lead_technician_id").eq("id",workOrderId).single();
+  if (oldCallError) { showMessage(oldCallError.message,true); return; }
+  if (oldCall.lead_technician_id && oldCall.lead_technician_id !== leadTechnicianId) {
+    const {error:clearLeadError} = await db.from("service_calls")
+      .update({lead_technician_id:null}).eq("id",workOrderId);
+    if (clearLeadError) { showMessage(clearLeadError.message,true); return; }
+  }
+}
+
+// Add new assignments first; remove deselected assignments only after additions succeed.
+const { data: previous, error: readError } = await db.from("service_call_technicians")
+  .select("technician_id").eq("service_call_id", workOrderId);
+if (readError) {
+  showMessage("Work order saved, but assignments could not be read: " + readError.message, true);
+  return;
+}
+const oldIds = (previous || []).map(a => a.technician_id);
+const additions = technicianIds.filter(id => !oldIds.includes(id));
+const removals = oldIds.filter(id => !technicianIds.includes(id));
+if (additions.length) {
+  const { error: addError } = await db.from("service_call_technicians")
+    .insert(additions.map(technician_id => ({ service_call_id: workOrderId, technician_id })));
+  if (addError) {
+    showMessage("Work order saved, but technician assignments need attention: " + addError.message, true);
+    return;
+  }
+}
+if (removals.length) {
+  const { error: removeError } = await db.from("service_call_technicians")
+    .delete().eq("service_call_id", workOrderId).in("technician_id", removals);
+  if (removeError) {
+    showMessage("Work order saved, but old assignments could not be removed: " + removeError.message, true);
+    return;
+  }
+}
+
+// Set the lead only after the lead exists in the assignment table.
+const {error:leadError} = await db.from("service_calls")
+  .update({lead_technician_id:leadTechnicianId}).eq("id",workOrderId);
+if (leadError) {
+  showMessage("Assignments saved, but lead technician could not be set: " + leadError.message,true);
+  return;
+}
 
 showMessage(
   existingId
