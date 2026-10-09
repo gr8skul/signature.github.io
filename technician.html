@@ -47,7 +47,7 @@ body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:va
 const SUPABASE_URL='https://zpawrfdfutswbvhlwvqf.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-let profile=null,tech=null,orders=[],tab='upcoming',selected=null,busy=false,teamMap={};
+let profile=null,tech=null,orders=[],blocks=[],requests=[],tab='upcoming',selected=null,busy=false,teamMap={};
 const app=document.getElementById('app');
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const contactName=c=>[c?.first_name,c?.last_name].filter(Boolean).join(' ').trim();
@@ -75,6 +75,7 @@ async function refresh(){
   if(!ids.length){
     orders=[];
     if(selected){selected=null;toast('This work order is no longer available.');}
+    await loadScheduleBlocks();
     render();
     return;
   }
@@ -103,7 +104,54 @@ async function refresh(){
     selected=null;
     toast('This work order is no longer available.');
   }
+  await loadScheduleBlocks();
   render();
+}
+
+async function loadScheduleBlocks(){
+  blocks=[];
+  try{
+    const {data:links,error:le}=await db.from('schedule_block_technicians')
+      .select('schedule_block_id').eq('technician_id',tech.id);
+    if(le)throw le;
+    const ids=[...new Set((links||[]).map(x=>x.schedule_block_id).filter(Boolean))];
+    if(ids.length){
+      const {data,error}=await db.from('schedule_blocks')
+        .select('id,title,block_type,description,location,starts_at,ends_at,all_day,status,released')
+        .in('id',ids).eq('status','approved').eq('released',true)
+        .order('starts_at',{ascending:true});
+      if(error)throw error;
+      blocks=data||[];
+    }
+  }catch(e){console.warn('Schedule blocks unavailable:',e);toast('Schedule blocks could not be loaded: '+e.message,true)}
+}
+function blockList(){
+  const upcoming=blocks.filter(b=>new Date(b.ends_at)>=new Date());
+  const past=blocks.filter(b=>new Date(b.ends_at)<new Date());
+  return `<h1 class="title">My Schedule Blocks</h1>
+    <p class="sub">Approved, released schedule blocks assigned to you by Dispatch.</p>
+    <div class="actions">${btn('refresh','↻ Refresh')}</div>
+    <div class="section"><h3>Upcoming / Current (${upcoming.length})</h3>
+    ${upcoming.length?upcoming.map(blockCard).join(''):'<div class="empty">No upcoming schedule blocks.</div>'}</div>
+    <div class="section"><h3>Past (${past.length})</h3>
+    ${past.length?past.map(blockCard).join(''):'<div class="empty">No past schedule blocks.</div>'}</div>`;
+}
+function blockCard(b){
+  return `<article class="card"><span class="pill released">Released</span>
+    <span class="pill">${esc(label(b.block_type))}</span>
+    <h2>${esc(b.title)}</h2>
+    <div class="meta">${esc(date(b.starts_at))} – ${esc(date(b.ends_at))}
+    ${b.all_day?' · All day':''}</div>
+    ${b.location?`<p class="meta">Location: ${esc(b.location)}</p>`:''}
+    ${b.description?`<p>${esc(b.description)}</p>`:''}</article>`;
+}
+function topTabs(){
+ const counts={upcoming:orders.filter(o=>['scheduled','open'].includes(o.status)).length,
+ current:orders.filter(o=>o.status==='in_progress').length,
+ completed:orders.filter(o=>o.status==='completed').length,
+ blocks:blocks.length};
+ return `<div class="tabs">${[['upcoming','Upcoming'],['current','Current'],['completed','Completed'],['blocks','Schedule Blocks']].map(([k,n])=>
+ `<button class="tab ${tab===k?'active':''}" data-tab="${k}">${n} (${counts[k]})</button>`).join('')}</div>`;
 }
 function filtered(){
   if(tab==='upcoming')return orders.filter(o=>o.status==='scheduled'||o.status==='open');
@@ -112,9 +160,9 @@ function filtered(){
 }
 function render(){
   if(selected){const o=orders.find(x=>x.id===selected);if(o)return detail(o)}
-  const counts={upcoming:orders.filter(o=>['scheduled','open'].includes(o.status)).length,current:orders.filter(o=>o.status==='in_progress').length,completed:orders.filter(o=>o.status==='completed').length};
-  app.innerHTML=`<h1 class="title">My Work Orders</h1><p class="sub">Assigned and released by Dispatch.</p>
-  <div class="tabs">${[['upcoming','Upcoming'],['current','Current'],['completed','Completed']].map(([k,n])=>`<button class="tab ${tab===k?'active':''}" data-tab="${k}">${n} (${counts[k]})</button>`).join('')}</div>
+  if(tab==='blocks'){app.innerHTML=topTabs()+blockList();return}
+  app.innerHTML=`<h1 class="title">My Work Orders</h1>
+  <p class="sub">Assigned and released by Dispatch.</p>${topTabs()}
   <div class="actions" style="margin-bottom:12px">${btn('refresh','↻ Refresh')}</div>
   ${filtered().length?filtered().map(o=>`<article class="card"><div class="meta"><b>${esc(wo(o))}</b>${o.scheduled_at?` · ${esc(date(o.scheduled_at))}`:''}</div>
   <span class="pill">${esc(label(o.status))}</span><span class="pill">${esc(o.work_type==='checkout'?'Check-Out':o.work_type==='install'?'Installation':'Service')}</span><h2>${esc(preview(o.description)||'Work Order')}</h2>
@@ -147,7 +195,7 @@ function detail(o){
  <div class="card"><div class="section"><h3>Status History</h3><div id="history">Loading...</div></div></div>`;
  loadRelated(o.id);
 }
-async function loadRelated(id){const results=await Promise.all([db.from('parts').select('*').eq('service_call_id',id).order('created_at',{ascending:false}),db.from('service_call_notes').select('*').eq('service_call_id',id).order('created_at',{ascending:false}),db.from('service_call_photos').select('*').eq('service_call_id',id).order('created_at',{ascending:false}),db.from('service_call_status_history').select('*').eq('service_call_id',id).order('created_at',{ascending:false})]);if(selected!==id)return;const [p,n,ph,h]=results;const target=k=>document.getElementById(k);const error=x=>`<div class="error">${esc(x.message)}</div>`;target('parts').innerHTML=p.error?error(p.error):(p.data.length?p.data.map(x=>`<div class="item"><b>${esc(x.part_number||x.description||'Part')}</b> · Qty ${esc(x.quantity??0)}${x.unit_cost!=null?` · Unit Price $${esc(Number(x.unit_cost).toFixed(2))}`:""}${x.description&&x.part_number?`<div class="meta">${esc(x.description)}</div>`:''}<div class="actions">${btn('editPart:'+x.id,'Edit')}${btn('delPart:'+x.id,'Delete','danger')}</div></div>`).join(''):'<p class="meta">No parts recorded.</p>');target('notes').innerHTML=n.error?error(n.error):(n.data.length?n.data.map(x=>`<div class="item">${x.is_completion_note?'<span class="pill released">Completion Note</span>':''}<div>${esc(x.note)}</div><div class="meta">${esc(date(x.created_at))}</div>${!x.is_completion_note&&x.user_id===profile.id?`<div class="actions">${btn('editNote:'+x.id,'Edit')}${btn('delNote:'+x.id,'Delete','danger')}</div>`:''}</div>`).join(''):'<p class="meta">No notes recorded.</p>');document.getElementById('historyCard').style.display=(!h.error&&!h.data?.length)?'none':'';target('history').innerHTML=h.error?error(h.error):(h.data.length?h.data.map(x=>`<div class="item"><b>${esc(label(x.status))}</b><div class="meta">${esc(date(x.created_at))}</div></div>`).join(''):'<p class="meta">No status changes recorded yet.</p>');if(ph.error){target('photos').innerHTML=error(ph.error)}else{const rows=await Promise.all(ph.data.map(async x=>{let pic='';if(x.file_path&&!/^https?:\/\//i.test(x.file_path)){const {data}=await db.storage.from('dispatch-photos').createSignedUrl(x.file_path,1800);pic=data?.signedUrl||''}return `<div class="item">${pic?`<a href="${esc(pic)}" target="_blank" rel="noopener noreferrer"><img class="thumb" src="${esc(pic)}" alt="Work order photo"></a>`:''}<div>${esc(x.caption||'Photo')}</div><div class="actions">${btn('delPhoto:'+x.id,'Delete Photo','danger')}</div></div>`}));if(selected===id)target('photos').innerHTML=rows.length?rows.join(''):'<p class="meta">No photos recorded.</p>'}}
+async function loadRelated(id){const results=await Promise.all([db.from('parts').select('*').eq('service_call_id',id).order('created_at',{ascending:false}),db.from('service_call_notes').select('*').eq('service_call_id',id).order('created_at',{ascending:false}),db.from('service_call_photos').select('*').eq('service_call_id',id).order('created_at',{ascending:false}),db.from('service_call_status_history').select('*').eq('service_call_id',id).order('created_at',{ascending:false})]);if(selected!==id)return;const [p,n,ph,h]=results;const target=k=>document.getElementById(k);const error=x=>`<div class="error">${esc(x.message)}</div>`;target('parts').innerHTML=p.error?error(p.error):(p.data.length?p.data.map(x=>`<div class="item"><b>${esc(x.part_number||x.description||'Part')}</b> · Qty ${esc(x.quantity??0)}${x.unit_cost!=null?` · Unit Price $${esc(Number(x.unit_cost).toFixed(2))}`:""}${x.description&&x.part_number?`<div class="meta">${esc(x.description)}</div>`:''}<div class="actions">${btn('editPart:'+x.id,'Edit')}${btn('delPart:'+x.id,'Delete','danger')}</div></div>`).join(''):'<p class="meta">No parts recorded.</p>');target('notes').innerHTML=n.error?error(n.error):(n.data.length?n.data.map(x=>`<div class="item">${x.is_completion_note?'<span class="pill released">Completion Note</span>':''}<div>${esc(x.note)}</div><div class="meta">${esc(date(x.created_at))}</div>${!x.is_completion_note&&x.user_id===profile.id?`<div class="actions">${btn('editNote:'+x.id,'Edit')}${btn('delNote:'+x.id,'Delete','danger')}</div>`:''}</div>`).join(''):'<p class="meta">No notes recorded.</p>');target('history').innerHTML=h.error?error(h.error):(h.data.length?h.data.map(x=>`<div class="item"><b>${esc(label(x.status))}</b><div class="meta">${esc(date(x.created_at))}</div></div>`).join(''):'<p class="meta">No status changes recorded yet.</p>');if(ph.error){target('photos').innerHTML=error(ph.error)}else{const rows=await Promise.all(ph.data.map(async x=>{let pic='';if(x.file_path&&!/^https?:\/\//i.test(x.file_path)){const {data}=await db.storage.from('dispatch-photos').createSignedUrl(x.file_path,1800);pic=data?.signedUrl||''}return `<div class="item">${pic?`<a href="${esc(pic)}" target="_blank" rel="noopener noreferrer"><img class="thumb" src="${esc(pic)}" alt="Work order photo"></a>`:''}<div>${esc(x.caption||'Photo')}</div><div class="actions">${btn('delPhoto:'+x.id,'Delete Photo','danger')}</div></div>`}));if(selected===id)target('photos').innerHTML=rows.length?rows.join(''):'<p class="meta">No photos recorded.</p>'}}
 function form(title,fields,action){app.innerHTML=`<div class="back">${btn('backDetail','← Back to Work Order')}</div><div class="card"><h1 class="title">${esc(title)}</h1><form id="editForm">${fields}<div class="actions"><button type="submit" class="btn dark" id="saveButton">Save</button><button type="button" class="btn" data-act="backDetail">Cancel</button></div></form></div>`;document.getElementById('editForm').addEventListener('submit',async e=>{e.preventDefault();if(busy)return;busy=true;const b=document.getElementById('saveButton');b.disabled=true;try{await action(new FormData(e.target));await refresh();toast('Saved.')}catch(err){fail(err)}finally{busy=false;if(b.isConnected)b.disabled=false}})}
 function field(n,label,value='',type='text',required=false){return `<div class="field"><label for="f_${n}">${esc(label)}</label><input id="f_${n}" name="${n}" type="${type}" value="${esc(value)}" ${required?'required':''}></div>`}
 function area(n,label,value='',required=false){return `<div class="field"><label for="f_${n}">${esc(label)}</label><textarea id="f_${n}" name="${n}" ${required?'required':''}>${esc(value)}</textarea></div>`}
