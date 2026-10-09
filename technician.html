@@ -47,7 +47,7 @@ body{margin:0;background:var(--bg);font:15px Arial,Helvetica,sans-serif;color:va
 const SUPABASE_URL='https://zpawrfdfutswbvhlwvqf.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_NGa3aWmkMCXm45Hf4m-RYQ_QitmMq68';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-let profile=null,tech=null,orders=[],blocks=[],requests=[],tab='schedule',selected=null,busy=false,teamMap={};
+let profile=null,tech=null,orders=[],blocks=[],requests=[],tab='schedule',selected=null,selectedBlock=null,busy=false,teamMap={};
 const app=document.getElementById('app');
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const contactName=c=>[c?.first_name,c?.last_name].filter(Boolean).join(' ').trim();
@@ -110,6 +110,7 @@ async function refresh(){
   }
   await loadScheduleBlocks();
   await loadRequests();
+  if(selectedBlock&&!blocks.some(b=>b.id===selectedBlock))selectedBlock=null;
   render();
 }
 
@@ -197,12 +198,22 @@ function requestForm(b=null){
 }
 function blockCard(b){
  return `<article class="card"><span class="pill released">Schedule Block</span>
- <span class="pill">${esc(label(b.block_type))}</span>
- <h2>${esc(b.title)}</h2>
- <div class="meta">${esc(date(b.starts_at))} – ${esc(date(b.ends_at))}</div>
- ${b.location?`<p class="meta">Location: ${esc(b.location)}</p>`:''}
- ${b.description?`<p>${esc(b.description)}</p>`:''}
- <div class="actions">${btn('changeBlock:'+b.id,'Request Change / Cancel')}</div></article>`;
+  <h2>${esc(b.title)}</h2>
+  <div class="meta">${esc(date(b.starts_at))} – ${esc(date(b.ends_at))}</div>
+  ${b.location?`<p class="meta">Location: ${esc(b.location)}</p>`:''}
+  ${b.description?`<p>${esc(preview(b.description))}</p>`:''}
+  <div class="actions">${btn('openBlock:'+b.id,'Open Schedule Block','dark')}${btn('changeBlock:'+b.id,'Request Change / Cancel')}</div></article>`;
+}
+function blockDetail(b){
+ app.innerHTML=`<div class="back">${btn('backBlock','← My Schedule')}</div>
+ <div class="card"><span class="pill released">Schedule Block</span>
+ <h1 class="title">${esc(b.title)}</h1>
+ <div class="meta"><b>Start:</b> ${esc(date(b.starts_at))}</div>
+ <div class="meta"><b>End:</b> ${esc(date(b.ends_at))}</div>
+ ${b.all_day?'<div class="meta">All day</div>':''}
+ ${b.location?`<div class="section"><h3>LOCATION</h3><p>${esc(b.location)}</p></div>`:''}
+ ${b.description?`<div class="section"><h3>DESCRIPTION</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(b.description)}</p></div>`:''}
+ <div class="actions">${btn('changeBlock:'+b.id,'Request Change / Cancel')}</div></div>`;
 }
 function orderCard(o){
  return `<article class="card"><div class="meta"><b>${esc(wo(o))}</b>${o.scheduled_at?` · ${esc(date(o.scheduled_at))}`:''}</div>
@@ -241,7 +252,7 @@ function render(){
   ${items.length?items.map(x=>x.kind==='block'?blockCard(x.item):orderCard(x.item)).join(''):'<div class="empty">Nothing on your schedule yet.</div>'}`;
   return;
  }
- app.innerHTML=`<h1 class="title">My Work Orders</h1><p class="sub">Assigned and released by Dispatch.</p>
+ app.innerHTML=`<h1 class="title">My Work Orders</h1>
  ${topTabs()}<div class="actions">${btn('refresh','↻ Refresh')}</div>
  ${filtered().length?filtered().map(orderCard).join(''):'<div class="empty">No work orders in this section.</div>'}`;
 }
@@ -307,6 +318,6 @@ function completionForm(){
 
 async function changeStatus(status){if(busy)return;busy=true;try{const {error}=await db.from('service_calls').update({status}).eq('id',selected);if(error)throw error;await refresh();toast('Status updated.')}catch(e){fail(e)}finally{busy=false}}
 async function remove(table,id){if(!confirm('Delete this item?'))return;try{const x=await getRow(table,id);if(table==='service_call_notes'&&x.is_completion_note)throw Error('Completion notes cannot be deleted.');if(table==='service_call_photos'&&x.file_path&&!/^https?:\/\//i.test(x.file_path)){const {error}=await db.storage.from('dispatch-photos').remove([x.file_path]);if(error)throw error}const {error}=await db.from(table).delete().eq('id',id).eq('service_call_id',selected);if(error)throw error;await refresh();toast('Deleted.')}catch(e){fail(e)}}
-app.addEventListener('click',async e=>{const t=e.target.closest('[data-tab],[data-act]');if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;selected=null;render();return}const act=t.dataset.act;if(!act)return;const [cmd,arg]=act.split(':');if(cmd==='back'){selected=null;render()}else if(cmd==='backDetail'){render()}else if(cmd==='refresh'){await refresh()}else if(cmd==='newRequest'){requestForm()}else if(cmd==='backRequests'){tab='requests';render()}else if(cmd==='backSchedule'){tab='schedule';render()}else if(cmd==='changeBlock'){const b=blocks.find(x=>x.id===arg);if(b)requestForm(b)}else if(cmd==='withdraw'){if(confirm('Withdraw this pending request?')){const {error}=await db.rpc('technician_withdraw_schedule_request',{p_request_id:arg});if(error)fail(error);else{await refresh();toast('Request withdrawn.')}}}else if(cmd==='open'){selected=arg;render()}else if(cmd==='status'){await changeStatus(arg)}else if(cmd==='complete'){completionForm()}else if(cmd==='partForm'){await partForm()}else if(cmd==='noteForm'){await noteForm()}else if(cmd==='photoForm'){photoForm()}else if(cmd==='editPart'){await partForm(arg)}else if(cmd==='editNote'){await noteForm(arg)}else if(cmd==='delPart'){await remove('parts',arg)}else if(cmd==='delNote'){await remove('service_call_notes',arg)}else if(cmd==='delPhoto'){await remove('service_call_photos',arg)}});
+app.addEventListener('click',async e=>{const t=e.target.closest('[data-tab],[data-act]');if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;selected=null;selectedBlock=null;render();return}const act=t.dataset.act;if(!act)return;const [cmd,arg]=act.split(':');if(cmd==='back'){selected=null;selectedBlock=null;render()}else if(cmd==='backBlock'){selectedBlock=null;tab='schedule';render()}else if(cmd==='openBlock'){if(blocks.some(x=>x.id===arg)){selectedBlock=arg;selected=null;render()}}else if(cmd==='backDetail'){render()}else if(cmd==='refresh'){await refresh()}else if(cmd==='newRequest'){requestForm()}else if(cmd==='backRequests'){tab='requests';render()}else if(cmd==='backSchedule'){tab='schedule';selectedBlock=null;render()}else if(cmd==='changeBlock'){const b=blocks.find(x=>x.id===arg);if(b){selectedBlock=null;requestForm(b)}}else if(cmd==='withdraw'){if(confirm('Withdraw this pending request?')){const {error}=await db.rpc('technician_withdraw_schedule_request',{p_request_id:arg});if(error)fail(error);else{await refresh();toast('Request withdrawn.')}}}else if(cmd==='open'){selected=arg;selectedBlock=null;render()}else if(cmd==='status'){await changeStatus(arg)}else if(cmd==='complete'){completionForm()}else if(cmd==='partForm'){await partForm()}else if(cmd==='noteForm'){await noteForm()}else if(cmd==='photoForm'){photoForm()}else if(cmd==='editPart'){await partForm(arg)}else if(cmd==='editNote'){await noteForm(arg)}else if(cmd==='delPart'){await remove('parts',arg)}else if(cmd==='delNote'){await remove('service_call_notes',arg)}else if(cmd==='delPhoto'){await remove('service_call_photos',arg)}});
 document.getElementById('signout').addEventListener('click',async()=>{await db.auth.signOut();location.replace('login.html')});init();
 </script></body></html>
