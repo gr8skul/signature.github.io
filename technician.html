@@ -138,7 +138,7 @@ function detail(o){
  ${teamSection(o)}
  ${o.description?`<div class="section"><h3>WORK DESCRIPTION</h3><p>${esc(o.description)}</p></div>`:''}
  ${o.locations?.notes?`<p class="meta">Location notes: ${esc(o.locations.notes)}</p>`:''}
- <div class="actions">${o.status==='scheduled'?btn('status:in_progress','Start Work','dark'):''}
+ <div class="actions">${['open','scheduled'].includes(o.status)?btn('status:in_progress','Start Work','dark'):''}
  ${o.status==='in_progress'?btn('status:scheduled','Return to Upcoming')+btn('complete','Complete Work Order','dark'):''}
  ${o.status==='completed'?btn('status:in_progress','Reopen Work Order'):''}</div></div>
  <div class="card"><div class="section"><h3>Parts</h3><div id="parts">Loading...</div>${btn('partForm','+ Add Part')}</div></div>
