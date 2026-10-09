@@ -659,6 +659,8 @@
   Work Orders
 </button>
 
+<button class="nav-button" data-page="schedule-blocks">Schedule Blocks</button>
+
 <button class="nav-button" data-page="customers">
   Customers
 </button>
@@ -1415,6 +1417,7 @@
         `;
 
       }).join("");
+    await appendScheduleBlocks(list, start, end);
   }
 
 
@@ -1541,6 +1544,7 @@
     updateWorkOrderSortHeaders();
     setupDispatchSearch("work-orders", "workOrdersBody");
     await loadWorkOrders();
+    await appendWorkOrderBlockPanel();
   }
 
 
@@ -6299,6 +6303,85 @@ if (selectedId) {
 // NAVIGATION
 // ============================================
 
+// SCHEDULE BLOCKS
+const blockTypes = ['vacation','time_off','appointment','training','meeting','lunch','unavailable','other'];
+function blockStatus(b){return b.status==='pending'?'Pending Approval':b.status==='approved'?(b.released?'Released':'Approved · Not Released'):statusLabel(b.status)}
+function blockDate(x){return x?new Date(x).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):''}
+function blockTechnicians(b){return (b.schedule_block_technicians||[]).map(x=>technicianName(x.technicians)).join(', ')}
+function blockTag(b){return `<span class="type-badge">SCHEDULE BLOCK</span> <span class="status">${escapeHtml(blockStatus(b))}</span>`}
+function blockCard(b){
+ const team=blockTechnicians(b);
+ return `<div class="schedule-item" style="border-left:4px solid #8a641f">
+   <div class="schedule-time">${escapeHtml(new Date(b.starts_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}))}</div>
+   <div><div class="schedule-description">${escapeHtml(b.title)}</div>
+   <div class="schedule-meta">${blockTag(b)}
+   ${team?' · '+escapeHtml(team):''}<br>${escapeHtml(blockDate(b.starts_at))} – ${escapeHtml(blockDate(b.ends_at))}
+   ${b.description?'<br>'+escapeHtml(b.description):''}</div></div>
+   <div class="schedule-actions"><button class="row-button" onclick="showScheduleBlockDetail('${b.id}')">Open</button></div>
+ </div>`;
+}
+async function fetchBlocks(){
+ const {data,error}=await db.from('schedule_blocks').select('*,schedule_block_technicians(technician_id,technicians(first_name,last_name))').order('starts_at',{ascending:true});
+ if(error)throw error;
+ return data||[];
+}
+async function fetchRequests(){
+ const {data,error}=await db.from('schedule_block_requests').select('*').order('created_at',{ascending:false});
+ if(error)throw error;
+ return data||[];
+}
+async function appendScheduleBlocks(list,start,end){
+ try{
+   const blocks=(await fetchBlocks()).filter(b=>!['cancelled','declined'].includes(b.status)&&new Date(b.starts_at)<=end&&new Date(b.ends_at)>start);
+   if(!list.isConnected)return;
+   list.innerHTML=(list.innerHTML||'')+blocks.map(blockCard).join('');
+   if(!list.innerHTML.trim())list.innerHTML='<div class="empty">No work orders or schedule blocks for this day.</div>';
+ }catch(e){console.error(e);if(list.isConnected)list.insertAdjacentHTML('beforeend',`<div class="empty">Schedule blocks unavailable: ${escapeHtml(e.message)}</div>`)}
+}
+async function appendWorkOrderBlockPanel(){
+ const main=document.getElementById('mainContent');
+ if(!main.querySelector('#workOrdersBody'))return;
+ const box=document.createElement('section');box.className='card';box.id='workOrderBlockPanel';
+ box.innerHTML='<div class="card-head"><h2>Schedule Blocks</h2><button class="row-button" id="viewAllBlocks">View All / Manage</button></div><div id="workOrderBlocks" class="schedule-list"><div class="empty">Loading...</div></div>';
+ main.appendChild(box);
+ box.querySelector('#viewAllBlocks').onclick=showScheduleBlocks;
+ try{const blocks=(await fetchBlocks()).filter(b=>!['cancelled','declined'].includes(b.status));
+  if(!box.isConnected)return;
+  box.querySelector('#workOrderBlocks').innerHTML=blocks.length?blocks.map(blockCard).join(''):'<div class="empty">No active schedule blocks.</div>';
+ }catch(e){box.querySelector('#workOrderBlocks').textContent='Unable to load schedule blocks: '+e.message;}
+}
+async function showScheduleBlocks(){
+ setActiveNav('schedule-blocks');
+ const main=document.getElementById('mainContent');
+ main.innerHTML=`<div class="page-head"><div><h1>Schedule Blocks</h1><p>View scheduled non-work time and pending requests.</p></div></div>
+ <div class="card"><div class="card-head"><h2>Pending Requests</h2></div><div id="pendingRequests" class="card-body">Loading...</div></div>
+ <div class="card"><div class="card-head"><h2>All Schedule Blocks</h2></div><div id="allScheduleBlocks" class="schedule-list">Loading...</div></div>`;
+ try{
+  const [blocks,requests]=await Promise.all([fetchBlocks(),fetchRequests()]);
+  if(!document.getElementById('pendingRequests'))return;
+  const pending=requests.filter(r=>r.status==='pending');
+  const map=new Map(blocks.map(b=>[b.id,b]));
+  document.getElementById('pendingRequests').innerHTML=pending.length?pending.map(r=>{
+   const b=map.get(r.schedule_block_id);
+   return `<div class="detail-item" style="padding:12px 0"><strong>${escapeHtml(statusLabel(r.request_type))} request: ${escapeHtml(r.title||b?.title||'Schedule Block')}</strong>
+    <div class="small-muted">${escapeHtml(b?blockTechnicians(b):'')} · ${escapeHtml(blockDate(r.proposed_starts_at||b?.starts_at))} – ${escapeHtml(blockDate(r.proposed_ends_at||b?.ends_at))}</div>
+    ${r.reason?`<p>${escapeHtml(r.reason)}</p>`:''}</div>`;
+  }).join(''):'<div class="small-muted">No requests awaiting review.</div>';
+  document.getElementById('allScheduleBlocks').innerHTML=blocks.length?blocks.map(blockCard).join(''):'<div class="empty">No schedule blocks yet.</div>';
+ }catch(e){console.error(e);showMessage(e.message,true);}
+}
+async function showScheduleBlockDetail(id){
+ try{
+  const blocks=await fetchBlocks();const b=blocks.find(x=>x.id===id);if(!b)throw Error('Schedule block not found.');
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-head"><div><h1>${escapeHtml(b.title)}</h1><p>Schedule Block · ${escapeHtml(blockStatus(b))}</p></div><button class="secondary" id="backBlocks">Back to Blocks</button></div>
+  <div class="card"><div class="card-body"><div class="detail-grid">
+  ${[['Type',statusLabel(b.block_type)],['Starts',blockDate(b.starts_at)],['Ends',blockDate(b.ends_at)],['Assigned Technicians',blockTechnicians(b)],['Description',b.description],['Location',b.location],['Review Note',b.review_note]].filter(x=>x[1]&&!(x[0]==='Type'&&x[1]==='Other')).map(([a,v])=>`<div class="detail-item"><div class="detail-label">${escapeHtml(a)}</div><div class="detail-value">${escapeHtml(v)}</div></div>`).join('')}
+  </div></div></div>`;
+  document.getElementById('backBlocks').onclick=showScheduleBlocks;
+ }catch(e){console.error(e);showMessage(e.message,true)}
+}
+
 function setActiveNav(page) {
 
 
@@ -6341,6 +6424,8 @@ document.querySelectorAll(
 
         await showWorkOrders();
 
+      } else if (page === "schedule-blocks") {
+        await showScheduleBlocks();
       } else if (
         page === "customers"
       ) {
