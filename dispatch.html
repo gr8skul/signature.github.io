@@ -6276,7 +6276,7 @@ if (selectedId) {
 // SCHEDULE BLOCKS — separate records, shared views
 // ============================================
 const blockTypes = ['vacation','time_off','appointment','training','meeting','lunch','unavailable','other'];
-function blockStatus(b){return b.status==='pending'?'Pending Approval':b.status==='approved'&&b.released?'Released':statusLabel(b.status)}
+function blockStatus(b){return b.status==='pending'?'Pending Approval':b.status==='approved'?(b.released?'Released':'Approved · Not Released'):statusLabel(b.status)}
 function blockDate(x){return x?new Date(x).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):''}
 function blockTechnicians(b){return (b.schedule_block_technicians||[]).map(x=>technicianName(x.technicians)).join(', ')}
 function blockTag(b){return `<span class="type-badge">SCHEDULE BLOCK</span> <span class="status">${escapeHtml(blockStatus(b))}</span>`}
@@ -6350,22 +6350,54 @@ async function reviewBlockRequest(id,approve){
  if(error)return showMessage(error.message,true);
  showMessage(approve?'Request approved and released.':'Request declined.');await showScheduleBlocks();
 }
+async function updateScheduleBlockState(id, action){
+ try {
+  const {data:b,error:readError}=await db.from('schedule_blocks').select('id,title,status,released').eq('id',id).single();
+  if(readError)throw readError;
+  let changes;
+  if(action==='release'){
+   if(b.status!=='approved')return showMessage('Only approved blocks can be released.',true);
+   changes={released:true};
+  }else if(action==='unrelease'){
+   changes={released:false};
+  }else if(action==='cancel'){
+   if(!confirm(`Cancel "${b.title}"? It will remain in the history.`))return;
+   changes={status:'cancelled',released:false};
+  }else if(action==='delete'){
+   if(!confirm(`PERMANENTLY DELETE "${b.title}" and its related assignments and requests? This cannot be undone.`))return;
+   const {error}=await db.from('schedule_blocks').delete().eq('id',id);
+   if(error)throw error;
+   showMessage('Schedule block permanently deleted.');
+   return await showScheduleBlocks();
+  }else return;
+  const {error}=await db.from('schedule_blocks').update({...changes,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error)throw error;
+  showMessage(action==='release'?'Released to assigned technicians.':action==='unrelease'?'Block unreleased.':'Block cancelled.');
+  await showScheduleBlockDetail(id);
+ }catch(e){console.error(e);showMessage(e.message,true)}
+}
 async function showScheduleBlockDetail(id){
  try{
   const blocks=await fetchBlocks();const b=blocks.find(x=>x.id===id);if(!b)throw Error('Schedule block not found.');
   const main=document.getElementById('mainContent');
+  const canRelease=b.status==='approved';
   main.innerHTML=`<div class="page-head"><div><h1>${escapeHtml(b.title)}</h1><p>Schedule Block · ${escapeHtml(blockStatus(b))}</p></div><button class="secondary" id="backBlocks">Back to Blocks</button></div>
   <div class="card"><div class="card-body"><div class="detail-grid">
   ${[['Type',statusLabel(b.block_type)],['Starts',blockDate(b.starts_at)],['Ends',blockDate(b.ends_at)],['Assigned Technicians',blockTechnicians(b)],['Description',b.description],['Location',b.location],['Review Note',b.review_note]].filter(x=>x[1]).map(([a,v])=>`<div class="detail-item"><div class="detail-label">${escapeHtml(a)}</div><div class="detail-value">${escapeHtml(v)}</div></div>`).join('')}
-  </div><div class="form-actions"><button class="primary" id="editBlock">Edit Block</button>${b.status!=='cancelled'?'<button class="danger" id="cancelBlock">Cancel Block</button>':''}</div></div></div>`;
+  </div><div class="form-actions" style="flex-wrap:wrap">
+  <button class="primary" id="editBlock">Edit Block</button>
+  ${canRelease?`<button class="secondary" id="toggleRelease">${b.released?'Unrelease':'Release to Technicians'}</button>`:''}
+  ${b.status!=='cancelled'?'<button class="secondary" id="cancelBlock">Cancel Block</button>':''}
+  <button class="danger" id="deleteBlock">Permanently Delete</button>
+  </div></div></div>`;
   document.getElementById('backBlocks').onclick=showScheduleBlocks;
   document.getElementById('editBlock').onclick=()=>showScheduleBlockForm(b);
-  const cancel=document.getElementById('cancelBlock');if(cancel)cancel.onclick=async()=>{
-   if(!confirm('Cancel this schedule block? This will remain in the history.'))return;
-   const {error}=await db.from('schedule_blocks').update({status:'cancelled',released:false,updated_at:new Date().toISOString()}).eq('id',b.id);
-   if(error)return showMessage(error.message,true);showMessage('Schedule block cancelled.');await showScheduleBlocks();
-  };
- }catch(e){showMessage(e.message,true)}
+  const toggle=document.getElementById('toggleRelease');
+  if(toggle)toggle.onclick=()=>updateScheduleBlockState(b.id,b.released?'unrelease':'release');
+  const cancel=document.getElementById('cancelBlock');
+  if(cancel)cancel.onclick=()=>updateScheduleBlockState(b.id,'cancel');
+  document.getElementById('deleteBlock').onclick=()=>updateScheduleBlockState(b.id,'delete');
+ }catch(e){console.error(e);showMessage(e.message,true)}
 }
 async function showScheduleBlockForm(existing=null){
  const main=document.getElementById('mainContent');
@@ -6379,6 +6411,7 @@ async function showScheduleBlockForm(existing=null){
  <div class="form-group full"><label>Title</label><input name="title" required value="${escapeAttribute(existing?.title||'')}"></div>
  <div class="form-group"><label>Block Type</label><select name="block_type">${blockTypes.map(t=>`<option value="${t}" ${existing?.block_type===t?'selected':''}>${escapeHtml(statusLabel(t))}</option>`).join('')}</select></div>
  <div class="form-group"><label>Status</label><select name="status"><option value="pending" ${existing?.status==='pending'?'selected':''}>Pending Approval</option><option value="approved" ${!existing||existing.status==='approved'?'selected':''}>Approved</option><option value="declined" ${existing?.status==='declined'?'selected':''}>Declined</option><option value="cancelled" ${existing?.status==='cancelled'?'selected':''}>Cancelled</option></select></div>
+ <div class="form-group full"><label style="font-weight:normal"><input type="checkbox" name="released" style="width:auto" ${existing?.released?'checked':''}> Release approved block to assigned technicians immediately</label><div class="small-muted">Leave unchecked to save without releasing. Only approved blocks can be released.</div></div>
  <div class="form-group"><label>Start</label><input name="starts_at" type="datetime-local" required value="${escapeAttribute(localDateTimeValue(existing?.starts_at||now))}"></div>
  <div class="form-group"><label>End</label><input name="ends_at" type="datetime-local" required value="${escapeAttribute(localDateTimeValue(existing?.ends_at||later))}"></div>
  <div class="form-group full"><label>Technicians</label><div style="display:flex;flex-wrap:wrap;gap:12px">${(techs||[]).map(t=>`<label style="font-weight:normal"><input style="width:auto" type="checkbox" name="technician" value="${t.id}" ${chosen.has(t.id)?'checked':''}> ${escapeHtml(technicianName(t))}</label>`).join('')}</div></div>
@@ -6391,7 +6424,7 @@ async function showScheduleBlockForm(existing=null){
   ev.preventDefault();const f=new FormData(ev.currentTarget);const start=new Date(f.get('starts_at')),end=new Date(f.get('ends_at'));
   if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<=start)return showMessage('End must be later than start.',true);
   const ids=f.getAll('technician');if(!ids.length)return showMessage('Select at least one technician.',true);
-  const status=String(f.get('status'));const payload={title:String(f.get('title')).trim(),block_type:f.get('block_type'),description:f.get('description')||null,location:f.get('location')||null,starts_at:start.toISOString(),ends_at:end.toISOString(),all_day:f.has('all_day'),status,released:status==='approved',updated_at:new Date().toISOString()};
+  const status=String(f.get('status'));const payload={title:String(f.get('title')).trim(),block_type:f.get('block_type'),description:f.get('description')||null,location:f.get('location')||null,starts_at:start.toISOString(),ends_at:end.toISOString(),all_day:f.has('all_day'),status,released:status==='approved'&&f.has('released'),updated_at:new Date().toISOString()};
   const button=document.getElementById('saveBlock');button.disabled=true;
   try{
    let blockId=existing?.id;
