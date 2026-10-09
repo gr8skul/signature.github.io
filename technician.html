@@ -154,22 +154,18 @@ function requestsView(){
 function requestForm(b=null){
  const changing=!!b;
  const d=x=>{if(!x)return '';const z=new Date(x);const p=n=>String(n).padStart(2,'0');return `${z.getFullYear()}-${p(z.getMonth()+1)}-${p(z.getDate())}T${p(z.getHours())}:${p(z.getMinutes())}`};
- const types=['vacation','time_off','appointment','meeting','training','other'];
  app.innerHTML=`<div class="back">${btn(changing?'backSchedule':'backRequests','← Back')}</div>
  <div class="card"><h1 class="title">${changing?'Request Schedule Change':'New Schedule Request'}</h1>
  <form id="scheduleRequestForm">
  ${changing?`<div class="field"><label>Request</label><select name="request_type" id="requestType"><option value="modify">Change this block</option><option value="cancel">Cancel this block</option></select></div>`:''}
  ${field('title','Title',b?.title||'', 'text',true)}
- <div class="field"><label>Type</label><select name="block_type">${types.map(t=>`<option value="${t}" ${b?.block_type===t?'selected':''}>${esc(label(t))}</option>`).join('')}</select></div>
  <div class="grid">${field('starts_at','Start',d(b?.starts_at),'datetime-local',true)}${field('ends_at','End',d(b?.ends_at),'datetime-local',true)}</div>
- <div class="field"><label><input type="checkbox" name="all_day" style="width:auto" ${b?.all_day?'checked':''}> All day</label></div>
  ${field('location','Location',b?.location||'')}
  ${area('description','Description',b?.description||'')}
- ${area('reason','Reason for Request','',true)}
  <div class="actions"><button class="btn dark" id="saveRequest" type="submit">Submit to Dispatch</button></div>
  </form></div>`;
  const sel=document.getElementById('requestType');
- if(sel)sel.onchange=()=>{const hide=sel.value==='cancel';for(const n of ['title','block_type','starts_at','ends_at','location','description']){const el=document.querySelector(`[name="${n}"]`);if(el){el.disabled=hide;if(el.closest('.field'))el.closest('.field').style.display=hide?'none':''}}};
+ if(sel)sel.onchange=()=>{const hide=sel.value==='cancel';for(const n of ['title','starts_at','ends_at','location','description']){const el=document.querySelector(`[name="${n}"]`);if(el){el.disabled=hide;if(el.closest('.field'))el.closest('.field').style.display=hide?'none':''}}};
  document.getElementById('scheduleRequestForm').onsubmit=async e=>{
   e.preventDefault();if(busy)return;
   const f=new FormData(e.target),cancel=changing&&f.get('request_type')==='cancel';
@@ -179,16 +175,16 @@ function requestForm(b=null){
   try{
    const args=changing?{
     p_block_id:b.id,p_request_type:cancel?'cancel':'modify',
-    p_title:cancel?null:String(f.get('title')).trim(),p_block_type:cancel?null:f.get('block_type'),
+    p_title:cancel?null:String(f.get('title')).trim(),p_block_type:cancel?null:(b.block_type||'other'),
     p_starts_at:cancel?null:new Date(start).toISOString(),
     p_ends_at:cancel?null:new Date(end).toISOString(),
     p_description:cancel?null:f.get('description'),p_location:cancel?null:f.get('location'),
-    p_all_day:cancel?null:false,p_reason:f.get('reason')
+    p_all_day:cancel?null:false,p_reason:(String(f.get('description')||'').trim()||String(f.get('title')||'').trim()||'Schedule change requested')
    }:{
-    p_title:String(f.get('title')).trim(),p_block_type:f.get('block_type'),
+    p_title:String(f.get('title')).trim(),p_block_type:'other',
     p_starts_at:new Date(start).toISOString(),p_ends_at:new Date(end).toISOString(),
     p_description:f.get('description'),p_location:f.get('location'),
-    p_all_day:false,p_reason:f.get('reason')
+    p_all_day:false,p_reason:(String(f.get('description')||'').trim()||String(f.get('title')||'').trim()||'Schedule change requested')
    };
    const {error}=await db.rpc(changing?'technician_request_schedule_change':'technician_submit_schedule_block',args);
    if(error)throw error;
@@ -238,12 +234,12 @@ function render(){
   const items=scheduleItems();
   app.innerHTML=`<h1 class="title">My Schedule</h1>
   <p class="sub">Your assigned, released Work Orders and Schedule Blocks, in date order.</p>
-  ${topTabs()}<div class="actions">${btn('newRequest','+ My Request','dark')}${btn('refresh','↻ Refresh')}</div>
+  ${topTabs()}<div class="actions">${btn('refresh','↻ Refresh')}</div>
   ${items.length?items.map(x=>x.kind==='block'?blockCard(x.item):orderCard(x.item)).join(''):'<div class="empty">Nothing on your schedule yet.</div>'}`;
   return;
  }
  app.innerHTML=`<h1 class="title">My Work Orders</h1><p class="sub">Assigned and released by Dispatch.</p>
- ${topTabs()}<div class="actions">${btn('newRequest','+ My Request')}${btn('refresh','↻ Refresh')}</div>
+ ${topTabs()}<div class="actions">${btn('refresh','↻ Refresh')}</div>
  ${filtered().length?filtered().map(orderCard).join(''):'<div class="empty">No work orders in this section.</div>'}`;
 }
 function teamSection(o){
