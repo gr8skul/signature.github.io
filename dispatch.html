@@ -6447,7 +6447,7 @@ function blockCard(b){
  return `<div class="schedule-item" style="border-left:4px solid #8a641f">
    <div class="schedule-time">${escapeHtml(new Date(b.starts_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}))}</div>
    <div><div class="schedule-description">${escapeHtml(b.title)}</div>
-   <div class="schedule-meta">${blockTag(b)} · ${escapeHtml(statusLabel(b.block_type))}
+   <div class="schedule-meta">${blockTag(b)}
    ${team?' · '+escapeHtml(team):''}<br>${escapeHtml(blockDate(b.starts_at))} – ${escapeHtml(blockDate(b.ends_at))}
    ${b.description?'<br>'+escapeHtml(b.description):''}</div></div>
    <div class="schedule-actions"><button class="row-button" onclick="showScheduleBlockDetail('${b.id}')">Open</button></div>
