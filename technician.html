@@ -214,7 +214,7 @@ function orderCard(o){
 }
 function topTabs(){
  const pending=requests.filter(r=>r.status==='pending').length;
- return `<div class="tabs">${[['schedule','My Schedule'],['upcoming','Upcoming'],['current','Current'],['completed','Completed'],['requests',`My Requests${pending?' ('+pending+')':''}`]].map(([k,n])=>
+ return `<div class="tabs">${[['schedule','My Schedule'],['current','Current'],['completed','Completed'],['requests',`My Requests${pending?' ('+pending+')':''}`]].map(([k,n])=>
  `<button class="tab ${tab===k?'active':''}" data-tab="${k}">${n}</button>`).join('')}</div>`;
 }
 function filtered(){
@@ -223,7 +223,7 @@ function filtered(){
  return orders.filter(o=>o.status==='completed');
 }
 function scheduleItems(){
- const work=orders.filter(o=>o.status!=='cancelled').map(o=>({kind:'work',date:o.scheduled_at||null,item:o}));
+ const work=orders.filter(o=>['open','scheduled','in_progress'].includes(o.status)).map(o=>({kind:'work',date:o.scheduled_at||null,item:o}));
  const time=blocks.map(b=>({kind:'block',date:b.starts_at||null,item:b}));
  return [...work,...time].sort((a,b)=>{
   if(!a.date)return 1;if(!b.date)return -1;
@@ -236,7 +236,7 @@ function render(){
  if(tab==='schedule'){
   const items=scheduleItems();
   app.innerHTML=`<h1 class="title">My Schedule</h1>
-  <p class="sub">Your assigned, released Work Orders and Schedule Blocks, in date order.</p>
+  <p class="sub">Your upcoming and in-progress Work Orders and approved Schedule Blocks, in date order.</p>
   ${topTabs()}<div class="actions">${btn('refresh','↻ Refresh')}</div>
   ${items.length?items.map(x=>x.kind==='block'?blockCard(x.item):orderCard(x.item)).join(''):'<div class="empty">Nothing on your schedule yet.</div>'}`;
   return;
@@ -263,9 +263,9 @@ function detail(o){
  ${o.description?`<div class="section"><h3>WORK DESCRIPTION</h3><p>${esc(o.description)}</p></div>`:''}
  ${o.locations?.notes?`<p class="meta">Location notes: ${esc(o.locations.notes)}</p>`:''}
  <div class="actions">${['open','scheduled'].includes(o.status)?btn('status:in_progress','Start Work','dark'):''}
- ${o.status==='in_progress'?btn('status:scheduled','Return to Upcoming')+btn('complete','Complete Work Order','dark'):''}
+ ${o.status==='in_progress'?btn('status:scheduled','Return to My Schedule')+btn('complete',lead?'Complete Work Order':'Submit Completion Note','dark'):''}
  ${o.status==='completed'?btn('status:in_progress','Reopen Work Order'):''}</div></div>
- <div class="card"><div class="section"><h3>Parts</h3><div id="parts">Loading...</div>${btn('partForm','+ Add Part')}</div></div>
+ ${lead?`<div class="card"><div class="section"><h3>Parts</h3><div id="parts">Loading...</div>${btn('partForm','+ Add Part')}</div></div>`:''}
  <div class="card"><div class="section"><h3>Notes</h3><div id="notes">Loading...</div>${btn('noteForm','+ Add Note')}</div></div>
  <div class="card"><div class="section"><h3>Photos</h3><div id="photos">Loading...</div>${btn('photoForm','+ Add Photo')}</div></div>
  <div class="card"><div class="section"><h3>Status History</h3><div id="history">Loading...</div></div></div>`;
