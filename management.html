@@ -816,6 +816,28 @@
   }
 
 
+  // Multiple technician assignments are stored in service_call_technicians.
+  async function fetchAssignmentMap(calls) {
+    const ids = [...new Set((calls || []).map(c => c.id).filter(Boolean))];
+    const map = new Map(ids.map(id => [id, []]));
+    if (!ids.length) return map;
+    const { data, error } = await db.from("service_call_technicians")
+      .select("service_call_id,technician_id,technicians(first_name,last_name)")
+      .in("service_call_id", ids);
+    if (error) throw error;
+    (data || []).forEach(a => map.get(a.service_call_id)?.push(a));
+    return map;
+  }
+
+  function assignedNames(call) {
+    if (Array.isArray(call._assignments)) {
+      return call._assignments.length
+        ? call._assignments.map(a => technicianName(a.technicians)).join(", ")
+        : "Unassigned";
+    }
+    return technicianName(call.technicians);
+  }
+
   function workOrderLabel(call) {
     return call.work_order_number != null
       ? `WO-${String(call.work_order_number).padStart(6, "0")}`
@@ -1008,6 +1030,30 @@
     return window.confirm(message);
   }
 
+
+  // Billing data is stored once on each Work Order, not on individual technicians.
+  function billingSummaryHtml(call) {
+    const quoted = call.billing_method === "quoted";
+    const hours = call.labor_hours;
+    const count = call.labor_technician_count;
+    const total = hours != null && count != null ? Number(hours) * Number(count) : null;
+    const item = (heading, value) => `<div class="detail-item"><div class="detail-label">${heading}</div><div class="detail-value">${escapeHtml(value)}</div></div>`;
+    return `<div class="card"><div class="card-head"><h2>Billing & Completion</h2></div><div class="card-body">
+      <div class="detail-grid">
+        ${item("Billing Method", quoted ? "Quoted" : "Standard")}
+        ${quoted ? item("Labor Billing", "Quoted — labor fields not required") : `
+          ${item("Service Classification", call.service_classification ? statusLabel(call.service_classification) : "Not submitted")}
+          ${item("Elapsed Labor Hours", hours == null ? "Not submitted" : hours)}
+          ${item("Technician Count", count == null ? "Not submitted" : count)}
+          ${item("Total Billable Labor-Hours", total == null ? "Not submitted" : total)}
+          ${item("Trip Charge", call.trip_charge == null ? "Not submitted" : call.trip_charge ? "Yes" : "No")}`}
+        ${item("Completed At", call.completed_at ? new Date(call.completed_at).toLocaleString() : "Not completed")}
+      </div>
+      ${currentProfile?.role === "dispatcher" || currentProfile?.role === "secretary" ?
+        `<div class="form-actions" style="justify-content:flex-start"><button class="secondary" id="editWorkOrderBilling">Edit Billing Details</button></div>` : ""}
+      <p class="small-muted">Completion notes appear in Notes below. Parts and unit prices appear in Parts.</p>
+    </div></div>`;
+  }
 
   // ============================================
   // AUTH
@@ -1816,6 +1862,13 @@
     }
 
 
+    try {
+      const assignmentMap = await fetchAssignmentMap([call]);
+      call._assignments = assignmentMap.get(call.id) || [];
+    } catch (assignmentError) {
+      console.error("Unable to load assigned technicians", assignmentError);
+    }
+
     const main =
       document.getElementById("mainContent");
 
@@ -1849,12 +1902,7 @@
             Back
           </button>
 
-          <button
-            class="primary"
-            id="editWorkOrder"
-          >
-            Edit Work Order
-          </button>
+
 
         </div>
 
@@ -1942,7 +1990,7 @@
 
               <div class="detail-value">
                 ${escapeHtml(
-                  technicianName(call.technicians)
+                  assignedNames(call)
                 )}
               </div>
             </div>
@@ -1994,6 +2042,13 @@
       </div>
 
 
+      <div class="card"><div class="card-head"><h2>Technician Team</h2></div><div class="card-body">
+        ${(call._assignments || []).length ? call._assignments.map(a =>
+          `<div style="padding:5px 0">${escapeHtml(technicianName(a.technicians))}${a.technician_id === call.lead_technician_id ? " <strong>— Lead</strong>" : ""}</div>`).join("") : "No technician assignments available."}
+      </div></div>
+
+      ${billingSummaryHtml(call)}
+
       <div class="card">
 
         <div class="card-head">
@@ -2012,30 +2067,19 @@
 
       </div>
 
-      <div class="card"><div class="card-head"><h2>Parts</h2><button class="row-button" id="detailAddPart">+ Add Part</button></div>
+      <div class="card"><div class="card-head"><h2>Parts</h2></div>
         <div class="card-body" id="detailParts">Loading parts...</div></div>
-      <div class="card"><div class="card-head"><h2>Notes</h2><button class="row-button" id="detailAddNote">+ Add Note</button></div>
+      <div class="card"><div class="card-head"><h2>Notes</h2></div>
         <div class="card-body" id="detailNotes">Loading notes...</div></div>
-      <div class="card"><div class="card-head"><h2>Photos</h2><button class="row-button" id="detailAddPhoto">+ Add Photo</button></div>
+      <div class="card"><div class="card-head"><h2>Photos</h2></div>
         <div class="card-body" id="detailPhotos">Loading photos...</div></div>
     `;
-
-    document.getElementById("detailAddPart").addEventListener("click", () => showPartForm(null, call.id));
-    document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm(null, call.id));
-    document.getElementById("detailAddPhoto").addEventListener("click", () => showPhotoForm(null, call.id));
     await loadWorkOrderRelated(call.id);
 
     document.getElementById("backToWorkOrders")
       .addEventListener(
         "click",
         () => showWorkOrders()
-      );
-
-
-    document.getElementById("editWorkOrder")
-      .addEventListener(
-        "click",
-        () => showWorkOrderForm(call)
       );
   }
 
