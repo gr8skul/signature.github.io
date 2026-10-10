@@ -317,95 +317,81 @@ function form(title,fields,action){app.innerHTML=`<div class="back">${btn('backD
 function field(n,label,value='',type='text',required=false){return `<div class="field"><label for="f_${n}">${esc(label)}</label><input id="f_${n}" name="${n}" type="${type}" ${type==='number'?'step="'+(n==='unit_cost'?'0.01':'1')+'" min="0"':''} value="${esc(value)}" ${required?'required':''}></div>`}
 function area(n,label,value='',required=false){return `<div class="field"><label for="f_${n}">${esc(label)}</label><textarea id="f_${n}" name="${n}" ${required?'required':''}>${esc(value)}</textarea></div>`}
 async function getRow(table,id){const {data,error}=await db.from(table).select('*').eq('id',id).eq('service_call_id',selected).single();if(error)throw error;return data}
-// Parts: catalog search / select / create, scoped to the lead technician's work order.
-let partSearchSerial=0;
-let selectedCatalogPart=null;
-function partPickerResults(rows,term){
- const holder=document.getElementById('partMatches');if(!holder)return;
- holder.innerHTML=rows.length?rows.map(p=>`<button type="button" class="part-result" data-catalog-id="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc(p.part_number||'No part number')}${p.description?' · '+esc(p.description):''}</small></button>`).join(''):
- `<div class="meta">${term?'No matching parts. You can create this part below.':'Start typing to find an existing part.'}</div>`;
-}
-async function searchTechnicianParts(term){
- const serial=++partSearchSerial;
- const holder=document.getElementById('partMatches');if(!holder)return;
- holder.innerHTML='<div class="meta">Searching catalog...</div>';
- try{
-  const {data,error}=await db.rpc('search_parts_catalog',{search_text:term,result_limit:20});
-  if(error)throw error;
-  if(serial!==partSearchSerial||!document.getElementById('partMatches'))return;
-  const rows=(data||[]).filter(p=>p.active!==false);
-  partPickerResults(rows,term);
- }catch(e){if(serial===partSearchSerial&&holder.isConnected)holder.innerHTML=`<div class="error">${esc(e.message)}</div>`}
-}
-function chooseTechnicianPart(p){
- selectedCatalogPart=p;
- const chosen=document.getElementById('partChosen');if(!chosen)return;
- chosen.innerHTML=`<div class="notice"><b>${esc(p.name)}</b>${p.part_number?`<div class="meta">${esc(p.part_number)}</div>`:''}<div class="actions"><button class="btn" type="button" id="changePartChoice">Change Part</button></div></div>`;
- document.getElementById('partCreateArea').style.display='none';
- document.getElementById('partSelectArea').style.display='none';
- document.getElementById('partQuantityArea').style.display='block';
- document.getElementById('partSave').textContent='Add to Work Order';
- document.getElementById('changePartChoice').onclick=()=>{selectedCatalogPart=null;document.getElementById('partChosen').innerHTML='';document.getElementById('partCreateArea').style.display='block';document.getElementById('partSelectArea').style.display='block';document.getElementById('partSave').textContent='Create Part & Add to Work Order';document.getElementById('partSearch').focus()};
-}
-async function partForm(id){
- try{
-  const o=orders.find(o=>o.id===selected);
-  if(!o||!isLead(o))throw Error('Only the lead technician can manage parts.');
-  const existing=id?await getRow('parts',id):null;
-  selectedCatalogPart=null;
-  app.innerHTML=`<div class="back">${btn('backDetail','← Back to Work Order')}</div><div class="card"><h1 class="title">${id?'Edit Work Order Part':'Add Work Order Part'}</h1>
-  <p class="meta">Search for a part already in the shared catalog. If it does not exist, create it here. Only the name is required to create a new catalog part.</p>
-  <form id="technicianPartForm">
-  <div id="partSelectArea"><div class="field"><label for="partSearch">Find a Part</label><input id="partSearch" autocomplete="off" placeholder="Start typing a name or part number..."></div><div id="partMatches" aria-live="polite"></div></div>
-  <div id="partChosen"></div>
-  <div id="partCreateArea" class="part-picker"><h2>Create a New Part</h2><p class="meta">Only fill this in if the part is not already in the catalog.</p>
-  ${field('new_part_name','Part Name *',existing?.description||'')}
-  ${field('new_part_number','Part Number (optional)',existing?.part_number||'')}
-  <p class="meta">Cost, selling price, and inventory details can be completed later by Dispatch or Office.</p></div>
-  <div id="partQuantityArea" class="field">${field('quantity','Quantity Used *',existing?.quantity??1,'number',true)}</div>
-  <div class="actions"><button type="submit" id="partSave" class="btn dark">Create Part & Add to Work Order</button><button type="button" class="btn" data-act="backDetail">Cancel</button></div></form></div>`;
-  const search=document.getElementById('partSearch');
-  search.oninput=()=>{const term=search.value.trim();const n=document.getElementById('f_new_part_name');if(n&&!n.dataset.edited)n.value=term;searchTechnicianParts(term)};
-  document.getElementById('f_new_part_name').oninput=e=>e.target.dataset.edited='1';
-  document.getElementById('partMatches').onclick=async e=>{
-   const b=e.target.closest('[data-catalog-id]');if(!b)return;
-   const {data,error}=await db.from('parts_catalog').select('id,name,part_number,description,unit_cost,unit_price,active').eq('id',b.dataset.catalogId).single();
-   if(error)return fail(error);if(!data.active)return toast('That part is inactive.',true);chooseTechnicianPart(data);
-  };
-  if(existing?.catalog_part_id){
-   const {data,error}=await db.from('parts_catalog').select('id,name,part_number,description,unit_cost,unit_price,active').eq('id',existing.catalog_part_id).single();
-   if(!error&&data)chooseTechnicianPart(data);
-  }
-  await searchTechnicianParts('');
-  document.getElementById('technicianPartForm').onsubmit=async e=>{
-   e.preventDefault();if(busy)return;
-   const quantity=Number(document.getElementById('f_quantity').value);
-   if(!Number.isInteger(quantity)||quantity<1)return toast('Quantity must be a whole number of at least 1.',true);
-   const save=document.getElementById('partSave');busy=true;save.disabled=true;
-   try{
-    let part=selectedCatalogPart;
-    if(!part){
-     const name=document.getElementById('f_new_part_name').value.trim();
-     const number=document.getElementById('f_new_part_number').value.trim();
-     if(!name)throw Error('Enter a part name or select an existing part.');
-     // Repeat the duplicate check immediately before creating a catalog record.
-     const {data:matches,error:me}=await db.rpc('search_parts_catalog',{search_text:name,result_limit:50});
-     if(me)throw me;
-     const duplicate=(matches||[]).find(x=>x.active!==false&&(x.name||'').trim().toLowerCase()===name.toLowerCase()||number&&(x.part_number||'').trim().toLowerCase()===number.toLowerCase());
-     if(duplicate)throw Error('A matching catalog part already exists. Search and select it instead.');
-     // Technician RLS permits catalog creation only with zero pricing and stock.
-     const {data:created,error:ce}=await db.from('parts_catalog').insert({name,part_number:number||null,unit_cost:0,unit_price:0,quantity_on_hand:0}).select('id,name,part_number,unit_cost,unit_price').single();
-     if(ce)throw ce;
-     part=created;
-    }
-    const payload={catalog_part_id:part.id,part_number:part.part_number||null,description:part.name,quantity,unit_cost:Number(part.unit_price||0),unit_price:Number(part.unit_price||0)};
-    const query=id?db.from('parts').update(payload).eq('id',id).eq('service_call_id',selected):db.from('parts').insert({...payload,service_call_id:selected});
-    const {error}=await query;if(error)throw error;
-    await refresh();toast('Part added to Work Order.');
-   }catch(err){fail(err)}finally{busy=false;if(save.isConnected)save.disabled=false}
-  };
- }catch(e){fail(e)}
-}
+// Technician Parts shopping list: catalog lookup is hidden until the user types.
+let partsCart=[], partsSearchSerial=0, partsResults=[], partsEditing=null, partsContextOrder=null;
+const money=n=>'$'+Number(n||0).toFixed(2);
+function partsAuthorized(){const o=orders.find(x=>x.id===selected);return !!o&&isLead(o)}
+function partsCartRow(p,i){return `<div class="item"><b>${esc(p.name)}</b>${p.part_number?`<div class="meta">${esc(p.part_number)}</div>`:''}
+ <div class="grid"><div class="field"><label>Quantity</label><input type="number" min="1" step="1" data-cart-qty="${i}" value="${esc(p.quantity)}"></div>
+ <div class="field"><label>Unit Price ($)</label><input type="number" min="0" step="0.01" data-cart-price="${i}" value="${esc(p.unit_price)}"></div></div>
+ <div class="meta">Catalog cost: ${money(p.unit_cost)} · Line total: <span data-line-total="${i}">${money(p.quantity*p.unit_price)}</span></div>
+ <div class="actions">${btn('cartRemove:'+i,'Remove','danger')}</div></div>`}
+function drawPartsCart(){const el=document.getElementById('partsCart');if(!el)return;el.innerHTML=partsCart.length?partsCart.map(partsCartRow).join(''):'<p class="meta">Your list is empty. Search for a part or create a new one.</p>';
+ const count=document.getElementById('cartCount');if(count)count.textContent=partsCart.length+' part line'+(partsCart.length===1?'':'s');
+ const save=document.getElementById('commitParts');if(save)save.disabled=!partsCart.length;
+ const total=document.getElementById('cartTotal');if(total)total.textContent=money(partsCart.reduce((n,p)=>n+p.quantity*p.unit_price,0));}
+function drawPartsMatches(){const holder=document.getElementById('partMatches');if(!holder)return;const term=document.getElementById('partSearch')?.value.trim()||'';
+ if(term.length<2){holder.style.display='none';holder.innerHTML='';return}
+ holder.style.display='block';holder.innerHTML=partsResults.length?partsResults.map(p=>`<button type="button" class="part-result" data-pick-part="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc(p.part_number||'No part number')}${p.description?' · '+esc(p.description):''}</small></button>`).join(''):'<p class="meta">No matching parts. Use + New Part to create one.</p>';}
+async function lookupParts(){const input=document.getElementById('partSearch');if(!input)return;const term=input.value.trim(),seq=++partsSearchSerial;
+ if(term.length<2){partsResults=[];drawPartsMatches();return}
+ const holder=document.getElementById('partMatches');holder.style.display='block';holder.innerHTML='<p class="meta">Searching...</p>';
+ try{const {data,error}=await db.rpc('search_parts_catalog',{search_text:term,result_limit:12});if(error)throw error;
+ if(seq!==partsSearchSerial||!document.getElementById('partSearch'))return;partsResults=(data||[]).filter(p=>p.active!==false).slice(0,12);drawPartsMatches();}
+ catch(e){if(seq===partsSearchSerial&&holder.isConnected)holder.innerHTML=`<p class="error">${esc(e.message)}</p>`}}
+function addPartsCartItem(p){const current=partsCart.find(x=>x.catalog_part_id===p.id);if(current)current.quantity++;
+ else partsCart.push({catalog_part_id:p.id,name:p.name,part_number:p.part_number||'',quantity:1,unit_cost:Number(p.unit_cost||0),unit_price:Number(p.unit_price||0)});
+ const input=document.getElementById('partSearch');if(input)input.value='';partsResults=[];drawPartsMatches();drawPartsCart();input?.focus();}
+function showNewPart(show=true){const box=document.getElementById('newPartPanel');if(!box)return;box.style.display=show?'block':'none';if(show){const input=document.getElementById('partSearch');const n=document.getElementById('newPartName');if(n&&!n.value)n.value=input?.value.trim()||'';n?.focus()}}
+async function partsPage(){if(!partsAuthorized())return toast('Only the lead technician can manage parts.',true);
+ partsContextOrder=selected;partsCart=[];partsEditing=null;
+ app.innerHTML=`<div class="back">${btn('cancelParts','← Back to Work Order')}</div>
+ <div class="card"><h1 class="title">Add Work Order Parts</h1><p class="meta">Search by name or part number. Results appear as you type. Build your list, then save all parts to this work order.</p>
+ <div class="field"><label for="partSearch">Find a Part</label><input id="partSearch" autocomplete="off" placeholder="Type at least 2 characters..."></div>
+ <div id="partMatches" class="part-results" style="display:none;max-height:240px;overflow-y:auto"></div>
+ <div class="actions">${btn('newCatalogPart','+ New Part')}</div>
+ <div id="newPartPanel" class="part-picker" style="display:none"><h2>New Catalog Part</h2><p class="meta">Only the name is required. This becomes a shared catalog part.</p>
+ <form id="newCatalogPartForm"><div class="field"><label for="newPartName">Part Name *</label><input id="newPartName" required maxlength="200"></div>
+ <div class="field"><label for="newPartNumber">Part Number (optional)</label><input id="newPartNumber"></div>
+ <div class="grid"><div class="field"><label for="newPartCost">Unit Cost ($)</label><input id="newPartCost" type="number" min="0" step="0.01" placeholder="Optional"></div>
+ <div class="field"><label for="newPartPrice">Unit Price ($)</label><input id="newPartPrice" type="number" min="0" step="0.01" placeholder="Optional"></div></div>
+ <div class="actions"><button type="submit" class="btn dark" id="saveNewCatalogPart">Create & Add to List</button>${btn('closeNewPart','Cancel')}</div></form></div></div>
+ <div class="card"><h2>Parts to Add <span class="meta" id="cartCount"></span></h2><div id="partsCart"></div>
+ <div class="item"><b>Estimated parts total: <span id="cartTotal">$0.00</span></b></div>
+ <div class="actions"><button id="commitParts" class="btn dark" data-act="commitParts">Add Parts to Work Order</button>${btn('cancelParts','Cancel')}</div></div>`;
+ document.getElementById('partSearch').addEventListener('input',lookupParts);
+ document.getElementById('newCatalogPartForm').addEventListener('submit',createTechnicianCatalogPart);
+ document.getElementById('partsCart').addEventListener('input',e=>{const q=e.target.closest('[data-cart-qty]'),price=e.target.closest('[data-cart-price]');if(!q&&!price)return;const idx=Number((q||price).dataset[q?'cartQty':'cartPrice']);const item=partsCart[idx];if(!item)return;if(q)item.quantity=Number(q.value);else item.unit_price=Number(price.value);const total=document.querySelector(`[data-line-total="${idx}"]`);if(total)total.textContent=money(item.quantity*item.unit_price);const sum=document.getElementById('cartTotal');if(sum)sum.textContent=money(partsCart.reduce((n,p)=>n+p.quantity*p.unit_price,0))});
+ drawPartsCart();}
+async function createTechnicianCatalogPart(e){e.preventDefault();if(busy)return;if(!partsAuthorized()||partsContextOrder!==selected)return toast('Work order access changed.',true);
+ const name=document.getElementById('newPartName').value.trim(),number=document.getElementById('newPartNumber').value.trim(),c=document.getElementById('newPartCost').value,p=document.getElementById('newPartPrice').value;
+ const cost=c===''?0:Number(c),price=p===''?0:Number(p);if(!name)return toast('Part name is required.',true);
+ if(!Number.isFinite(cost)||cost<0||!Number.isFinite(price)||price<0)return toast('Enter valid nonnegative prices.',true);
+ busy=true;const button=document.getElementById('saveNewCatalogPart');button.disabled=true;
+ try{const {data:matches,error:me}=await db.rpc('search_parts_catalog',{search_text:name,result_limit:50});if(me)throw me;
+ const duplicate=(matches||[]).find(x=>x.active!==false&&((x.name||'').trim().toLowerCase()===name.toLowerCase()||(number&&(x.part_number||'').trim().toLowerCase()===number.toLowerCase())));
+ if(duplicate)throw Error('This part may already exist. Search and select it rather than creating a duplicate.');
+ const {data,error}=await db.from('parts_catalog').insert({name,part_number:number||null,unit_cost:cost,unit_price:price,quantity_on_hand:0}).select('id,name,part_number,unit_cost,unit_price').single();if(error)throw error;
+ addPartsCartItem(data);showNewPart(false);document.getElementById('newCatalogPartForm').reset();toast('Part created in catalog and added to your list.');}
+ catch(err){fail(err)}finally{busy=false;if(button.isConnected)button.disabled=false}}
+async function commitPartsCart(){if(busy)return;if(!partsAuthorized()||partsContextOrder!==selected)return toast('Work order access changed.',true);
+ if(!partsCart.length)return toast('Add a part to your list first.',true);
+ for(const p of partsCart)if(!Number.isInteger(p.quantity)||p.quantity<1||!Number.isFinite(p.unit_price)||p.unit_price<0)return toast('Check quantities and prices. Quantity must be a positive whole number.',true);
+ busy=true;const button=document.getElementById('commitParts');if(button)button.disabled=true;
+ try{const payload=partsCart.map(p=>({service_call_id:selected,catalog_part_id:p.catalog_part_id,part_number:p.part_number||null,description:p.name,quantity:p.quantity,unit_cost:p.unit_cost,unit_price:p.unit_price}));
+ const {error}=await db.from('parts').insert(payload);if(error)throw error;partsCart=[];await refresh();toast('All parts added to Work Order.');}
+ catch(err){fail(err)}finally{busy=false;if(button?.isConnected)button.disabled=false}}
+async function partForm(id){if(!id)return partsPage();
+ try{if(!partsAuthorized())throw Error('Only the lead technician can manage parts.');const x=await getRow('parts',id);
+ form('Edit Work Order Part',`<p class="meta">${esc(x.description||x.part_number||'Part')}</p>`+field('quantity','Quantity',x.quantity??1,'number',true)+field('unit_price','Unit Price ($)',x.unit_price??x.unit_cost??0,'number',true)+field('unit_cost','Unit Cost ($)',x.unit_cost??0,'number',true),async f=>{
+ const quantity=Number(f.get('quantity')),price=Number(f.get('unit_price')),cost=Number(f.get('unit_cost'));
+ if(!Number.isInteger(quantity)||quantity<1||![price,cost].every(v=>Number.isFinite(v)&&v>=0))throw Error('Enter a valid quantity, cost and price.');
+ const {error}=await db.from('parts').update({quantity,unit_price:price,unit_cost:cost}).eq('id',id).eq('service_call_id',selected);if(error)throw error;
+ // Update catalog defaults only through the controlled technician pricing function.
+ if(x.catalog_part_id&&confirm('Also update the shared catalog default cost and selling price?')){
+ const {error:ce}=await db.rpc('technician_set_catalog_prices',{p_part_id:x.catalog_part_id,p_unit_cost:cost,p_unit_price:price});if(ce)toast('Work order updated, but catalog pricing could not be updated: '+ce.message,true);
+ }
+ });}catch(e){fail(e)}}
 async function noteForm(id){try{const x=id?await getRow('service_call_notes',id):{};if(x.is_completion_note)throw Error('Completion notes cannot be edited.');form(id?'Edit Note':'Add Note',area('note','Note',x.note||'',true),async f=>{const note=String(f.get('note')).trim();if(!note)throw Error('Enter a note.');const query=id?db.from('service_call_notes').update({note}).eq('id',id).eq('service_call_id',selected):db.from('service_call_notes').insert({service_call_id:selected,user_id:profile.id,note,is_completion_note:false});const {error}=await query;if(error)throw error})}catch(e){fail(e)}}
 function photoForm(){form('Add Photo',`<div class="field"><label for="photoFile">Photo (10 MB maximum)</label><input id="photoFile" type="file" name="photo" accept="image/*" required></div>`+field('caption','Caption'),async f=>{const file=f.get('photo');if(!(file instanceof File)||!file.type.startsWith('image/')||file.size>10*1024*1024)throw Error('Choose an image under 10 MB.');const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');const path=`${selected}/${crypto.randomUUID()}.${ext}`;const {error:uploadError}=await db.storage.from('dispatch-photos').upload(path,file,{contentType:file.type,upsert:false});if(uploadError)throw uploadError;const {error}=await db.from('service_call_photos').insert({service_call_id:selected,file_path:path,caption:String(f.get('caption')).trim()});if(error){await db.storage.from('dispatch-photos').remove([path]);throw error}})}
 function completionForm(){
@@ -435,6 +421,6 @@ function completionForm(){
 
 async function changeStatus(status){if(busy)return;busy=true;try{const {error}=await db.from('service_calls').update({status}).eq('id',selected);if(error)throw error;await refresh();toast('Status updated.')}catch(e){fail(e)}finally{busy=false}}
 async function remove(table,id){if(!confirm('Delete this item?'))return;try{const x=await getRow(table,id);if(table==='service_call_notes'&&x.is_completion_note)throw Error('Completion notes cannot be deleted.');if(table==='service_call_photos'&&x.file_path&&!/^https?:\/\//i.test(x.file_path)){const {error}=await db.storage.from('dispatch-photos').remove([x.file_path]);if(error)throw error}const {error}=await db.from(table).delete().eq('id',id).eq('service_call_id',selected);if(error)throw error;await refresh();toast('Deleted.')}catch(e){fail(e)}}
-app.addEventListener('click',async e=>{const t=e.target.closest('[data-tab],[data-act]');if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;selected=null;selectedBlock=null;render();return}const act=t.dataset.act;if(!act)return;const [cmd,arg]=act.split(':');if(cmd==='back'){selected=null;selectedBlock=null;render()}else if(cmd==='backBlock'){selectedBlock=null;tab='schedule';render()}else if(cmd==='openBlock'){if(blocks.some(x=>x.id===arg)){selectedBlock=arg;selected=null;render()}}else if(cmd==='backDetail'){render()}else if(cmd==='refresh'){await refresh()}else if(cmd==='newRequest'){requestForm()}else if(cmd==='backRequests'){tab='requests';render()}else if(cmd==='backSchedule'){tab='schedule';selectedBlock=null;render()}else if(cmd==='changeBlock'){const b=blocks.find(x=>x.id===arg);if(b){selectedBlock=null;requestForm(b)}}else if(cmd==='withdraw'){if(confirm('Withdraw this pending request?')){const {error}=await db.rpc('technician_withdraw_schedule_request',{p_request_id:arg});if(error)fail(error);else{await refresh();toast('Request withdrawn.')}}}else if(cmd==='open'){selected=arg;selectedBlock=null;render()}else if(cmd==='status'){await changeStatus(arg)}else if(cmd==='complete'){completionForm()}else if(cmd==='partForm'){await partForm()}else if(cmd==='noteForm'){await noteForm()}else if(cmd==='photoForm'){photoForm()}else if(cmd==='editPart'){await partForm(arg)}else if(cmd==='editNote'){await noteForm(arg)}else if(cmd==='delPart'){await remove('parts',arg)}else if(cmd==='delNote'){await remove('service_call_notes',arg)}else if(cmd==='delPhoto'){await remove('service_call_photos',arg)}});
+app.addEventListener('click',async e=>{const t=e.target.closest('[data-tab],[data-act]');if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;selected=null;selectedBlock=null;render();return}const act=t.dataset.act;if(!act)return;const [cmd,arg]=act.split(':');if(cmd==='back'){selected=null;selectedBlock=null;render()}else if(cmd==='backBlock'){selectedBlock=null;tab='schedule';render()}else if(cmd==='openBlock'){if(blocks.some(x=>x.id===arg)){selectedBlock=arg;selected=null;render()}}else if(cmd==='backDetail'){render()}else if(cmd==='refresh'){await refresh()}else if(cmd==='newRequest'){requestForm()}else if(cmd==='backRequests'){tab='requests';render()}else if(cmd==='backSchedule'){tab='schedule';selectedBlock=null;render()}else if(cmd==='changeBlock'){const b=blocks.find(x=>x.id===arg);if(b){selectedBlock=null;requestForm(b)}}else if(cmd==='withdraw'){if(confirm('Withdraw this pending request?')){const {error}=await db.rpc('technician_withdraw_schedule_request',{p_request_id:arg});if(error)fail(error);else{await refresh();toast('Request withdrawn.')}}}else if(cmd==='open'){selected=arg;selectedBlock=null;render()}else if(cmd==='status'){await changeStatus(arg)}else if(cmd==='complete'){completionForm()}else if(cmd==='partForm'){await partForm()}else if(cmd==='newCatalogPart'){showNewPart(true)}else if(cmd==='closeNewPart'){showNewPart(false)}else if(cmd==='cancelParts'){if(partsCart.length&&!confirm('Discard your unsaved parts list?'))return;partsCart=[];render()}else if(cmd==='cartRemove'){partsCart.splice(Number(arg),1);drawPartsCart()}else if(cmd==='commitParts'){await commitPartsCart()}else if(cmd==='noteForm'){await noteForm()}else if(cmd==='photoForm'){photoForm()}else if(cmd==='editPart'){await partForm(arg)}else if(cmd==='editNote'){await noteForm(arg)}else if(cmd==='delPart'){await remove('parts',arg)}else if(cmd==='delNote'){await remove('service_call_notes',arg)}else if(cmd==='delPhoto'){await remove('service_call_photos',arg)}});
 document.getElementById('signout').addEventListener('click',async()=>{await db.auth.signOut();location.replace('login.html')});init();
 </script></body></html>
