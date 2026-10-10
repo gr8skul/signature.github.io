@@ -4732,603 +4732,230 @@ await showTechnicians();
 // PARTS
 // ============================================
 
+// =============================================================
+// PARTS CATALOG — independent catalog and work-order associations
+// =============================================================
+const partsCanEdit = () => ["dispatcher", "secretary"].includes(currentProfile?.role);
+let partsCatalogCache = [];
+let partsCatalogFilter = "active";
+const partMoney = n => "$" + Number(n ?? 0).toFixed(2);
+const partField = id => document.getElementById(id);
+const partEmpty = v => String(v ?? "").trim();
+const partNumberText = p => p.part_number || "—";
+
 async function showParts() {
-
-
-setActiveNav("parts");
-
-const main =
-  document.getElementById("mainContent");
-
-
-main.innerHTML = `
-
-  <div class="page-head">
-
-    <div>
-
-      <h1>Parts</h1>
-
-      <p>
-        Parts used on Work Orders.
-      </p>
-
-    </div>
-
-    <button
-      class="primary"
-      id="newPartButton"
-    >
-      + Add Part
-    </button>
-
-  </div>
-
-
-  <div class="card">
-
-    ${dispatchSearchField("parts")}
-
-    <div class="table-wrap">
-
-      <table>
-
-        <thead>
-
-          <tr>
-            <th>Work Order</th>
-            <th>Type</th>
-            <th>Work Description</th>
-            <th>Part Number</th>
-            <th>Description</th>
-            <th>Quantity</th>
-            <th>Unit Price</th>
-            <th></th>
-          </tr>
-
-        </thead>
-
-        <tbody id="partsBody">
-
-          <tr>
-            <td colspan="8">
-              <div class="empty">
-                Loading parts...
-              </div>
-            </td>
-          </tr>
-
-        </tbody>
-
-      </table>
-
-    </div>
-
-  </div>
-`;
-
-
-document.getElementById("newPartButton")
-  .addEventListener(
-    "click",
-    () => showPartForm()
-  );
-
-
-setupDispatchSearch("parts", "partsBody");
-
-await loadPartsPage();
-
-
+  setActiveNav("parts");
+  document.getElementById("mainContent").innerHTML = `
+    <div class="page-head"><div><h1>Parts</h1><p>Permanent parts catalog, inventory, and work-order history.</p></div>
+      ${partsCanEdit() ? '<button class="primary" id="newCatalogPart">+ New Part</button>' : ''}</div>
+    <div class="card">
+      <div class="filter-bar">
+        <button class="filter-button ${partsCatalogFilter==='active'?'active':''}" data-part-filter="active">Active</button>
+        <button class="filter-button ${partsCatalogFilter==='all'?'active':''}" data-part-filter="all">All</button>
+        <button class="filter-button ${partsCatalogFilter==='inactive'?'active':''}" data-part-filter="inactive">Inactive</button>
+      </div>
+      <div class="dispatch-search"><label for="partsCatalogSearch">Search Parts</label>
+        <input id="partsCatalogSearch" type="search" autocomplete="off" placeholder="Part name, number, description, manufacturer..." value="${escapeAttribute(dispatchSearch.parts||'')}">
+        <div class="small-muted" id="partsCatalogCount"></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Part Number</th><th>Part Name</th><th>Cost</th><th>Price</th><th>On Hand</th><th>Status</th><th></th></tr></thead>
+        <tbody id="partsCatalogBody"><tr><td colspan="7"><div class="empty">Loading catalog...</div></td></tr></tbody></table></div>
+    </div>`;
+  partField("newCatalogPart")?.addEventListener("click",()=>showCatalogPartForm());
+  partField("partsCatalogSearch").addEventListener("input",e=>{dispatchSearch.parts=e.target.value;renderPartsCatalogRows();});
+  document.querySelectorAll("[data-part-filter]").forEach(b=>b.addEventListener("click",()=>{partsCatalogFilter=b.dataset.partFilter;showParts();}));
+  await loadPartsPage();
 }
 
 async function loadPartsPage() {
-
-
-const body =
-  document.getElementById(
-    "partsBody"
-  );
-
-
-const {
-  data,
-  error
-} = await db
-  .from("parts")
-  .select(`
-    *,
-    service_calls (
-      id,
-      work_order_number,
-      work_type,
-      description,
-      customers (
-        first_name,
-        last_name,
-        company_name
-      )
-    )
-  `)
-  .order(
-    "created_at",
-    {
-      ascending: false
-    }
-  );
-
-
-if (error) {
-
-  console.error(error);
-
-  body.innerHTML = `
-    <tr>
-      <td colspan="8">
-        <div class="empty">
-          Unable to load parts.<br><br>
-          ${escapeHtml(error.message)}
-        </div>
-      </td>
-    </tr>
-  `;
-
-  return;
+  const {data,error}=await db.from("parts_catalog").select("*").order("name");
+  if(error){partField("partsCatalogBody").innerHTML=`<tr><td colspan="7"><div class="empty">${escapeHtml(error.message)}</div></td></tr>`;return;}
+  partsCatalogCache=data||[];
+  renderPartsCatalogRows();
+}
+function renderPartsCatalogRows() {
+  const body=partField("partsCatalogBody"); if(!body)return;
+  const terms=(dispatchSearch.parts||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const rows=partsCatalogCache.filter(p=>(partsCatalogFilter==='all'||(partsCatalogFilter==='active'?p.active:!p.active)) &&
+    terms.every(t=>[p.name,p.part_number,p.description,p.manufacturer,p.supplier].some(v=>String(v||'').toLowerCase().includes(t))));
+  body.innerHTML=rows.length?rows.map(p=>`<tr>
+    <td>${escapeHtml(partNumberText(p))}</td>
+    <td><strong>${escapeHtml(p.name)}</strong><div class="small-muted">${escapeHtml(p.description||'')}</div></td>
+    <td>${partMoney(p.unit_cost)}</td><td>${partMoney(p.unit_price)}</td>
+    <td>${escapeHtml(p.quantity_on_hand)} ${escapeHtml(p.unit_of_measure||'')}</td>
+    <td>${p.active?'Active':'Inactive'}</td>
+    <td><button class="row-button" data-open-catalog="${p.id}">Open</button></td></tr>`).join(''):
+    '<tr><td colspan="7"><div class="empty">No matching parts.</div></td></tr>';
+  partField("partsCatalogCount").textContent=`${rows.length} of ${partsCatalogCache.length} catalog parts shown`;
+  body.querySelectorAll("[data-open-catalog]").forEach(b=>b.addEventListener("click",()=>showCatalogPartDetail(b.dataset.openCatalog)));
 }
 
-
-if (!data || data.length === 0) {
-
-  body.innerHTML = `
-    <tr>
-      <td colspan="8">
-        <div class="empty">
-          No parts yet.
-        </div>
-      </td>
-    </tr>
-  `;
-
-  return;
-}
-
-
-body._dispatchRecords =
-  data.map(part => {
-
-    const workOrder =
-      part.service_calls;
-
-    const workOrderLabel =
-      workOrder
-        ? customerName(
-            workOrder.customers
-          )
-        : "Work Order";
-
-
-    const search = dispatchSearchText(part, [part.part_number, part.description, part.quantity]);
-    const html = `
-
-      <tr>
-
-        <td>
-          ${relatedWorkOrderCell(part.service_calls)}
-        </td>
-        <td>
-          ${relatedWorkTypeCell(part.service_calls)}
-        </td>
-        <td>
-          ${relatedDescriptionCell(part.service_calls)}
-        </td>
-
-        <td>
-          ${escapeHtml(
-            part.part_number || "—"
-          )}
-        </td>
-
-        <td>
-          ${escapeHtml(
-            part.description || "—"
-          )}
-        </td>
-
-        <td>
-          ${escapeHtml(
-            part.quantity ?? 0
-          )}
-        </td>
-
-        <td>
-          $${escapeHtml(
-            Number(
-              part.unit_cost || 0
-            ).toFixed(2)
-          )}
-        </td>
-
-        <td>
-
-          <button
-            class="row-button"
-            onclick="showPartForm('${part.id}')"
-          >
-            Edit
-          </button>
-
-          <button
-            class="danger"
-            onclick="deletePart('${part.id}')"
-          >
-            Delete
-          </button>
-
-        </td>
-
-      </tr>
-    `;
-    return { html, search };
-  });
-  applyDispatchSearch("parts", "partsBody");
-
-
-}
-
-async function showPartForm(
-id = null,
-contextWorkOrderId = null
-) {
-
-
-let part = null;
-
-
-if (id) {
-
-  const {
-    data,
-    error
-  } = await db
-    .from("parts")
-    .select("*")
-    .eq(
-      "id",
-      id
-    )
-    .single();
-
-
-  if (error) {
-
-    showMessage(
-      error.message,
-      true
-    );
-
-    return;
+async function showCatalogPartDetail(id) {
+  setActiveNav("parts");
+  const [{data:p,error},{data:uses,error:useError},{data:moves,error:moveError}]=await Promise.all([
+    db.from("parts_catalog").select("*").eq("id",id).single(),
+    db.from("parts").select("id,service_call_id,quantity,unit_cost,unit_price,service_calls(id,work_order_number,work_type,description,customers(first_name,last_name,company_name))").eq("catalog_part_id",id).order("created_at",{ascending:false}),
+    db.from("parts_inventory_movements").select("id,quantity_change,movement_type,notes,created_at").eq("catalog_part_id",id).order("created_at",{ascending:false}).limit(30)
+  ]);
+  if(error){showMessage(error.message,true);return;}
+  const item=(label,value)=>`<div class="detail-item"><div class="detail-label">${label}</div><div class="detail-value">${escapeHtml(value??'—')}</div></div>`;
+  document.getElementById("mainContent").innerHTML=`
+    <div class="page-head"><div><h1>${escapeHtml(p.name)}</h1><p>Part ${escapeHtml(partNumberText(p))} · ${p.active?'Active':'Inactive'}</p></div>
+    <button class="secondary" id="backPartsCatalog">← Parts</button></div>
+    <div class="card"><div class="card-head"><h2>Part Details</h2></div><div class="card-body">
+      <div class="detail-grid">${item('Part Number',p.part_number)}${item('Name',p.name)}${item('Description',p.description)}${item('Manufacturer',p.manufacturer)}${item('Supplier',p.supplier)}${item('Cost',partMoney(p.unit_cost))}${item('Selling Price',partMoney(p.unit_price))}${item('On Hand',p.quantity_on_hand+' '+p.unit_of_measure)}${item('Reorder Point',p.reorder_point)}${item('Reorder Quantity',p.reorder_quantity)}${item('Storage Location',p.location_code)}${item('Notes',p.notes)}</div>
+      ${partsCanEdit()?`<div class="form-actions" style="flex-wrap:wrap"><button class="secondary" id="catalogAdjustStock">Adjust Inventory</button><button class="secondary" id="catalogEditPart">Edit Part</button><button class="secondary" id="catalogToggleActive">${p.active?'Deactivate':'Reactivate'}</button><button class="danger" id="catalogDeletePart">Delete Part</button></div>`:''}
+    </div></div>
+    <div class="card"><div class="card-head"><h2>Associated Work Orders</h2></div><div class="table-wrap"><table><thead><tr><th>Work Order</th><th>Customer</th><th>Quantity</th><th>Usage Price</th><th></th></tr></thead><tbody>
+      ${useError?`<tr><td colspan="5">${escapeHtml(useError.message)}</td></tr>`:(uses||[]).length?(uses||[]).map(u=>`<tr><td>${escapeHtml(u.service_calls?workOrderLabel(u.service_calls):'Unavailable')}</td><td>${escapeHtml(customerName(u.service_calls?.customers))}</td><td>${escapeHtml(u.quantity??'—')}</td><td>${partMoney(u.unit_price??u.unit_cost)}</td><td>${u.service_calls?`<button class="row-button" data-open-work-order="${u.service_call_id}">Open Work Order</button>`:''}</td></tr>`).join(''):'<tr><td colspan="5"><div class="empty">This part has not been attached to a work order.</div></td></tr>'}
+    </tbody></table></div></div>
+    <div class="card"><div class="card-head"><h2>Inventory History</h2></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Change</th><th>Notes</th></tr></thead><tbody>
+    ${moveError?`<tr><td colspan="4">${escapeHtml(moveError.message)}</td></tr>`:(moves||[]).length?(moves||[]).map(m=>`<tr><td>${escapeHtml(new Date(m.created_at).toLocaleString())}</td><td>${escapeHtml(m.movement_type)}</td><td>${escapeHtml(m.quantity_change)}</td><td>${escapeHtml(m.notes||'')}</td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">No inventory movements recorded.</div></td></tr>'}</tbody></table></div></div>`;
+  partField('backPartsCatalog').onclick=showParts;
+  document.querySelectorAll('[data-open-work-order]').forEach(b=>b.onclick=()=>showWorkOrderDetail(b.dataset.openWorkOrder));
+  if(partsCanEdit()){
+    partField('catalogEditPart').onclick=()=>showCatalogPartForm(id);
+    partField('catalogAdjustStock').onclick=()=>showPartStockForm(id);
+    partField('catalogToggleActive').onclick=async()=>{
+      const {error:e}=await db.from('parts_catalog').update({active:!p.active}).eq('id',id);
+      if(e)return showMessage(e.message,true);showMessage(p.active?'Part deactivated.':'Part reactivated.');showCatalogPartDetail(id);
+    };
+    partField('catalogDeletePart').onclick=()=>deleteCatalogPart(id);
   }
-
-  part =
-    data;
 }
 
-
-const main =
-  document.getElementById(
-    "mainContent"
-  );
-
-
-main.innerHTML = `
-
-  <div class="page-head">
-
-    <div>
-
-      <h1>
-        ${part
-          ? "Edit Part"
-          : "Add Part"}
-      </h1>
-
-      <p>
-        Part information for a Work Order.
-      </p>
-
-    </div>
-
-  </div>
-
-
-  <div class="card">
-
-    <div class="card-body">
-
-      <form id="partForm">
-
-        <div class="form-grid">
-
-          <div class="form-group full">
-
-            <label for="partWorkOrder">
-              Work Order
-            </label>
-
-            <select
-              id="partWorkOrder"
-              required
-            >
-              <option value="">
-                Loading Work Orders...
-              </option>
-            </select>
-
-          </div>
-
-
-          <div class="form-group">
-
-            <label for="partNumber">
-              Part Number
-            </label>
-
-            <input
-              id="partNumber"
-              value="${escapeAttribute(
-                part?.part_number || ""
-              )}"
-            >
-
-          </div>
-
-
-          <div class="form-group">
-
-            <label for="partQuantity">
-              Quantity
-            </label>
-
-            <input
-              type="number"
-              min="1"
-              id="partQuantity"
-              value="${escapeAttribute(
-                part?.quantity ?? 1
-              )}"
-            >
-
-          </div>
-
-
-          <div class="form-group full">
-
-            <label for="partDescription">
-              Description
-            </label>
-
-            <input
-              id="partDescription"
-              value="${escapeAttribute(
-                part?.description || ""
-              )}"
-            >
-
-          </div>
-
-
-          <div class="form-group">
-
-            <label for="partUnitCost">
-              Unit Price
-            </label>
-
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              id="partUnitCost"
-              value="${escapeAttribute(
-                part?.unit_cost ?? 0
-              )}"
-            >
-
-          </div>
-
-        </div>
-
-
-        <div class="form-actions">
-
-          <button
-            type="button"
-            class="secondary"
-            id="cancelPart"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            class="primary"
-          >
-            ${part
-              ? "Save Part"
-              : "Add Part"}
-          </button>
-
-        </div>
-
-      </form>
-
-    </div>
-
-  </div>
-`;
-
-
-await loadWorkOrderOptions(
-  "partWorkOrder",
-  contextWorkOrderId || part?.service_call_id || null
-);
-
-
-// When opened from a work order, keep the association fixed.
-if (contextWorkOrderId) {
-  const orderSelect = document.getElementById("partWorkOrder");
-  if (orderSelect.value !== contextWorkOrderId) {
-    showMessage("The selected work order could not be loaded.", true);
-    return;
+async function showCatalogPartForm(id=null) {
+  if(!partsCanEdit())return showMessage('Read-only access.',true);
+  let p=null;
+  if(id){const {data,error}=await db.from('parts_catalog').select('*').eq('id',id).single();if(error)return showMessage(error.message,true);p=data;}
+  setActiveNav('parts');
+  const val=(key)=>escapeAttribute(p?.[key]??'');
+  const field=(key,label,type='text',extra='')=>`<div class="form-group"><label for="catalog_${key}">${label}</label><input id="catalog_${key}" type="${type}" ${type==='number'?'min="0" step="0.01"':''} value="${val(key)}" ${extra}></div>`;
+  document.getElementById('mainContent').innerHTML=`<div class="page-head"><div><h1>${p?'Edit Part':'New Part'}</h1><p>Only the part name is required. Search for an existing part before saving.</p></div></div>
+    <div class="card"><div class="card-body"><form id="catalogPartForm"><div class="form-grid">
+      ${field('name','Part Name','text','required autocomplete="off"')}
+      ${field('part_number','Part Number')}
+      <div class="form-group full"><div class="small-muted">Existing matches (select one to avoid a duplicate):</div><div id="catalogMatches" class="office-intake suggestions" style="border:1px solid #dfe2e6;border-radius:5px;max-height:180px;overflow-y:auto"></div></div>
+      ${field('description','Description')}${field('unit_cost','Unit Cost','number')}${field('unit_price','Selling Price','number')}
+      ${field('unit_of_measure','Unit of Measure')}${field('reorder_point','Reorder Point','number')}${field('reorder_quantity','Reorder Quantity','number')}
+      ${field('manufacturer','Manufacturer')}${field('supplier','Supplier')}${field('location_code','Storage Location')}
+      <div class="form-group full"><label for="catalog_notes">Notes</label><textarea id="catalog_notes">${escapeHtml(p?.notes||'')}</textarea></div>
+      </div><div class="form-actions"><button type="button" class="secondary" id="cancelCatalogPart">Cancel</button><button type="submit" class="primary" id="saveCatalogPart">${p?'Save Changes':'Create Part'}</button></div></form></div></div>`;
+  partField('cancelCatalogPart').onclick=()=>p?showCatalogPartDetail(id):showParts();
+  let request=0;
+  async function suggest(){
+    const q=partEmpty(partField('catalog_name').value||partField('catalog_part_number').value);
+    const target=partField('catalogMatches');if(q.length<2){target.innerHTML='';return;}
+    const n=++request;
+    const {data,error}=await db.rpc('search_parts_catalog',{search_text:q,result_limit:10});
+    if(n!==request||!target.isConnected)return;
+    if(error){target.textContent=error.message;return;}
+    target.innerHTML=(data||[]).filter(x=>x.id!==id).map(x=>`<button type="button" class="suggestion" data-existing-part="${x.id}" style="display:block;width:100%;padding:10px;text-align:left;border:0;border-bottom:1px solid #ddd;background:white">${escapeHtml(x.name)} · ${escapeHtml(x.part_number||'No part number')}</button>`).join('');
+    target.querySelectorAll('[data-existing-part]').forEach(b=>b.onclick=()=>showCatalogPartDetail(b.dataset.existingPart));
   }
-  orderSelect.disabled = true;
+  partField('catalog_name').addEventListener('input',suggest);
+  partField('catalog_part_number').addEventListener('input',suggest);
+  partField('catalogPartForm').onsubmit=async e=>{
+    e.preventDefault();const btn=partField('saveCatalogPart');if(btn.disabled)return;
+    const name=partEmpty(partField('catalog_name').value);
+    if(!name)return showMessage('Enter a part name.',true);
+    const payload={name};
+    ['part_number','description','unit_of_measure','manufacturer','supplier','location_code','notes'].forEach(k=>payload[k]=partEmpty(partField('catalog_'+k).value)||null);
+    payload.unit_of_measure ||= 'each';
+    ['unit_cost','unit_price','reorder_point'].forEach(k=>payload[k]=Number(partField('catalog_'+k).value||0));
+    payload.reorder_quantity=partEmpty(partField('catalog_reorder_quantity').value)===''?null:Number(partField('catalog_reorder_quantity').value);
+    btn.disabled=true;
+    const query=id?db.from('parts_catalog').update(payload).eq('id',id):db.from('parts_catalog').insert(payload);
+    const {data,error}=await query.select('id').single();
+    btn.disabled=false;
+    if(error)return showMessage(error.message,true);
+    showMessage(id?'Part updated.':'Part created.');await showCatalogPartDetail(data.id);
+  };
+  partField('catalog_name').focus();
 }
 
-document.getElementById("cancelPart")
-  .addEventListener(
-    "click",
-    () => contextWorkOrderId ? showWorkOrderDetail(contextWorkOrderId) : showParts()
-  );
-
-
-document.getElementById("partForm")
-  .addEventListener(
-    "submit",
-    async event => {
-
-      event.preventDefault();
-
-
-      const payload = {
-
-        service_call_id:
-          (contextWorkOrderId || document.getElementById(
-            "partWorkOrder"
-          ).value),
-
-        part_number:
-          document.getElementById(
-            "partNumber"
-          ).value.trim(),
-
-        description:
-          document.getElementById(
-            "partDescription"
-          ).value.trim(),
-
-        quantity:
-          Number(
-            document.getElementById(
-              "partQuantity"
-            ).value
-          ) || 1,
-
-        unit_cost:
-          Number(
-            document.getElementById(
-              "partUnitCost"
-            ).value
-          ) || 0
-      };
-
-
-      let error;
-
-
-      if (part) {
-
-        ({
-          error
-        } =
-          await db
-            .from("parts")
-            .update(payload)
-            .eq(
-              "id",
-              part.id
-            ));
-
-      } else {
-
-        ({
-          error
-        } =
-          await db
-            .from("parts")
-            .insert(payload));
-      }
-
-
-      if (error) {
-
-        console.error(error);
-
-        showMessage(
-          error.message,
-          true
-        );
-
-        return;
-      }
-
-
-      showMessage(
-        part
-          ? "Part saved."
-          : "Part added."
-      );
-
-
-      if (contextWorkOrderId) await showWorkOrderDetail(contextWorkOrderId);
-      else await showParts();
-
-    }
-  );
-
-
+async function deleteCatalogPart(id){
+  if(!partsCanEdit())return showMessage('Read-only access.',true);
+  const {count,error:countError}=await db.from('parts').select('id',{count:'exact',head:true}).eq('catalog_part_id',id);
+  if(countError)return showMessage(countError.message,true);
+  if(count){return showMessage('This part is attached to work orders. Deactivate it to preserve history.',true);}
+  const {count:movementCount,error:movementError}=await db.from('parts_inventory_movements').select('id',{count:'exact',head:true}).eq('catalog_part_id',id);
+  if(movementError)return showMessage(movementError.message,true);
+  if(movementCount)return showMessage('This part has inventory history. Deactivate it instead.',true);
+  if(!confirmDelete('Permanently delete this unused catalog part? This cannot be undone.'))return;
+  const {error}=await db.from('parts_catalog').delete().eq('id',id);
+  if(error)return showMessage(error.message,true);
+  showMessage('Part deleted.');await showParts();
 }
 
-async function deletePart(id) {
-
-
-if (!confirmDelete(
-  "Delete this part?"
-)) {
-  return;
+async function showPartStockForm(id){
+  if(!partsCanEdit())return showMessage('Read-only access.',true);
+  const {data:p,error}=await db.from('parts_catalog').select('id,name,quantity_on_hand').eq('id',id).single();
+  if(error)return showMessage(error.message,true);
+  document.getElementById('mainContent').innerHTML=`<div class="page-head"><h1>Inventory · ${escapeHtml(p.name)}</h1></div><div class="card"><div class="card-body"><p>Current quantity: <strong>${escapeHtml(p.quantity_on_hand)}</strong></p>
+  <form id="partMovementForm"><div class="form-grid"><div class="form-group"><label>Movement Type</label><select id="stockType"><option value="received">Received</option><option value="used">Used</option><option value="returned">Returned</option><option value="adjustment">Adjustment</option><option value="damaged">Damaged</option></select></div>
+  <div class="form-group"><label>Quantity Change (+ or −)</label><input type="number" id="stockChange" step="0.01" required placeholder="Example: 5 or -2"></div>
+  <div class="form-group full"><label>Notes</label><textarea id="stockNotes"></textarea></div></div>
+  <div class="form-actions"><button type="button" class="secondary" id="cancelStock">Cancel</button><button type="submit" class="primary" id="saveStock">Record Movement</button></div></form></div></div>`;
+  partField('cancelStock').onclick=()=>showCatalogPartDetail(id);
+  partField('partMovementForm').onsubmit=async e=>{
+    e.preventDefault();const change=Number(partField('stockChange').value);if(!Number.isFinite(change)||change===0)return showMessage('Enter a nonzero quantity change.',true);
+    const btn=partField('saveStock');btn.disabled=true;
+    const {error}=await db.from('parts_inventory_movements').insert({catalog_part_id:id,quantity_change:change,movement_type:partField('stockType').value,notes:partEmpty(partField('stockNotes').value)||null});
+    btn.disabled=false;if(error)return showMessage(error.message,true);
+    showMessage('Inventory updated.');await showCatalogPartDetail(id);
+  };
 }
 
-
-const {
-  error
-} = await db
-  .from("parts")
-  .delete()
-  .eq(
-    "id",
-    id
-  );
-
-
-if (error) {
-
-  console.error(error);
-
-  showMessage(
-    error.message,
-    true
-  );
-
-  return;
+// Called from a work-order detail screen. Creates a usage entry,
+// not a duplicate catalog part.
+async function showPartForm(id=null,contextWorkOrderId=null){
+  if(!partsCanEdit())return showMessage('Read-only access.',true);
+  let usage=null;
+  if(id){const {data,error}=await db.from('parts').select('*').eq('id',id).single();if(error)return showMessage(error.message,true);usage=data;}
+  const workOrderId=contextWorkOrderId||usage?.service_call_id||null;
+  document.getElementById('mainContent').innerHTML=`<div class="page-head"><div><h1>${usage?'Edit Work Order Part':'Add Part to Work Order'}</h1><p>Choose an existing catalog part, or create a new catalog entry first.</p></div></div>
+  <div class="card"><div class="card-body"><form id="usagePartForm"><div class="form-grid">
+    <div class="form-group full"><label>Work Order</label><select id="usageWorkOrder" required><option value="">Loading...</option></select></div>
+    <div class="form-group full"><label>Find a Part</label><input id="usagePartSearch" type="search" autocomplete="off" placeholder="Search part name or number..."><div id="usagePartMatches" style="border:1px solid #ddd;border-radius:5px;max-height:200px;overflow-y:auto"></div><div id="usageChosen" class="small-muted"></div></div>
+    <div class="form-group"><label>Quantity</label><input id="usageQuantity" type="number" min="1" step="1" required value="${escapeAttribute(usage?.quantity??1)}"></div>
+    <div class="form-group"><label>Unit Selling Price</label><input id="usagePrice" type="number" min="0" step="0.01" value="${escapeAttribute(usage?.unit_price??'')}"></div>
+    <div class="form-group full"><label>Usage Notes</label><textarea id="usageNotes">${escapeHtml(usage?.notes||'')}</textarea></div>
+    </div><div class="form-actions"><button type="button" class="secondary" id="usageCancel">Cancel</button><button type="button" class="secondary" id="usageNewCatalog">+ Create Catalog Part</button><button type="submit" class="primary" id="usageSave">${usage?'Save':'Add to Work Order'}</button></div></form></div></div>`;
+  await loadWorkOrderOptions('usageWorkOrder',workOrderId);
+  if(contextWorkOrderId)partField('usageWorkOrder').disabled=true;
+  let selected=null;
+  const {data:initial,error:catalogError}=await db.from('parts_catalog').select('id,name,part_number,description,unit_cost,unit_price,active').eq('active',true).order('name');
+  if(catalogError)return showMessage(catalogError.message,true);
+  const catalog=initial||[];
+  function choose(p){selected=p;partField('usagePartSearch').value=p.name;partField('usageChosen').textContent=`Selected: ${p.name} · ${p.part_number||'No number'}`;partField('usagePartMatches').innerHTML='';if(!usage)partField('usagePrice').value=p.unit_price??0;}
+  if(usage?.catalog_part_id){const p=catalog.find(x=>x.id===usage.catalog_part_id);if(p)choose(p);}
+  function matches(){const q=partEmpty(partField('usagePartSearch').value).toLowerCase();if(selected&&q!==selected.name.toLowerCase())selected=null;
+    const found=q?catalog.filter(p=>[p.name,p.part_number,p.description].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,12):[];
+    partField('usagePartMatches').innerHTML=found.map(p=>`<button type="button" class="suggestion" style="display:block;width:100%;padding:10px;text-align:left;border:0;border-bottom:1px solid #ddd;background:white" data-usage-pick="${p.id}">${escapeHtml(p.name)} · ${escapeHtml(p.part_number||'No number')}</button>`).join('');
+    partField('usagePartMatches').querySelectorAll('[data-usage-pick]').forEach(b=>b.onclick=()=>choose(catalog.find(p=>p.id===b.dataset.usagePick)));
+  }
+  partField('usagePartSearch').addEventListener('input',matches);
+  partField('usageCancel').onclick=()=>workOrderId?showWorkOrderDetail(workOrderId):showParts();
+  partField('usageNewCatalog').onclick=()=>{showMessage('Create the catalog part first, then return to the work order.');showCatalogPartForm();};
+  partField('usagePartForm').onsubmit=async e=>{
+    e.preventDefault();if(!selected)return showMessage('Select a catalog part from the suggestions.',true);
+    const wo=contextWorkOrderId||partField('usageWorkOrder').value;if(!wo)return showMessage('Select a work order.',true);
+    const quantity=Number(partField('usageQuantity').value);if(!Number.isInteger(quantity)||quantity<1)return showMessage('Quantity must be a positive whole number.',true);
+    const payload={service_call_id:wo,catalog_part_id:selected.id,part_number:selected.part_number||null,description:selected.name,quantity,unit_cost:Number(selected.unit_cost||0),unit_price:Number(partField('usagePrice').value||0),notes:partEmpty(partField('usageNotes').value)||null};
+    const btn=partField('usageSave');btn.disabled=true;
+    const {error}=usage?await db.from('parts').update(payload).eq('id',usage.id):await db.from('parts').insert(payload);
+    btn.disabled=false;if(error)return showMessage(error.message,true);
+    showMessage(usage?'Work-order part updated.':'Part added to work order.');await showWorkOrderDetail(wo);
+  };
+  partField('usagePartSearch').focus();
 }
 
-
-showMessage(
-  "Part deleted."
-);
-
-
-await showParts();
-
-
+async function deletePart(id){
+  if(!partsCanEdit())return showMessage('Read-only access.',true);
+  if(!confirmDelete('Remove this part from its work order? The catalog part will remain.'))return;
+  const {error}=await db.from('parts').delete().eq('id',id);
+  if(error)return showMessage(error.message,true);
+  showMessage('Work-order part removed.');await showParts();
 }
 
 // ============================================
