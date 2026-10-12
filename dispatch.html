@@ -742,6 +742,9 @@
   let currentProfile = null;
   let currentDate = new Date();
   let currentWorkOrderFilter = "all";
+  let currentWorkOrderShop = "all";
+  let calendarShop = "all";
+  let shopDirectory = [];
   let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
   let calendarFilter = "all";
   let calendarSelectedDay = new Date().getDate();
@@ -870,6 +873,22 @@
     return technicianName(call.technicians);
   }
 
+  async function ensureShops() {
+    const {data,error} = await db.from("shops").select("id,name").order("name");
+    if(error) throw error;
+    shopDirectory = data || [];
+    return shopDirectory;
+  }
+  function shopName(id) {
+    return shopDirectory.find(s=>String(s.id)===String(id))?.name || "Unassigned";
+  }
+  function shopOptions(selected, includeAll=false) {
+    return (includeAll ? '<option value="all">All shops</option>' : '<option value="">Select shop</option>') +
+      shopDirectory.map(s=>`<option value="${escapeAttribute(s.id)}" ${String(selected)===String(s.id)?'selected':''}>${escapeHtml(s.name)}</option>`).join('');
+  }
+  function shopFilterHtml(id, selected) {
+    return `<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--border)"><label for="${id}" style="margin:0">Shop</label><select id="${id}" style="width:auto;min-width:180px">${shopOptions(selected,true)}</select></div>`;
+  }
   function workOrderLabel(call) {
     return call.work_order_number != null
       ? `WO-${String(call.work_order_number).padStart(6, "0")}`
@@ -938,7 +957,8 @@
     if (!body || !body._dispatchRecords) return;
     const terms = (dispatchSearch[page] || "").trim().toLowerCase().split(/\\s+/).filter(Boolean);
     const matching = body._dispatchRecords.filter(item =>
-      terms.every(term => item.search.includes(term))
+      terms.every(term => item.search.includes(term)) &&
+      (page !== "work-orders" || currentWorkOrderShop === "all" || String(item.record.shop_id) === currentWorkOrderShop)
     );
     if (page === "work-orders") {
       matching.sort((a, b) => {
@@ -956,7 +976,7 @@
     }
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
-      : `<tr><td colspan="${page === "work-orders" ? 10 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
+      : `<tr><td colspan="${page === "work-orders" ? 11 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
           <div class="empty">No matching records.</div></td></tr>`;
     const count = document.getElementById("dispatchSearchCount");
     if (count) count.textContent = `${matching.length} of ${body._dispatchRecords.length} records shown`;
@@ -1524,6 +1544,7 @@
 
   async function showCalendar(){
     setActiveNav('calendar');
+    try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
     const request=++calendarRequest;
     const main=document.getElementById('mainContent');
     main.innerHTML=`<div class="page-head"><div><h1>Work Calendar</h1><p>Scheduled work orders only. Select an entry to open its work order.</p></div></div>
@@ -1531,6 +1552,7 @@
       <div class="date-controls"><button id="calendarPrev" type="button" aria-label="Previous month">‹</button><strong>${escapeHtml(calendarMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'}))}</strong><button id="calendarNext" type="button" aria-label="Next month">›</button><button id="calendarToday" type="button">Today</button></div>
       <div class="filter-bar" style="border:0;padding:0;background:transparent">
       ${[['all','All'],['released','Work Orders Released'],['unreleased','Work Orders Unreleased']].map(([value,label])=>`<button type="button" class="filter-button ${calendarFilter===value?'active':''}" data-calendar-filter="${value}">${label}</button>`).join('')}</div></div>
+      ${shopFilterHtml("calendarShopFilter",calendarShop)}
       <div class="calendar-weekdays">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div>${x}</div>`).join('')}</div>
       <div class="calendar-grid" id="calendarGrid"><div class="empty" style="grid-column:1/-1">Loading calendar...</div></div>
       <div id="calendarAgenda" class="calendar-agenda"></div></div>`;
@@ -1538,11 +1560,12 @@
     document.getElementById('calendarNext').onclick=()=>{calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,1);calendarSelectedDay=1;showCalendar()};
     document.getElementById('calendarToday').onclick=()=>{const now=new Date();calendarMonth=new Date(now.getFullYear(),now.getMonth(),1);calendarSelectedDay=now.getDate();showCalendar()};
     main.querySelectorAll('[data-calendar-filter]').forEach(b=>b.onclick=()=>{calendarFilter=b.dataset.calendarFilter;showCalendar()});
+    document.getElementById('calendarShopFilter').onchange=e=>{calendarShop=e.target.value;showCalendar()};
     const from=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1);
     const to=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,1);
     // Query the month directly; do not download all historical work orders.
     const {data,error}=await db.from('service_calls')
-      .select('id,work_order_number,description,scheduled_at,released,status,customers(first_name,last_name,company_name),technicians!service_calls_assigned_technician_id_fkey(first_name,last_name)')
+      .select('id,shop_id,work_order_number,description,scheduled_at,released,status,customers(first_name,last_name,company_name),technicians!service_calls_assigned_technician_id_fkey(first_name,last_name)')
       .gte('scheduled_at',from.toISOString()).lt('scheduled_at',to.toISOString())
       .order('scheduled_at',{ascending:true});
     if(request!==calendarRequest || !document.getElementById('calendarGrid'))return;
@@ -1554,7 +1577,7 @@
       calls.forEach(call=>call._assignments=assignments.get(call.id)||[]);
     }catch(e){console.warn('Calendar assignments unavailable',e);showMessage('Calendar loaded, but technician assignments could not be retrieved.',true)}
     if(request!==calendarRequest || !document.getElementById('calendarGrid'))return;
-    calls=calls.filter(c=>calendarFilter==='all'||(calendarFilter==='released'?c.released===true:c.released!==true));
+    calls=calls.filter(c=>(calendarShop==='all'||String(c.shop_id)===calendarShop) && (calendarFilter==='all'||(calendarFilter==='released'?c.released===true:c.released!==true)));
     const byDay=new Map();
     for(const c of calls){const key=calendarDateKey(c.scheduled_at);if(!byDay.has(key))byDay.set(key,[]);byDay.get(key).push(c)}
     const year=calendarMonth.getFullYear(),month=calendarMonth.getMonth();
@@ -1602,6 +1625,7 @@
 
     currentWorkOrderFilter =
       filter;
+    try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
 
     setActiveNav("work-orders");
 
@@ -1644,6 +1668,7 @@
 
         </div>
 
+        ${shopFilterHtml("workOrderShopFilter",currentWorkOrderShop)}
         ${dispatchSearchField("work-orders")}
 
         <div class="table-wrap">
@@ -1654,6 +1679,7 @@
               <tr>
                 <th><button type="button" class="sort-heading" data-work-sort="created_at">Work Order ↓</button></th>
                 <th>Type</th>
+                <th>Shop</th>
                 <th>Customer</th>
                 <th>Description</th>
                 <th>Location</th>
@@ -1668,7 +1694,7 @@
             <tbody id="workOrdersBody">
 
               <tr>
-                <td colspan="10">
+                <td colspan="11">
                   <div class="empty">
                     Loading work orders...
                   </div>
@@ -1713,6 +1739,7 @@
       button.addEventListener("click", () => changeWorkOrderSort(button.dataset.workSort));
     });
     updateWorkOrderSortHeaders();
+    document.getElementById("workOrderShopFilter").onchange=e=>{currentWorkOrderShop=e.target.value;applyDispatchSearch("work-orders","workOrdersBody")};
     setupDispatchSearch("work-orders", "workOrdersBody");
     await loadWorkOrders();
     await appendWorkOrderBlockPanel();
@@ -1846,7 +1873,7 @@
 
       body.innerHTML = `
         <tr>
-          <td colspan="10">
+          <td colspan="11">
 
             <div class="empty">
               Unable to load work orders.<br><br>
@@ -1865,7 +1892,7 @@
 
       body.innerHTML = `
         <tr>
-          <td colspan="10">
+          <td colspan="11">
 
             <div class="empty">
               No work orders match this view.
@@ -1930,6 +1957,7 @@
               </span>
             </td>
 
+            <td>${escapeHtml(shopName(call.shop_id))}</td>
             <td>
               ${escapeHtml(
                 customerName(call.customers)
@@ -1996,6 +2024,7 @@
   // ============================================
 
   async function showWorkOrderDetail(id) {
+    try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
 
     const {
       data: call,
@@ -2118,6 +2147,7 @@
 
           <div class="detail-grid">
 
+            <div class="detail-item"><div class="detail-label">Shop</div><div class="detail-value">${escapeHtml(shopName(call.shop_id))}</div></div>
             <div class="detail-item">
               <div class="detail-label">
                 Work Type
@@ -2363,6 +2393,7 @@
 
     const editing =
       !!existing;
+    try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
 
     const main =
       document.getElementById("mainContent");
@@ -2397,6 +2428,7 @@
           <form id="workOrderForm">
 
             <div class="form-grid">
+              <div class="form-group"><label for="workOrderShop">Shop</label><select id="workOrderShop" required>${shopOptions(existing?.shop_id || "")}</select></div>
 
               <div class="form-group">
 
@@ -2636,6 +2668,9 @@ await loadCustomersForForm(
 );
 
 await loadTechniciansForForm(existing);
+document.getElementById("workOrderShop").addEventListener("change",async()=>{
+  await loadTechniciansForForm(null); refreshLeadChoices();
+});
 
 function refreshLeadChoices() {
   const checked = [...document.querySelectorAll(".technician-choice:checked")];
@@ -2853,7 +2888,7 @@ if (selectedLocationId) {
 
 async function loadTechniciansForForm(existing = null) {
   const container = document.getElementById("technicianChoices");
-  const { data, error } = await db.from("technicians").select("id,first_name,last_name,active")
+  const { data, error } = await db.from("technicians").select("id,first_name,last_name,active,shop_id")
     .eq("active", true).order("last_name");
   if (error) { container.textContent = "Unable to load technicians: " + error.message; return; }
   let selected = [];
@@ -2864,12 +2899,14 @@ async function loadTechniciansForForm(existing = null) {
     selected = (assigned || []).map(a => a.technician_id);
     if (!selected.length && existing.assigned_technician_id) selected = [existing.assigned_technician_id];
   }
-  container.innerHTML = data?.length ? data.map(t => `
+  const selectedShop = document.getElementById("workOrderShop")?.value;
+  const eligible = (data||[]).filter(t => selectedShop && String(t.shop_id)===String(selectedShop));
+  container.innerHTML = eligible.length ? eligible.map(t => `
     <label style="display:flex;align-items:center;gap:10px;padding:9px 3px;margin:0;font-weight:normal;cursor:pointer;">
       <input type="checkbox" class="technician-choice" value="${escapeAttribute(t.id)}"
         ${selected.includes(t.id) ? "checked" : ""} style="width:auto;flex:none;">
       <span>${escapeHtml(technicianName(t))}</span>
-    </label>`).join("") : '<span class="small-muted">No active technicians.</span>';
+    </label>`).join("") : '<span class="small-muted">Select a shop with active assigned technicians.</span>';
 }
 
 async function saveWorkOrder(
@@ -2882,6 +2919,8 @@ event.preventDefault();
 
 const customerId =
   document.getElementById("customer").value;
+const shopId = document.getElementById("workOrderShop").value;
+if (!shopId) { showMessage("Select a shop.",true); return; }
 
 const locationId =
   document.getElementById("location").value;
@@ -2929,6 +2968,7 @@ if (!customerId || !locationId) {
 }
 
 const payload = {
+  shop_id: Number(shopId),
 
   customer_id:
     customerId,
@@ -4126,6 +4166,7 @@ async function showTechnicians() {
 
 
 setActiveNav("technicians");
+try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
 
 const main =
   document.getElementById("mainContent");
@@ -4168,6 +4209,7 @@ main.innerHTML = `
           <tr>
             <th>Name</th>
             <th>Title</th>
+            <th>Shop</th>
             <th>Phone</th>
             <th>Email</th>
             <th>Status</th>
@@ -4179,7 +4221,7 @@ main.innerHTML = `
         <tbody id="techniciansBody">
 
           <tr>
-            <td colspan="6">
+            <td colspan="7">
               <div class="empty">
                 Loading technicians...
               </div>
@@ -4234,7 +4276,7 @@ if (error) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="6">
+      <td colspan="7">
         <div class="empty">
           Unable to load technicians.<br><br>
           ${escapeHtml(error.message)}
@@ -4251,7 +4293,7 @@ if (!data || data.length === 0) {
 
   body.innerHTML = `
     <tr>
-      <td colspan="6">
+      <td colspan="7">
         <div class="empty">
           No technicians yet.
         </div>
@@ -4276,6 +4318,7 @@ body._dispatchRecords =
         )}
       </td>
 
+      <td>${escapeHtml(shopName(technician.shop_id))}</td>
       <td>
         ${escapeHtml(technician.title || "—")}
       </td>
@@ -4340,6 +4383,7 @@ applyDispatchSearch("technicians", "techniciansBody");
 async function showTechnicianForm(
 id = null
 ) {
+try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
 
 
 let technician = null;
@@ -4407,6 +4451,7 @@ main.innerHTML = `
       <form id="technicianForm">
 
         <div class="form-grid">
+          <div class="form-group"><label for="technicianShop">Shop</label><select id="technicianShop" required>${shopOptions(technician?.shop_id || "")}</select></div>
 
           <div class="form-group">
 
@@ -4553,6 +4598,7 @@ document.getElementById(
 
 
       const payload = {
+        shop_id: Number(document.getElementById("technicianShop").value),
 
         first_name:
           document.getElementById(
