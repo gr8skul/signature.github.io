@@ -2454,6 +2454,18 @@
                 </div>
                 <select id="customer" hidden><option value="">Select customer</option></select>
                 <div id="customerSelection" class="wo-selection"></div>
+                <div id="woPhonePanel" class="wo-inline" hidden>
+                  <h3>Customer phone numbers</h3>
+                  <div id="woPhoneList" class="small-muted">Loading...</div>
+                  <div id="woPhoneEntry" hidden style="margin-top:12px">
+                    <div class="form-grid">
+                      <div class="form-group"><label for="woPhoneNumber">Phone number</label><input id="woPhoneNumber" type="tel" placeholder="Phone number"></div>
+                      <div class="form-group"><label for="woPhoneType">Type</label><input id="woPhoneType" type="text" placeholder="Office, Mobile, After Hours..."></div>
+                    </div>
+                    <div class="form-actions"><button type="button" class="secondary" id="woCancelPhone">Cancel</button><button type="button" class="primary" id="woSavePhone">Save number</button></div>
+                  </div>
+                  <button type="button" class="secondary" id="woAddPhone" style="margin-top:12px">+ Add phone number</button>
+                </div>
                 <div id="newCustomerPanel" class="wo-inline" hidden>
                   <h3>Add customer without leaving this work order</h3>
                   <div class="form-grid">
@@ -2934,6 +2946,72 @@ function syncWorkOrderLookupDisplays() {
   document.getElementById('locationSelection').textContent=l.value?'Selected location':'';
   lt.disabled=!c.value;
   lt.placeholder=c.value?'Search address or add a new location...':'Select a customer first';
+  // Keep phone controls tied to the currently selected customer.
+  refreshWorkOrderPhones();
+}
+let woPhoneLoadedCustomer = null;
+let woPhoneRequest = 0;
+async function refreshWorkOrderPhones(force = false) {
+  const panel = document.getElementById('woPhonePanel');
+  const customer = document.getElementById('customer');
+  if (!panel || !customer) return;
+  const id = customer.value;
+  panel.hidden = !id;
+  if (!id) { woPhoneLoadedCustomer = null; ++woPhoneRequest; return; }
+  if (!force && woPhoneLoadedCustomer === id) return;
+  woPhoneLoadedCustomer = id;
+  const request = ++woPhoneRequest;
+  const list = document.getElementById('woPhoneList');
+  const entry = document.getElementById('woPhoneEntry');
+  entry.hidden = true;
+  list.textContent = 'Loading phone numbers...';
+  const { data, error } = await db.from('customer_phone_numbers')
+    .select('id,phone_number,phone_type').eq('customer_id', id).order('created_at');
+  if (request !== woPhoneRequest || document.getElementById('customer')?.value !== id) return;
+  if (error) { list.textContent = 'Could not load phone numbers: ' + error.message; return; }
+  list.replaceChildren();
+  if (!data?.length) list.textContent = 'No additional phone numbers saved.';
+  for (const phone of data || []) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;justify-content:space-between;padding:7px 0;border-bottom:1px solid #e5e5e5';
+    const label = document.createElement('span');
+    label.textContent = `${phone.phone_number} · ${phone.phone_type || 'Main'}`;
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.className = 'row-button'; remove.textContent = 'Remove';
+    remove.onclick = async () => {
+      if (!confirmDelete('Remove this phone number from the customer?')) return;
+      remove.disabled = true;
+      const { error: deleteError } = await db.from('customer_phone_numbers').delete().eq('id', phone.id);
+      if (deleteError) { showMessage(deleteError.message, true); remove.disabled = false; return; }
+      await refreshWorkOrderPhones(true);
+    };
+    row.append(label, remove); list.appendChild(row);
+  }
+}
+function initializeWorkOrderPhoneEntry() {
+  document.getElementById('woAddPhone').onclick = () => {
+    document.getElementById('woPhoneEntry').hidden = false;
+    document.getElementById('woPhoneNumber').focus();
+  };
+  document.getElementById('woCancelPhone').onclick = () => {
+    document.getElementById('woPhoneEntry').hidden = true;
+  };
+  document.getElementById('woSavePhone').onclick = async () => {
+    const customerId = document.getElementById('customer').value;
+    const number = document.getElementById('woPhoneNumber').value.trim();
+    const type = document.getElementById('woPhoneType').value.trim() || 'Main';
+    if (!customerId || !number) { showMessage('Select a customer and enter a phone number.', true); return; }
+    const button = document.getElementById('woSavePhone'); button.disabled = true;
+    try {
+      const { error } = await db.from('customer_phone_numbers').insert({ customer_id: customerId, phone_number: number, phone_type: type });
+      if (error) throw error;
+      document.getElementById('woPhoneNumber').value = '';
+      document.getElementById('woPhoneType').value = '';
+      await refreshWorkOrderPhones(true);
+      showMessage('Phone number saved to customer.');
+    } catch (error) { console.error(error); showMessage(error.message || 'Could not save phone number.', true); }
+    finally { button.disabled = false; }
+  };
 }
 async function initializeWorkOrderLookups() {
   const customer=document.getElementById('customer'), location=document.getElementById('location');
@@ -3032,6 +3110,7 @@ async function initializeWorkOrderLookups() {
     }catch(e){console.error(e);showMessage(e.message||'Could not create location.',true)}
     finally{btn.disabled=false}
   };
+  initializeWorkOrderPhoneEntry();
   syncWorkOrderLookupDisplays();
 }
 
