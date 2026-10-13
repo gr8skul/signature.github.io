@@ -549,6 +549,7 @@
     .calendar-number{font-size:12px;font-weight:700;margin-bottom:7px}
     .calendar-entry{display:block;width:100%;text-align:left;border:1px solid #dce3dd;border-left:3px solid var(--success);background:#f3f8f4;border-radius:4px;padding:6px;margin:4px 0;color:var(--text);font-size:11px;line-height:1.4;overflow-wrap:anywhere;cursor:pointer}
     .calendar-entry.unreleased{background:#faf6ed;border-color:#e9dfca;border-left-color:var(--warning)}
+    .calendar-entry.schedule-block{background:#eef2fa;border-color:#d6dff0;border-left-color:#526b9b}
     .calendar-entry:hover{filter:brightness(.96)}
     .calendar-entry .calendar-desc{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .calendar-more{font-size:11px;color:var(--muted);margin-top:5px}
@@ -1547,7 +1548,7 @@
 
 
   // ============================================
-  // CALENDAR: SCHEDULED WORK ORDERS ONLY
+  // CALENDAR: WORK ORDERS AND SCHEDULE BLOCKS
   // ============================================
   function calendarDateKey(value){
     const d = new Date(value);
@@ -1556,15 +1557,15 @@
 
   async function showCalendar(){
     setActiveNav('calendar');
-    try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
+    try { await ensureShops(); } catch(e) { showMessage('Could not load shops: '+e.message,true); return; }
     const request=++calendarRequest;
     const main=document.getElementById('mainContent');
-    main.innerHTML=`<div class="page-head"><div><h1>Work Calendar</h1><p>Scheduled work orders only. Select an entry to open its work order.</p></div></div>
+    main.innerHTML=`<div class="page-head"><div><h1>Work Calendar</h1><p>Scheduled work orders and schedule blocks. Select an entry to view details.</p></div></div>
       <div class="card"><div class="calendar-toolbar">
       <div class="date-controls"><button id="calendarPrev" type="button" aria-label="Previous month">‹</button><strong>${escapeHtml(calendarMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'}))}</strong><button id="calendarNext" type="button" aria-label="Next month">›</button><button id="calendarToday" type="button">Today</button></div>
       <div class="filter-bar" style="border:0;padding:0;background:transparent">
       ${[['all','All'],['released','Work Orders Released'],['unreleased','Work Orders Unreleased']].map(([value,label])=>`<button type="button" class="filter-button ${calendarFilter===value?'active':''}" data-calendar-filter="${value}">${label}</button>`).join('')}</div></div>
-      ${shopFilterHtml("calendarShopFilter",calendarShop)}
+      ${shopFilterHtml('calendarShopFilter',calendarShop)}
       <div class="calendar-weekdays">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div>${x}</div>`).join('')}</div>
       <div class="calendar-grid" id="calendarGrid"><div class="empty" style="grid-column:1/-1">Loading calendar...</div></div>
       <div id="calendarAgenda" class="calendar-agenda"></div></div>`;
@@ -1575,28 +1576,55 @@
     document.getElementById('calendarShopFilter').onchange=e=>{calendarShop=e.target.value;showCalendar()};
     const from=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1);
     const to=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,1);
-    // Query the month directly; do not download all historical work orders.
-    const {data,error}=await db.from('service_calls')
-      .select('id,shop_id,work_order_number,description,scheduled_at,released,status,customers(first_name,last_name,company_name),technicians!service_calls_assigned_technician_id_fkey(first_name,last_name)')
-      .gte('scheduled_at',from.toISOString()).lt('scheduled_at',to.toISOString())
-      .order('scheduled_at',{ascending:true});
+    const [ordersResult,blocksResult]=await Promise.all([
+      db.from('service_calls')
+        .select('id,shop_id,work_order_number,description,scheduled_at,released,status,customers(first_name,last_name,company_name),technicians!service_calls_assigned_technician_id_fkey(first_name,last_name)')
+        .gte('scheduled_at',from.toISOString()).lt('scheduled_at',to.toISOString())
+        .order('scheduled_at',{ascending:true}),
+      db.from('schedule_blocks')
+        .select('id,title,block_type,description,location,starts_at,ends_at,all_day,status,released,schedule_block_technicians(technician_id,technicians(first_name,last_name))')
+        .lt('starts_at',to.toISOString()).gt('ends_at',from.toISOString())
+        .order('starts_at',{ascending:true})
+    ]);
     if(request!==calendarRequest || !document.getElementById('calendarGrid'))return;
     const grid=document.getElementById('calendarGrid');
-    if(error){console.error(error);grid.innerHTML=`<div class="empty" style="grid-column:1/-1">Unable to load calendar: ${escapeHtml(error.message)}</div>`;return}
-    let calls=data||[];
+    if(ordersResult.error){console.error(ordersResult.error);grid.innerHTML=`<div class="empty" style="grid-column:1/-1">Unable to load calendar: ${escapeHtml(ordersResult.error.message)}</div>`;return}
+    let calls=ordersResult.data||[];
     try{
       const assignments=await fetchAssignmentMap(calls);
       calls.forEach(call=>call._assignments=assignments.get(call.id)||[]);
     }catch(e){console.warn('Calendar assignments unavailable',e);showMessage('Calendar loaded, but technician assignments could not be retrieved.',true)}
     if(request!==calendarRequest || !document.getElementById('calendarGrid'))return;
     calls=calls.filter(c=>(calendarShop==='all'||String(c.shop_id)===calendarShop) && (calendarFilter==='all'||(calendarFilter==='released'?c.released===true:c.released!==true)));
+    // Schedule Blocks have no shop field. Keep them visible under every shop filter.
+    // Release filters retain their original work-order meaning; blocks remain visible.
+    let blocks=[];
+    if(blocksResult.error){console.error(blocksResult.error);showMessage('Schedule blocks unavailable: '+blocksResult.error.message,true)}
+    else blocks=(blocksResult.data||[]).filter(b=>!['cancelled','declined'].includes(String(b.status||'').toLowerCase()));
     const byDay=new Map();
-    for(const c of calls){const key=calendarDateKey(c.scheduled_at);if(!byDay.has(key))byDay.set(key,[]);byDay.get(key).push(c)}
+    const add=(key,item)=>{if(!byDay.has(key))byDay.set(key,[]);byDay.get(key).push(item)};
+    for(const c of calls)add(calendarDateKey(c.scheduled_at),{kind:'order',time:new Date(c.scheduled_at),data:c});
+    // Add multi-day blocks to every date they overlap, not just their start date.
+    for(const b of blocks){
+      const start=new Date(b.starts_at),end=new Date(b.ends_at);
+      if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime()))continue;
+      let day=new Date(Math.max(from.getTime(),new Date(start.getFullYear(),start.getMonth(),start.getDate()).getTime()));
+      for(;day<to && day<end;day.setDate(day.getDate()+1)){
+        const next=new Date(day.getFullYear(),day.getMonth(),day.getDate()+1);
+        if(start<next && end>day)add(calendarDateKey(day),{kind:'block',time:start,data:b});
+      }
+    }
+    for(const items of byDay.values())items.sort((a,b)=>a.time-b.time || (a.kind==='block'?-1:1));
     const year=calendarMonth.getFullYear(),month=calendarMonth.getMonth();
     const firstDay=new Date(year,month,1).getDay();
     const count=new Date(year,month+1,0).getDate();
     const total=Math.ceil((firstDay+count)/7)*7;
     const now=new Date();
+    const timeLabel=item=>item.kind==='block'&&item.data.all_day?'All day':new Date(item.time).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const itemTitle=item=>item.kind==='block'?item.data.title:customerName(item.data.customers);
+    const itemDescription=item=>item.kind==='block'?(item.data.description||statusLabel(item.data.block_type)):descriptionPreview(item.data.description,45);
+    const itemPeople=item=>item.kind==='block'?blockTechnicians(item.data):assignedNames(item.data);
+    const itemAttribute=item=>item.kind==='block'?`data-calendar-block="${escapeAttribute(item.data.id)}"`:`data-calendar-order="${escapeAttribute(item.data.id)}"`;
     grid.innerHTML=Array.from({length:total},(_,index)=>{
       const day=index-firstDay+1;
       if(day<1||day>count)return `<div class="calendar-day outside" aria-hidden="true"></div>`;
@@ -1604,8 +1632,8 @@
       const items=byDay.get(key)||[];
       const isToday=year===now.getFullYear()&&month===now.getMonth()&&day===now.getDate();
       return `<div class="calendar-day ${isToday?'today':''}">
-        <button type="button" data-calendar-day="${day}" class="row-button calendar-number" aria-label="Show ${escapeAttribute(key)} work orders">${day}</button>
-        ${items.slice(0,3).map(c=>`<button type="button" class="calendar-entry ${c.released?'':'unreleased'}" data-calendar-order="${escapeAttribute(c.id)}" title="${escapeAttribute(`${workOrderLabel(c)} | ${customerName(c.customers)} | ${c.description||''} | ${assignedNames(c)}`)}"><strong>${escapeHtml(new Date(c.scheduled_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}))} · ${escapeHtml(customerName(c.customers))}</strong><span class="calendar-desc">${escapeHtml(descriptionPreview(c.description,45))}</span><span class="calendar-tech">${escapeHtml(assignedNames(c))}</span></button>`).join('')}
+        <button type="button" data-calendar-day="${day}" class="row-button calendar-number" aria-label="Show ${escapeAttribute(key)} scheduled entries">${day}</button>
+        ${items.slice(0,3).map(item=>`<button type="button" class="calendar-entry ${item.kind==='block'?'schedule-block':item.data.released?'':'unreleased'}" ${itemAttribute(item)} title="${escapeAttribute(`${item.kind==='block'?'Schedule Block':'Work Order'} | ${itemTitle(item)} | ${itemDescription(item)} | ${itemPeople(item)}`)}"><strong>${escapeHtml(timeLabel(item))} · ${escapeHtml(itemTitle(item))}</strong><span class="calendar-desc">${escapeHtml(itemDescription(item))}</span><span class="calendar-tech">${escapeHtml(itemPeople(item))}</span></button>`).join('')}
         ${items.length>3?`<button type="button" class="row-button calendar-more" data-calendar-day="${day}">+${items.length-3} more</button>`:''}</div>`;
     }).join('');
     function showAgenda(){
@@ -1613,16 +1641,22 @@
       const items=byDay.get(key)||[];
       const agenda=document.getElementById('calendarAgenda');
       if(!agenda)return;
-      agenda.innerHTML=`<h3>${escapeHtml(new Date(year,month,calendarSelectedDay).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}))} · ${items.length} work order${items.length===1?'':'s'}</h3>`+
-        (items.length?items.map(c=>`<div class="calendar-agenda-item"><div style="min-width:85px"><strong>${escapeHtml(new Date(c.scheduled_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}))}</strong></div><div style="flex:1;min-width:0"><strong>${escapeHtml(customerName(c.customers))}</strong> · ${escapeHtml(workOrderLabel(c))}<div>${escapeHtml(descriptionPreview(c.description,110))}</div><div class="small-muted">${escapeHtml(assignedNames(c))} · ${c.released?'Released':'Not Released'} · ${escapeHtml(statusLabel(c.status))}</div></div><button type="button" class="row-button" data-calendar-order="${escapeAttribute(c.id)}">Open</button></div>`).join(''):'<p class="small-muted">No scheduled work orders for this day.</p>');
+      agenda.innerHTML=`<h3>${escapeHtml(new Date(year,month,calendarSelectedDay).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}))} · ${items.length} scheduled entr${items.length===1?'y':'ies'}</h3>`+
+        (items.length?items.map(item=>`<div class="calendar-agenda-item"><div style="min-width:85px"><strong>${escapeHtml(timeLabel(item))}</strong></div><div style="flex:1;min-width:0"><strong>${escapeHtml(itemTitle(item))}</strong> · ${item.kind==='block'?'Schedule Block':escapeHtml(workOrderLabel(item.data))}<div>${escapeHtml(itemDescription(item))}</div><div class="small-muted">${escapeHtml(itemPeople(item))} · ${item.kind==='block'?escapeHtml(statusLabel(item.data.status)):`${item.data.released?'Released':'Not Released'} · ${escapeHtml(statusLabel(item.data.status))}`}</div></div><button type="button" class="row-button" ${itemAttribute(item)}>Open</button></div>`).join(''):'<p class="small-muted">No scheduled work orders or schedule blocks for this day.</p>');
+    }
+    function openCalendarEntry(event){
+      const block=event.target.closest('[data-calendar-block]');
+      if(block){showScheduleBlockDetail(block.dataset.calendarBlock);return true}
+      const order=event.target.closest('[data-calendar-order]');
+      if(order){showWorkOrderDetail(order.dataset.calendarOrder);return true}
+      return false;
     }
     grid.onclick=e=>{
-      const entry=e.target.closest('[data-calendar-order]');
-      if(entry){showWorkOrderDetail(entry.dataset.calendarOrder);return}
+      if(openCalendarEntry(e))return;
       const day=e.target.closest('[data-calendar-day]');
       if(day){calendarSelectedDay=Number(day.dataset.calendarDay);showAgenda()}
     };
-    document.getElementById('calendarAgenda').onclick=e=>{const entry=e.target.closest('[data-calendar-order]');if(entry)showWorkOrderDetail(entry.dataset.calendarOrder)};
+    document.getElementById('calendarAgenda').onclick=openCalendarEntry;
     if(calendarSelectedDay>count)calendarSelectedDay=count;
     showAgenda();
   }
