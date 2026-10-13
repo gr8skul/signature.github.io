@@ -641,6 +641,18 @@
         min-width: 0;
       }
     }
+
+    /* Work-order inline customer and location lookup */
+    .wo-lookup{position:relative}
+    .wo-results{position:absolute;z-index:25;top:100%;left:0;right:0;max-height:240px;overflow:auto;background:white;border:1px solid var(--border);border-radius:5px;box-shadow:0 8px 22px rgba(0,0,0,.12)}
+    .wo-results[hidden],.wo-inline[hidden]{display:none!important}
+    .wo-result{display:block;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid #eee;background:white;cursor:pointer;font-size:13px}
+    .wo-result:hover,.wo-result:focus{background:#f1f2f3}
+    .wo-inline{margin-top:10px;border:1px solid var(--border);background:#fafafa;padding:14px;border-radius:6px}
+    .wo-inline h3{font-size:14px;margin:0 0 12px}
+    .wo-inline .form-grid{gap:10px}
+    .wo-inline .form-actions{margin-top:12px}
+    .wo-selection{margin-top:6px;color:var(--success);font-size:12px}
   </style>
 
 </head>
@@ -2436,14 +2448,24 @@
                   Customer
                 </label>
 
-                <select
-                  id="customer"
-                  required
-                >
-                  <option value="">
-                    Loading customers...
-                  </option>
-                </select>
+                <div class="wo-lookup">
+                  <input id="customerSearch" type="text" autocomplete="off" placeholder="Search customer or company..." aria-label="Search customers" required>
+                  <div id="customerResults" class="wo-results" hidden></div>
+                </div>
+                <select id="customer" hidden><option value="">Select customer</option></select>
+                <div id="customerSelection" class="wo-selection"></div>
+                <div id="newCustomerPanel" class="wo-inline" hidden>
+                  <h3>Add customer without leaving this work order</h3>
+                  <div class="form-grid">
+                    <div class="form-group"><label for="woCustomerFirst">First name</label><input id="woCustomerFirst"></div>
+                    <div class="form-group"><label for="woCustomerLast">Last name</label><input id="woCustomerLast"></div>
+                    <div class="form-group"><label for="woCustomerCompany">Company name</label><input id="woCustomerCompany"></div>
+                    <div class="form-group"><label for="woCustomerPhone">Phone</label><input id="woCustomerPhone" type="tel"></div>
+                    <div class="form-group"><label for="woCustomerEmail">Email</label><input id="woCustomerEmail" type="email"></div>
+                    <div class="form-group full"><label for="woCustomerNotes">Notes</label><textarea id="woCustomerNotes" style="min-height:65px"></textarea></div>
+                  </div>
+                  <div class="form-actions"><button type="button" class="secondary" id="woCancelCustomer">Cancel</button><button type="button" class="primary" id="woSaveCustomer">Save customer</button></div>
+                </div>
 
               </div>
 
@@ -2454,14 +2476,23 @@
                   Location
                 </label>
 
-                <select
-                  id="location"
-                  required
-                >
-                  <option value="">
-                    Select a customer first
-                  </option>
-                </select>
+                <div class="wo-lookup">
+                  <input id="locationSearch" type="text" autocomplete="off" placeholder="Search this customer's locations..." aria-label="Search locations" required>
+                  <div id="locationResults" class="wo-results" hidden></div>
+                </div>
+                <select id="location" hidden><option value="">Select location</option></select>
+                <div id="locationSelection" class="wo-selection"></div>
+                <div id="newLocationPanel" class="wo-inline" hidden>
+                  <h3>Add location for selected customer</h3>
+                  <div class="form-grid">
+                    <div class="form-group full"><label for="woLocationAddress">Street address</label><input id="woLocationAddress"></div>
+                    <div class="form-group"><label for="woLocationCity">City</label><input id="woLocationCity"></div>
+                    <div class="form-group"><label for="woLocationState">State</label><input id="woLocationState"></div>
+                    <div class="form-group"><label for="woLocationZip">ZIP</label><input id="woLocationZip"></div>
+                    <div class="form-group full"><label for="woLocationNotes">Notes</label><textarea id="woLocationNotes" style="min-height:65px"></textarea></div>
+                  </div>
+                  <div class="form-actions"><button type="button" class="secondary" id="woCancelLocation">Cancel</button><button type="button" class="primary" id="woSaveLocation">Save location</button></div>
+                </div>
 
               </div>
 
@@ -2666,6 +2697,7 @@
 await loadCustomersForForm(
   existing?.customer_id || null
 );
+await initializeWorkOrderLookups();
 
 await loadTechniciansForForm(existing);
 document.getElementById("workOrderShop").addEventListener("change",async()=>{
@@ -2703,6 +2735,7 @@ if (existing) {
   await loadLocationsForSelectedCustomer(
     existing.locations_id || null
   );
+  syncWorkOrderLookupDisplays();
 
   document.getElementById("workType").value =
     existing.work_type || "service";
@@ -2732,10 +2765,10 @@ if (existing) {
 
 
 document.getElementById("customer")
-  .addEventListener(
-    "change",
-    () => loadLocationsForSelectedCustomer()
-  );
+  .addEventListener("change", async () => {
+    await loadLocationsForSelectedCustomer();
+    syncWorkOrderLookupDisplays();
+  });
 
 
 document.getElementById("cancelWorkOrder")
@@ -2884,6 +2917,122 @@ if (selectedLocationId) {
 }
 
 
+}
+
+// Inline work-order customer/location search and creation. Existing directory pages stay unchanged.
+function woLocationLabel(l) {
+  return [l.address, [l.city,l.state].filter(Boolean).join(', '), l.zip].filter(Boolean).join(' · ');
+}
+function syncWorkOrderLookupDisplays() {
+  const c=document.getElementById('customer'),l=document.getElementById('location');
+  if (!c||!l) return;
+  const co=c.selectedOptions[0],lo=l.selectedOptions[0];
+  const ct=document.getElementById('customerSearch'),lt=document.getElementById('locationSearch');
+  ct.value=c.value ? co.textContent.trim() : '';
+  lt.value=l.value ? lo.textContent.trim() : '';
+  document.getElementById('customerSelection').textContent=c.value?'Selected customer':'';
+  document.getElementById('locationSelection').textContent=l.value?'Selected location':'';
+  lt.disabled=!c.value;
+  lt.placeholder=c.value?'Search address or add a new location...':'Select a customer first';
+}
+async function initializeWorkOrderLookups() {
+  const customer=document.getElementById('customer'), location=document.getElementById('location');
+  const cs=document.getElementById('customerSearch'),ls=document.getElementById('locationSearch');
+  const cr=document.getElementById('customerResults'),lr=document.getElementById('locationResults');
+  const cp=document.getElementById('newCustomerPanel'),lp=document.getElementById('newLocationPanel');
+  function hideResults(){cr.hidden=true;lr.hidden=true;}
+  function render(input,select,results,type){
+    const q=input.value.trim().toLowerCase();
+    const opts=[...select.options].filter(o=>o.value && (!q||o.textContent.toLowerCase().includes(q)));
+    results.replaceChildren();
+    opts.slice(0,35).forEach(o=>{
+      const b=document.createElement('button');b.type='button';b.className='wo-result';b.textContent=o.textContent;
+      b.onclick=async()=>{
+        select.value=o.value;input.value=o.textContent.trim();hideResults();
+        if(type==='customer'){
+          cp.hidden=true;lp.hidden=true;
+          await loadLocationsForSelectedCustomer();
+        }else lp.hidden=true;
+        syncWorkOrderLookupDisplays();
+      };
+      results.appendChild(b);
+    });
+    const add=document.createElement('button');add.type='button';add.className='wo-result';
+    add.textContent=type==='customer'?'+ Add new customer':'+ Add new location';
+    add.onclick=()=>{
+      hideResults();
+      if(type==='customer'){
+        cp.hidden=false;
+        const name=cs.value.trim();
+        if(name && !document.getElementById('woCustomerCompany').value && !document.getElementById('woCustomerFirst').value){
+          const parts=name.split(/\s+/);
+          if(parts.length===1)document.getElementById('woCustomerCompany').value=name;
+          else {document.getElementById('woCustomerFirst').value=parts.shift();document.getElementById('woCustomerLast').value=parts.join(' ');}
+        }
+        document.getElementById('woCustomerFirst').focus();
+      }else{
+        lp.hidden=false;
+        document.getElementById('woLocationAddress').value=ls.value.trim();
+        document.getElementById('woLocationAddress').focus();
+      }
+    };
+    results.appendChild(add);results.hidden=false;
+  }
+  cs.addEventListener('focus',()=>render(cs,customer,cr,'customer'));
+  cs.addEventListener('input',()=>{
+    customer.value='';location.innerHTML='<option value="">Select a customer first</option>';
+    ls.value='';ls.disabled=true;cp.hidden=true;lp.hidden=true;
+    document.getElementById('customerSelection').textContent='Select a matching customer below or add a new one';
+    document.getElementById('locationSelection').textContent='';
+    render(cs,customer,cr,'customer');
+  });
+  ls.addEventListener('focus',()=>{if(customer.value)render(ls,location,lr,'location')});
+  ls.addEventListener('input',()=>{
+    location.value='';lp.hidden=true;
+    document.getElementById('locationSelection').textContent='Select a matching location below or add a new one';
+    if(customer.value)render(ls,location,lr,'location');
+  });
+  document.addEventListener('click',e=>{
+    if(!cs.closest('.wo-lookup')?.contains(e.target))cr.hidden=true;
+    if(!ls.closest('.wo-lookup')?.contains(e.target))lr.hidden=true;
+  },{signal:(()=>{const controller=new AbortController();
+    // The document listener is removed automatically when a subsequent form is opened.
+    const old=window._woLookupController; if(old)old.abort();window._woLookupController=controller;
+    return controller.signal;})()});
+  document.getElementById('woCancelCustomer').onclick=()=>{cp.hidden=true;syncWorkOrderLookupDisplays()};
+  document.getElementById('woCancelLocation').onclick=()=>{lp.hidden=true;syncWorkOrderLookupDisplays()};
+  document.getElementById('woSaveCustomer').onclick=async()=>{
+    const val=id=>document.getElementById(id).value.trim();
+    const payload={first_name:val('woCustomerFirst'),last_name:val('woCustomerLast'),company_name:val('woCustomerCompany'),phone:val('woCustomerPhone'),email:val('woCustomerEmail'),notes:val('woCustomerNotes')};
+    if(!payload.first_name&&!payload.last_name&&!payload.company_name){showMessage('Enter a customer name or company.',true);return;}
+    const btn=document.getElementById('woSaveCustomer');btn.disabled=true;
+    try{
+      const {data,error}=await db.from('customers').insert(payload).select('id').single();
+      if(error)throw error;
+      await loadCustomersForForm(data.id);
+      cp.hidden=true;
+      await loadLocationsForSelectedCustomer();syncWorkOrderLookupDisplays();
+      showMessage('Customer created. Continue with the location.');
+      ls.focus();
+    }catch(e){console.error(e);showMessage(e.message||'Could not create customer.',true)}
+    finally{btn.disabled=false}
+  };
+  document.getElementById('woSaveLocation').onclick=async()=>{
+    if(!customer.value){showMessage('Select a customer first.',true);return;}
+    const val=id=>document.getElementById(id).value.trim();
+    const payload={customer_id:customer.value,address:val('woLocationAddress'),city:val('woLocationCity'),state:val('woLocationState'),zip:val('woLocationZip'),notes:val('woLocationNotes')};
+    if(!payload.address){showMessage('Enter a street address.',true);return;}
+    const btn=document.getElementById('woSaveLocation');btn.disabled=true;
+    try{
+      const {data,error}=await db.from('locations').insert(payload).select('id').single();
+      if(error)throw error;
+      await loadLocationsForSelectedCustomer(data.id);
+      lp.hidden=true;syncWorkOrderLookupDisplays();
+      showMessage('Location created. Continue your work order.');
+    }catch(e){console.error(e);showMessage(e.message||'Could not create location.',true)}
+    finally{btn.disabled=false}
+  };
+  syncWorkOrderLookupDisplays();
 }
 
 async function loadTechniciansForForm(existing = null) {
