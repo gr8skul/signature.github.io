@@ -671,7 +671,8 @@
 .call-history{border-bottom:1px solid var(--border);padding:12px 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .call-history:last-child{border:0}
 #callOrderResults,#callCustomerResults{position:relative;top:auto;max-height:220px;box-shadow:none;margin-top:4px}
-@media(max-width:600px){.call-actions>*{flex:1}.calls-toolbar>*{width:100%!important}.call-card{padding:13px}.calls-form-actions{flex-direction:column}.calls-form-actions button{width:100%}}
+.call-datetime{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.call-datetime input[type=date]{flex:2;min-width:150px}.call-datetime select{flex:0 1 auto;width:auto;min-width:66px}.call-datetime span{font-weight:700}
+@media(max-width:600px){.call-datetime input[type=date]{width:100%;flex:auto}.call-datetime select{flex:1}.call-actions>*{flex:1}.calls-toolbar>*{width:100%!important}.call-card{padding:13px}.calls-form-actions{flex-direction:column}.calls-form-actions button{width:100%}}
   </style>
 
 </head>
@@ -1747,7 +1748,7 @@
                 <th>Shop</th>
                 <th>Customer</th>
                 <th>Description</th>
-                <th>Location</th>
+                <th>Communication</th>
                 <th><button type="button" class="sort-heading" data-work-sort="scheduled_at">Scheduled ↕</button></th>
                 <th>Technician</th>
                 <th>Status</th>
@@ -1979,6 +1980,43 @@
       showMessage("Technician assignments unavailable; showing existing work orders.", true);
     }
 
+    // Communication status is calculated from existing tasks and history; no Work Order fields are changed.
+    const communicationSummary = new Map();
+    try {
+      const ids = data.map(c => c.id);
+      for (let i = 0; i < ids.length; i += 150) {
+        const chunk = ids.slice(i, i + 150);
+        const [tasksResult, historyResult] = await Promise.all([
+          db.from('communication_tasks').select('service_call_id,status,scheduled_at,purpose').in('service_call_id',chunk).eq('status','pending'),
+          db.from('communications').select('service_call_id,occurred_at,outcome,direction,communication_type').in('service_call_id',chunk).order('occurred_at',{ascending:false})
+        ]);
+        if (tasksResult.error) throw tasksResult.error;
+        if (historyResult.error) throw historyResult.error;
+        for (const task of tasksResult.data || []) {
+          if (!communicationSummary.has(task.service_call_id)) communicationSummary.set(task.service_call_id,{tasks:[],latest:null});
+          communicationSummary.get(task.service_call_id).tasks.push(task);
+        }
+        for (const entry of historyResult.data || []) {
+          if (!communicationSummary.has(entry.service_call_id)) communicationSummary.set(entry.service_call_id,{tasks:[],latest:null});
+          const summary=communicationSummary.get(entry.service_call_id);
+          if (!summary.latest || new Date(entry.occurred_at)>new Date(summary.latest.occurred_at)) summary.latest=entry;
+        }
+      }
+    } catch (error) {
+      console.warn('Communication status unavailable',error);
+    }
+    const nowForCalls = new Date();
+    const communicationLabel = id => {
+      const info=communicationSummary.get(id);
+      if (!info) return 'No communications';
+      if (info.tasks.length) {
+        const overdue=info.tasks.some(t=>t.scheduled_at && new Date(t.scheduled_at)<nowForCalls);
+        return overdue ? 'Overdue callback' : 'Call scheduled';
+      }
+      if (info.latest) return 'Last: '+statusLabel(info.latest.outcome||info.latest.communication_type||'Contacted');
+      return 'No communications';
+    };
+
     body._dispatchRecords =
       data.map(call => {
 
@@ -1999,15 +2037,12 @@
             : "Not scheduled";
 
 
-        const location =
-          call.locations
-            ? `${call.locations.city || ""}, ${call.locations.state || ""}`
-            : "—";
+        const communicationState = communicationLabel(call.id);
 
 
         const search = dispatchSearchText(call, [
           assignedNames(call), call.status,
-          call.locations?.city, call.locations?.state
+          call.locations?.city, call.locations?.state, communicationState
         ]);
         const html = `
 
@@ -2033,7 +2068,7 @@
               ${escapeHtml(descriptionPreview(call.description))}
             </td>
             <td>
-              ${escapeHtml(location)}
+              <button type="button" class="row-button" onclick="showWorkOrderDetail('${call.id}')" title="Open Work Order communications">${escapeHtml(communicationState)}</button>
             </td>
 
             <td>
@@ -6923,6 +6958,32 @@ function callAssociationWiring(){
   });
   callSearchPicker('callCustomerSearch','callCustomerSelect','callCustomerResults',callsCache.customers,customerSelectionName,c=>[c.first_name,c.last_name,c.company_name,c.phone].join(' '),fill);
 }
+// Scrollable hour/minute menus avoid the browser's restricted datetime-local picker.
+function callDateTimeFields(id, value, label){
+  const d=value ? new Date(value) : new Date();
+  const valid=Number.isFinite(d.getTime())?d:new Date();
+  const day=localDateTimeValue(valid).slice(0,10);
+  const hour24=valid.getHours();
+  const hour12=hour24%12||12;
+  const minute=valid.getMinutes();
+  const hours=Array.from({length:12},(_,i)=>i+1).map(h=>`<option value="${h}" ${h===hour12?'selected':''}>${h}</option>`).join('');
+  const minutes=Array.from({length:60},(_,i)=>`<option value="${i}" ${i===minute?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('');
+  return `<div class="form-group full"><label for="${id}Date">${callText(label)}</label>
+    <div class="call-datetime"><input type="date" id="${id}Date" value="${day}" aria-label="${callText(label)} date">
+    <select id="${id}Hour" aria-label="Hour">${hours}</select>
+    <span>:</span><select id="${id}Minute" aria-label="Minute">${minutes}</select>
+    <select id="${id}AmPm" aria-label="AM or PM"><option ${hour24<12?'selected':''}>AM</option><option ${hour24>=12?'selected':''}>PM</option></select></div></div>`;
+}
+function callReadDateTime(id){
+  const day=document.getElementById(id+'Date')?.value;
+  if(!day)return null;
+  const h=Number(document.getElementById(id+'Hour').value)%12;
+  const m=Number(document.getElementById(id+'Minute').value);
+  const pm=document.getElementById(id+'AmPm').value==='PM';
+  const date=new Date(`${day}T${String(h+(pm?12:0)).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+  if(!Number.isFinite(date.getTime()))throw new Error('Choose a valid date and time.');
+  return date.toISOString();
+}
 async function showCallTaskForm(task=null,context=null){
   if(!callOffice())return showMessage('Office access required.',true);
   callRememberReturn(context);
@@ -6937,7 +6998,7 @@ async function showCallTaskForm(task=null,context=null){
     <div class="form-group"><label for="callContact">Contact name</label><input id="callContact" value="${escapeAttribute(initialContact)}" placeholder="Name or business"></div>
     <div class="form-group"><label for="callPhone">Phone number</label><input id="callPhone" type="tel" value="${escapeAttribute(initialPhone)}"></div>
     <div class="form-group"><label for="callMethod">Method</label><select id="callMethod">${['phone','text','email','other'].map(x=>`<option ${task?.task_type===x?'selected':''}>${x}</option>`).join('')}</select></div>
-    <div class="form-group"><label for="callDue">Scheduled date and time</label><input id="callDue" type="datetime-local" value="${escapeAttribute(due)}"></div>
+    ${callDateTimeFields('callDue',due,'Scheduled date and time')}
     <div class="form-group"><label for="callPriority">Priority</label><select id="callPriority">${['low','normal','high'].map(x=>`<option ${task?.priority===x?'selected':''}>${x}</option>`).join('')}</select></div>
     <div class="form-group"><label for="callStatus">Status</label><select id="callStatus">${['pending','completed','cancelled'].map(x=>`<option ${task?.status===x?'selected':''}>${x}</option>`).join('')}</select></div>
     <div class="form-group full"><label for="callPurpose">Purpose / outstanding question</label><textarea id="callPurpose" required placeholder="What do you need to discuss or resolve?">${callText(task?.purpose||'')}</textarea></div>
@@ -6948,7 +7009,7 @@ async function showCallTaskForm(task=null,context=null){
     e.preventDefault();const btn=document.getElementById('callSave');btn.disabled=true;
     const val=id=>document.getElementById(id).value.trim()||null;
     const status=val('callStatus');
-    const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),task_type:val('callMethod'),scheduled_at:val('callDue')?new Date(val('callDue')).toISOString():null,priority:val('callPriority'),status,purpose:val('callPurpose'),updated_at:new Date().toISOString(),completed_at:status==='completed'?(task?.completed_at||new Date().toISOString()):null};
+    const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),task_type:val('callMethod'),scheduled_at:callReadDateTime('callDue'),priority:val('callPriority'),status,purpose:val('callPurpose'),updated_at:new Date().toISOString(),completed_at:status==='completed'?(task?.completed_at||new Date().toISOString()):null};
     if(!payload.purpose){showMessage('Enter a purpose.',true);btn.disabled=false;return}
     try{
       const q=task?db.from('communication_tasks').update(payload).eq('id',task.id):db.from('communication_tasks').insert({...payload,created_by_user_id:currentProfile.id});
@@ -6972,7 +7033,7 @@ async function showCallLogForm(taskId=null,context=null){
     <div class="form-group"><label for="callMethod">Method</label><select id="callMethod">${['phone','text','email','other'].map(x=>`<option ${task?.task_type===x?'selected':''}>${x}</option>`).join('')}</select></div>
     <div class="form-group"><label for="callDirection">Direction</label><select id="callDirection"><option value="outgoing">Outgoing</option><option value="incoming">Incoming</option></select></div>
     <div class="form-group"><label for="callOutcome">Result</label><select id="callOutcome"><option value="spoke">Spoke with contact</option><option value="voicemail">Left voicemail</option><option value="no_answer">No answer</option><option value="message_sent">Message sent</option><option value="message_received">Message received</option><option value="other">Other</option></select></div>
-    <div class="form-group"><label for="callOccurred">Date and time</label><input id="callOccurred" type="datetime-local" value="${escapeAttribute(localDateTimeValue(new Date()))}"></div>
+    ${callDateTimeFields('callOccurred',new Date(),'Date and time')}
     <div class="form-group full"><label for="callPurposeLog">Purpose / Question</label><textarea id="callPurposeLog" placeholder="What was the question or reason for contact?">${callText(task?.purpose||context?.purpose||'')}</textarea></div>
     <div class="form-group full"><label for="callAnswer">Answer / Response</label><textarea id="callAnswer" placeholder="What did they say? What was the response?"></textarea></div>
     <div class="form-group full"><label for="callNotes">Additional notes / unresolved items</label><textarea id="callNotes" placeholder="Conversation details, commitments, unanswered questions..."></textarea></div>
@@ -6984,7 +7045,7 @@ async function showCallLogForm(taskId=null,context=null){
   document.getElementById('callLogForm').onsubmit=async e=>{
     e.preventDefault();const btn=document.getElementById('callSave');btn.disabled=true;
     const val=id=>document.getElementById(id).value.trim()||null;
-    const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),communication_type:val('callMethod'),direction:val('callDirection'),outcome:val('callOutcome'),purpose:val('callPurposeLog'),answer:val('callAnswer'),notes:val('callNotes'),occurred_at:val('callOccurred')?new Date(val('callOccurred')).toISOString():new Date().toISOString(),created_by_user_id:currentProfile.id};
+    const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),communication_type:val('callMethod'),direction:val('callDirection'),outcome:val('callOutcome'),purpose:val('callPurposeLog'),answer:val('callAnswer'),notes:val('callNotes'),occurred_at:callReadDateTime('callOccurred'),created_by_user_id:currentProfile.id};
     try{
       const {data,error}=await db.from('communications').insert(payload).select('id').single();if(error)throw error;
       if(task && document.getElementById('callCompleteTask').checked){
