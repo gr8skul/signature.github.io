@@ -1621,7 +1621,7 @@
     const total=Math.ceil((firstDay+count)/7)*7;
     const now=new Date();
     const timeLabel=item=>item.kind==='block'&&item.data.all_day?'All day':new Date(item.time).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    const itemTitle=item=>item.kind==='block'?item.data.title:customerName(item.data.customers);
+    const itemTitle=item=>item.kind==='block'?item.data.title:[shopName(item.data.shop_id),assignedNames(item.data),customerName(item.data.customers)].join(' | ');
     const itemDescription=item=>item.kind==='block'?(item.data.description||statusLabel(item.data.block_type)):descriptionPreview(item.data.description,45);
     const itemPeople=item=>item.kind==='block'?blockTechnicians(item.data):assignedNames(item.data);
     const itemAttribute=item=>item.kind==='block'?`data-calendar-block="${escapeAttribute(item.data.id)}"`:`data-calendar-order="${escapeAttribute(item.data.id)}"`;
