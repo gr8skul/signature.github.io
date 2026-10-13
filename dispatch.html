@@ -114,6 +114,11 @@
     }
 
     nav {
+      position: sticky;
+      top: 68px;
+      height: calc(100vh - 68px);
+      overflow-y: auto;
+      align-self: flex-start;
       width: 220px;
       background: #fafafa;
       border-right: 1px solid var(--border);
@@ -607,6 +612,9 @@
       }
 
       nav {
+        position: static;
+        height: auto;
+        overflow-y: visible;
         width: 100%;
         border-right: 0;
         border-bottom: 1px solid var(--border);
@@ -774,6 +782,7 @@
   let currentUser = null;
   let currentProfile = null;
   let currentDate = new Date();
+  let scheduleDayCount = 1;
   let currentWorkOrderFilter = "all";
   let currentWorkOrderShop = "all";
   let calendarShop = "all";
@@ -1023,6 +1032,11 @@
   }
 
   function updateWorkOrderSortHeaders() {
+    document.getElementById("communicationCycleButton").onclick = () => {
+      const choices = ["comm_callback","comm_resolved","comm_none"];
+      const index = choices.indexOf(currentWorkOrderFilter);
+      showWorkOrders(choices[(index+1)%choices.length]);
+    };
     document.querySelectorAll("[data-work-sort]").forEach(button => {
       const active = button.dataset.workSort === workOrderSort.field;
       const label = button.dataset.workSort === "created_at" ? "Work Order" : "Scheduled";
@@ -1286,7 +1300,7 @@
 
         <div>
           <h1>Schedule</h1>
-          <p>Dispatch schedule for the selected day.</p>
+          <p>Dispatch schedule for the selected days.</p>
         </div>
 
         <button
@@ -1313,9 +1327,11 @@
 
             <button id="nextDay">›</button>
 
-            <button id="todayButton">
-              Today
-            </button>
+            <button id="todayButton">Today</button>
+            <label for="scheduleDayCount" style="margin:0 0 0 12px">Show</label>
+            <select id="scheduleDayCount" style="width:auto;min-width:110px">
+              ${[1,2,3,5,7,14,30].map(n=>`<option value="${n}" ${scheduleDayCount===n?'selected':''}>${n} ${n===1?'day':'days'}</option>`).join('')}
+            </select>
 
           </div>
 
@@ -1365,6 +1381,10 @@
       });
 
 
+    document.getElementById("scheduleDayCount").onchange = e => {
+      scheduleDayCount = Number(e.target.value);
+      showSchedule();
+    };
     document.getElementById("newWorkOrderButton")
       .addEventListener(
         "click",
@@ -1395,12 +1415,8 @@
     const end =
       new Date(currentDate);
 
-    end.setHours(
-      23,
-      59,
-      59,
-      999
-    );
+    end.setDate(end.getDate() + scheduleDayCount - 1);
+    end.setHours(23,59,59,999);
 
     const {
       data,
@@ -1495,6 +1511,7 @@
           <div class="schedule-item">
 
             <div class="schedule-time">
+              ${scheduleDayCount > 1 ? scheduled.toLocaleDateString("en-US",{month:"short",day:"numeric"}) + " · " : ""}
               ${scheduled.toLocaleTimeString(
                 "en-US",
                 {
@@ -1727,9 +1744,9 @@
           ${filterButton("service", "Service")}
           ${filterButton("install", "Installation")}
           ${filterButton("checkout", "Check-Out")}
-          ${filterButton("upcoming", "Upcoming")}
+          ${filterButton("unreleased", "Unreleased")}
           ${filterButton("in_progress", "Current / In Progress")}
-          ${filterButton("completed", "Completed")}
+          <button type="button" class="filter-button ${['comm_callback','comm_resolved','comm_none'].includes(currentWorkOrderFilter)?'active':''}" id="communicationCycleButton" title="Cycle communication designations">Communication: ${currentWorkOrderFilter==='comm_callback'?'Call Back':currentWorkOrderFilter==='comm_resolved'?'Resolved':currentWorkOrderFilter==='comm_none'?'No Communication':'Call Back'} ↻</button>
           ${filterButton("cancelled", "Cancelled")}
 
         </div>
@@ -1906,24 +1923,8 @@
     }
 
 
-    if (
-      currentWorkOrderFilter === "upcoming"
-    ) {
-
-      query =
-        query
-          .gte(
-            "scheduled_at",
-            new Date().toISOString()
-          )
-          .neq(
-            "status",
-            "completed"
-          )
-          .neq(
-            "status",
-            "cancelled"
-          );
+    if (currentWorkOrderFilter === "unreleased") {
+      query = query.eq("released", false);
     }
 
 
@@ -1987,7 +1988,7 @@
       for (let i = 0; i < ids.length; i += 150) {
         const chunk = ids.slice(i, i + 150);
         const [tasksResult, historyResult] = await Promise.all([
-          db.from('communication_tasks').select('service_call_id,status,scheduled_at,purpose').in('service_call_id',chunk).eq('status','pending'),
+          db.from('communication_tasks').select('service_call_id,status,scheduled_at,purpose').in('service_call_id',chunk),
           db.from('communications').select('service_call_id,occurred_at,outcome,direction,communication_type').in('service_call_id',chunk).order('occurred_at',{ascending:false})
         ]);
         if (tasksResult.error) throw tasksResult.error;
@@ -2005,20 +2006,16 @@
     } catch (error) {
       console.warn('Communication status unavailable',error);
     }
-    const nowForCalls = new Date();
     const communicationLabel = id => {
-      const info=communicationSummary.get(id);
-      if (!info) return 'No communications';
-      if (info.tasks.length) {
-        const overdue=info.tasks.some(t=>t.scheduled_at && new Date(t.scheduled_at)<nowForCalls);
-        return overdue ? 'Overdue callback' : 'Call scheduled';
-      }
-      if (info.latest) return 'Last: '+statusLabel(info.latest.outcome||info.latest.communication_type||'Contacted');
-      return 'No communications';
+      const info = communicationSummary.get(id);
+      if (!info) return 'No Communication';
+      if (info.tasks.some(t => t.status === 'pending')) return 'Call Back';
+      if (info.tasks.some(t => t.status === 'completed') || info.latest) return 'Resolved';
+      return 'No Communication';
     };
 
     body._dispatchRecords =
-      data.map(call => {
+      data.filter(call => !["comm_callback","comm_resolved","comm_none"].includes(currentWorkOrderFilter) || communicationLabel(call.id) === ({comm_callback:"Call Back",comm_resolved:"Resolved",comm_none:"No Communication"}[currentWorkOrderFilter])).map(call => {
 
         const scheduled =
           call.scheduled_at
@@ -2532,7 +2529,9 @@
           <form id="workOrderForm">
 
             <div class="form-grid">
-              <div class="form-group"><label for="workOrderShop">Shop</label><select id="workOrderShop" required>${shopOptions(existing?.shop_id || "")}</select></div>
+              <div class="form-group"><label for="workOrderShop">Primary Shop</label><select id="workOrderShop" required>${shopOptions(existing?.shop_id || "")}</select>
+              <label style="margin-top:12px;display:flex;align-items:center;gap:8px;font-weight:normal"><input id="includeBothShops" type="checkbox" style="width:auto"> Include both shops for group work</label>
+              <div class="small-muted">Allows assigning technicians from both shops to one Work Order. The primary shop remains the Work Order's shop for existing reporting and calendar sync.</div></div>
 
               <div class="form-group">
 
@@ -2808,6 +2807,17 @@ await loadTechniciansForForm(existing);
 document.getElementById("workOrderShop").addEventListener("change",async()=>{
   await loadTechniciansForForm(null); refreshLeadChoices();
 });
+document.getElementById("includeBothShops").addEventListener("change",async()=>{
+  await loadTechniciansForForm(existing); refreshLeadChoices();
+});
+if(existing?.id){
+  const {data: assigned} = await db.from("service_call_technicians")
+    .select("technician_id,technicians(shop_id)").eq("service_call_id",existing.id);
+  if((assigned||[]).some(a=>a.technicians?.shop_id!=null && String(a.technicians.shop_id)!==String(existing.shop_id))){
+    document.getElementById("includeBothShops").checked=true;
+    await loadTechniciansForForm(existing);
+  }
+}
 
 function refreshLeadChoices() {
   const checked = [...document.querySelectorAll(".technician-choice:checked")];
@@ -3279,12 +3289,13 @@ async function loadTechniciansForForm(existing = null) {
     if (!selected.length && existing.assigned_technician_id) selected = [existing.assigned_technician_id];
   }
   const selectedShop = document.getElementById("workOrderShop")?.value;
-  const eligible = (data||[]).filter(t => selectedShop && String(t.shop_id)===String(selectedShop));
+  const bothShops = document.getElementById("includeBothShops")?.checked;
+  const eligible = (data||[]).filter(t => bothShops || (selectedShop && String(t.shop_id)===String(selectedShop)));
   container.innerHTML = eligible.length ? eligible.map(t => `
     <label style="display:flex;align-items:center;gap:10px;padding:9px 3px;margin:0;font-weight:normal;cursor:pointer;">
       <input type="checkbox" class="technician-choice" value="${escapeAttribute(t.id)}"
         ${selected.includes(t.id) ? "checked" : ""} style="width:auto;flex:none;">
-      <span>${escapeHtml(technicianName(t))}</span>
+      <span>${escapeHtml(technicianName(t))}${bothShops ? ` <small class="small-muted">(${escapeHtml(shopName(t.shop_id))})</small>` : ""}</span>
     </label>`).join("") : '<span class="small-muted">Select a shop with active assigned technicians.</span>';
 }
 
@@ -6970,10 +6981,24 @@ function callDateTimeFields(id, value, label){
   const minutes=Array.from({length:60},(_,i)=>`<option value="${i}" ${i===minute?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('');
   return `<div class="form-group full"><label for="${id}Date">${callText(label)}</label>
     <div class="call-datetime"><input type="date" id="${id}Date" value="${day}" aria-label="${callText(label)} date">
-    <select id="${id}Hour" aria-label="Hour">${hours}</select>
-    <span>:</span><select id="${id}Minute" aria-label="Minute">${minutes}</select>
+    <select id="${id}Hour" class="scroll-time" aria-label="Hour">${hours}</select>
+    <span>:</span><select id="${id}Minute" class="scroll-time" aria-label="Minute">${minutes}</select>
     <select id="${id}AmPm" aria-label="AM or PM"><option ${hour24<12?'selected':''}>AM</option><option ${hour24>=12?'selected':''}>PM</option></select></div></div>`;
 }
+// Expand hour/minute menus into scrollable lists when focused, avoiding clipped native pickers.
+document.addEventListener('focusin', e => {
+  if (!e.target.matches('select.scroll-time')) return;
+  const select=e.target;
+  select.size= Math.min(8, select.options.length);
+  select.style.maxHeight='220px';
+  select.style.overflowY='auto';
+});
+document.addEventListener('change', e => {
+  if(e.target.matches('select.scroll-time')) {e.target.size=1; e.target.blur();}
+});
+document.addEventListener('focusout', e => {
+  if(e.target.matches('select.scroll-time')) e.target.size=1;
+});
 function callReadDateTime(id){
   const day=document.getElementById(id+'Date')?.value;
   if(!day)return null;
