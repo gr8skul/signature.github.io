@@ -3741,6 +3741,8 @@ main.innerHTML = `
 
         <div class="form-actions">
 
+          ${customer ? `<button type="button" class="danger" id="deleteCustomer">Delete Customer</button>` : ""}
+
           <button
             type="button"
             class="secondary"
@@ -3770,6 +3772,46 @@ main.innerHTML = `
 
 document.getElementById('customerDirectoryAddPhone').onclick = () => phoneDraftRow('customerDirectoryPhoneDrafts');
 if (customer) await loadCustomerDirectoryPhones(customer.id);
+
+if (customer) {
+  document.getElementById("deleteCustomer").addEventListener("click", async () => {
+    if (!["dispatcher", "secretary"].includes(currentProfile?.role)) {
+      showMessage("You do not have permission to delete customers.", true);
+      return;
+    }
+    const button = document.getElementById("deleteCustomer");
+    button.disabled = true;
+    try {
+      // Do not delete a customer that has existing Work Orders or locations.
+      const checks = await Promise.all([
+        db.from("service_calls").select("id", { count: "exact", head: true }).eq("customer_id", customer.id),
+        db.from("locations").select("id", { count: "exact", head: true }).eq("customer_id", customer.id)
+      ]);
+      for (const result of checks) if (result.error) throw result.error;
+      const orders = checks[0].count || 0;
+      const locations = checks[1].count || 0;
+      if (orders || locations) {
+        showMessage(`Cannot delete this customer: ${orders} Work Order(s) and ${locations} location(s) are linked. Reassign them first.`, true);
+        return;
+      }
+      const label = customerSelectionName(customer);
+      if (!confirmDelete(`Permanently delete customer "${label}"? This cannot be undone.`)) return;
+      const { data, error } = await db.from("customers")
+        .delete().eq("id", customer.id).select("id");
+      if (error) throw error;
+      if (!data || data.length !== 1) {
+        throw new Error("Customer was not deleted. Check the customer DELETE permission in Supabase.");
+      }
+      showMessage("Customer deleted.");
+      await showCustomers();
+    } catch (error) {
+      console.error("Customer deletion failed", error);
+      showMessage("Could not delete customer: " + (error.message || String(error)) + ". Linked phone records or database permissions may need attention.", true);
+    } finally {
+      if (button.isConnected) button.disabled = false;
+    }
+  });
+}
 
 document.getElementById("cancelCustomer")
   .addEventListener(
