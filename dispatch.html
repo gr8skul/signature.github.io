@@ -654,6 +654,23 @@
     .wo-inline .form-grid{gap:10px}
     .wo-inline .form-actions{margin-top:12px}
     .wo-selection{margin-top:6px;color:var(--success);font-size:12px}
+
+/* Phone-first communications */
+.calls-toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.calls-toolbar input{flex:1;min-width:160px}
+.calls-toolbar select{width:auto;min-width:130px}
+.calls-list{display:grid;gap:11px}
+.call-card{border:1px solid var(--border);border-radius:8px;padding:16px;background:white;min-width:0}
+.call-card.overdue{border-left:4px solid #a52a2a}
+.call-card-head{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.call-card h3{font-size:16px;margin:0 0 5px}
+.call-card p{margin:7px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.call-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.call-actions a{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;background:#e9f2ec;border:1px solid #c6d9cc;color:#245638;border-radius:6px;padding:10px 13px;font-weight:600}
+.call-actions button{min-height:40px}
+.call-history{border-bottom:1px solid var(--border);padding:12px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.call-history:last-child{border:0}
+@media(max-width:600px){.call-actions>*{flex:1}.calls-toolbar>*{width:100%!important}.call-card{padding:13px}.calls-form-actions{flex-direction:column}.calls-form-actions button{width:100%}}
   </style>
 
 </head>
@@ -698,6 +715,7 @@
 </button>
 
 <button class="nav-button" data-page="schedule-blocks">Schedule Blocks</button>
+<button class="nav-button" data-page="calls">Calls</button>
 
 <button class="nav-button" data-page="customers">
   Customers
@@ -2337,6 +2355,8 @@
 
       </div>
 
+      <div class="card"><div class="card-head"><h2>Communications</h2><button class="row-button" id="detailScheduleCall">+ Schedule Call</button></div><div class="card-body" id="detailCommunications">Loading...</div></div>
+
       <div class="card"><div class="card-head"><h2>Parts</h2><button class="row-button" id="detailAddPart">+ Add Part</button></div>
         <div class="card-body" id="detailParts">Loading parts...</div></div>
       <div class="card"><div class="card-head"><h2>Notes</h2><button class="row-button" id="detailAddNote">+ Add Note</button></div>
@@ -2349,6 +2369,8 @@
     document.getElementById("detailAddPart").addEventListener("click", () => showPartForm(null, call.id));
     document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm(null, call.id));
     document.getElementById("detailAddPhoto").addEventListener("click", () => showPhotoForm(null, call.id));
+    document.getElementById("detailScheduleCall")?.addEventListener("click",()=>showCallTaskForm(null,call));
+    await loadWorkOrderCommunications(call.id);
     await loadWorkOrderRelated(call.id);
 
     document.getElementById("backToWorkOrders")
@@ -6772,6 +6794,196 @@ async function showScheduleBlockForm(existing=null){
  };
 }
 
+
+// ============================================
+// CALLS & COMMUNICATIONS (office-only)
+// ============================================
+let callsFilter = 'pending';
+let callsQuery = '';
+let callsCache = { tasks: [], communications: [], customers: [], orders: [] };
+const callOffice = () => ['dispatcher','secretary'].includes(currentProfile?.role);
+const callDate = v => v ? new Date(v).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : 'Not scheduled';
+const callText = v => escapeHtml(v ?? '');
+const callTel = v => String(v||'').replace(/[^+0-9]/g,'');
+const callLink = (number, method='phone') => {
+  const n=callTel(number);
+  return n ? `<a href="${method==='text'?'sms:':'tel:'}${escapeAttribute(n)}">${method==='text'?'Text':'Call'} ${callText(number)}</a>` : '';
+};
+const callContact = item => item.contact_name || (item.customers ? customerName(item.customers) : '') || 'Unnamed contact';
+const callOrder = item => item.service_calls ? workOrderLabel(item.service_calls) : '';
+const callChoice = (rows, selected, emptyLabel, format) => `<option value="">${emptyLabel}</option>`+
+  rows.map(x=>`<option value="${escapeAttribute(x.id)}" ${String(selected||'')===String(x.id)?'selected':''}>${callText(format(x))}</option>`).join('');
+async function loadCallDirectory(){
+  const [customers,orders]=await Promise.all([
+    db.from('customers').select('id,first_name,last_name,company_name,phone').order('created_at',{ascending:false}).limit(1000),
+    db.from('service_calls').select('id,work_order_number,customer_id,customers(first_name,last_name,company_name,phone)').order('created_at',{ascending:false}).limit(1000)
+  ]);
+  if(customers.error)throw customers.error;
+  if(orders.error)throw orders.error;
+  callsCache.customers=customers.data||[];
+  callsCache.orders=orders.data||[];
+}
+async function loadCallData(){
+  const [tasks,comms]=await Promise.all([
+    db.from('communication_tasks').select('*,customers(first_name,last_name,company_name,phone),service_calls(id,work_order_number)').order('created_at',{ascending:false}).limit(1000),
+    db.from('communications').select('*,customers(first_name,last_name,company_name,phone),service_calls(id,work_order_number)').order('occurred_at',{ascending:false}).limit(1000)
+  ]);
+  if(tasks.error)throw tasks.error;
+  if(comms.error)throw comms.error;
+  callsCache.tasks=tasks.data||[];
+  callsCache.communications=comms.data||[];
+}
+function callTaskCard(t){
+  const late=t.status==='pending' && t.scheduled_at && new Date(t.scheduled_at)<new Date();
+  const number=t.phone_number || t.customers?.phone || '';
+  return `<article class="call-card ${late?'overdue':''}">
+    <div class="call-card-head"><div><h3>${callText(callContact(t))}</h3><div class="small-muted">${callText(callOrder(t)||'General call')} · ${callText(t.task_type)} · ${callText(t.priority)} priority</div></div>
+    <span class="status">${late?'Overdue':callText(t.status)}</span></div>
+    <p><strong>${callText(t.purpose)}</strong></p><div class="small-muted">${callText(callDate(t.scheduled_at))}</div>
+    <div class="call-actions">${callLink(number,t.task_type)}
+    ${t.status==='pending'?`<button class="primary" data-call-result="${escapeAttribute(t.id)}">Record Result</button>`:''}
+    <button class="secondary" data-call-edit="${escapeAttribute(t.id)}">${t.status==='pending'?'Reschedule / Edit':'View / Edit'}</button>
+    ${t.service_call_id?`<button class="secondary" data-call-order="${escapeAttribute(t.service_call_id)}">Work Order</button>`:''}</div></article>`;
+}
+async function showCalls(){
+  setActiveNav('calls');
+  const main=document.getElementById('mainContent');
+  if(!callOffice()){main.innerHTML='<div class="empty">Calls are available to dispatchers and secretaries.</div>';return;}
+  main.innerHTML='<div class="empty">Loading calls...</div>';
+  try{await loadCallData();}catch(e){console.error(e);main.innerHTML=`<div class="empty">Unable to load calls: ${callText(e.message)}</div>`;return;}
+  main.innerHTML=`<div class="page-head"><div><h1>Calls</h1><p>Scheduled calls, callbacks, and communication history.</p></div><div class="call-actions"><button class="primary" id="callsNew">+ Schedule Call</button><button class="secondary" id="callsLog">+ Log Communication</button></div></div>
+    <div class="card"><div class="card-body"><div class="calls-toolbar"><input id="callsSearch" type="search" placeholder="Search names, numbers, work orders, notes..." value="${escapeAttribute(callsQuery)}"><select id="callsFilter"><option value="pending" ${callsFilter==='pending'?'selected':''}>To Call</option><option value="all" ${callsFilter==='all'?'selected':''}>All Tasks</option><option value="completed" ${callsFilter==='completed'?'selected':''}>Completed Tasks</option><option value="history" ${callsFilter==='history'?'selected':''}>Communication History</option></select></div><div id="callsList" class="calls-list"></div></div></div>`;
+  document.getElementById('callsNew').onclick=()=>showCallTaskForm();
+  document.getElementById('callsLog').onclick=()=>showCallLogForm();
+  document.getElementById('callsSearch').oninput=e=>{callsQuery=e.target.value;renderCallsList()};
+  document.getElementById('callsFilter').onchange=e=>{callsFilter=e.target.value;renderCallsList()};
+  renderCallsList();
+}
+function renderCallsList(){
+  const el=document.getElementById('callsList');if(!el)return;
+  const terms=callsQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const match=t=>terms.every(term=>[callContact(t),t.phone_number,t.customers?.phone,t.purpose,t.notes,t.outcome,callOrder(t),t.communication_type,t.task_type].join(' ').toLowerCase().includes(term));
+  if(callsFilter==='history'){
+    const records=callsCache.communications.filter(match);
+    el.innerHTML=records.length?records.map(c=>`<article class="call-card"><div class="call-card-head"><h3>${callText(callContact(c))}</h3><span class="small-muted">${callText(callDate(c.occurred_at))}</span></div><div class="small-muted">${callText(c.communication_type)} · ${callText(c.direction)} · ${callText(c.outcome||'No outcome')} · ${callText(callOrder(c)||'General')}</div><p>${callText(c.notes||'No notes')}</p><div class="call-actions">${callLink(c.phone_number||c.customers?.phone,c.communication_type)}${c.service_call_id?`<button class="secondary" data-call-order="${escapeAttribute(c.service_call_id)}">Work Order</button>`:''}<button class="secondary" data-call-follow="${escapeAttribute(c.id)}">Schedule Follow-up</button></div></article>`).join(''):'<div class="empty">No matching communications.</div>';
+  }else{
+    const records=callsCache.tasks.filter(t=>(callsFilter==='all'||t.status===callsFilter)&&match(t)).sort((a,b)=>{
+      if(!a.scheduled_at)return 1;if(!b.scheduled_at)return -1;return new Date(a.scheduled_at)-new Date(b.scheduled_at);
+    });
+    el.innerHTML=records.length?records.map(callTaskCard).join(''):'<div class="empty">No matching call tasks.</div>';
+  }
+  el.querySelectorAll('[data-call-result]').forEach(b=>b.onclick=()=>showCallLogForm(b.dataset.callResult));
+  el.querySelectorAll('[data-call-edit]').forEach(b=>b.onclick=()=>showCallTaskForm(callsCache.tasks.find(t=>t.id===b.dataset.callEdit)));
+  el.querySelectorAll('[data-call-order]').forEach(b=>b.onclick=()=>showWorkOrderDetail(b.dataset.callOrder));
+  el.querySelectorAll('[data-call-follow]').forEach(b=>{const c=callsCache.communications.find(x=>x.id===b.dataset.callFollow);showCallTaskForm(null,c)});
+}
+function callAssociationFields(orderId,customerId){
+  return `<div class="form-group"><label for="callOrderSelect">Work Order (optional)</label><select id="callOrderSelect">${callChoice(callsCache.orders,orderId,'General — no Work Order',o=>`${workOrderLabel(o)} — ${customerName(o.customers)}`)}</select></div>
+    <div class="form-group"><label for="callCustomerSelect">Customer (optional)</label><select id="callCustomerSelect">${callChoice(callsCache.customers,customerId,'No customer',customerSelectionName)}</select></div>`;
+}
+function callFormShell(title,contents){
+  document.getElementById('mainContent').innerHTML=`<div class="page-head"><div><h1>${callText(title)}</h1></div></div><div class="card"><div class="card-body">${contents}</div></div>`;
+}
+function callAssociationWiring(){
+  document.getElementById('callOrderSelect').onchange=e=>{
+    const order=callsCache.orders.find(x=>x.id===e.target.value);
+    if(order){document.getElementById('callCustomerSelect').value=order.customer_id||'';
+      const phone=document.getElementById('callPhone');if(phone&&!phone.value)phone.value=order.customers?.phone||'';
+      const contact=document.getElementById('callContact');if(contact&&!contact.value)contact.value=customerName(order.customers);}
+  };
+  document.getElementById('callCustomerSelect').onchange=e=>{
+    const c=callsCache.customers.find(x=>x.id===e.target.value);
+    if(c){const phone=document.getElementById('callPhone');if(phone&&!phone.value)phone.value=c.phone||'';
+      const contact=document.getElementById('callContact');if(contact&&!contact.value)contact.value=customerName(c);}
+  };
+}
+async function showCallTaskForm(task=null,context=null){
+  if(!callOffice())return showMessage('Office access required.',true);
+  try{await loadCallDirectory()}catch(e){showMessage(e.message,true);return}
+  const orderId=task?.service_call_id||context?.service_call_id||(context?.work_order_number!=null?context.id:null);
+  const customerId=task?.customer_id||context?.customer_id||null;
+  const initialPhone=task?.phone_number||context?.phone_number||context?.customers?.phone||'';
+  const initialContact=task?.contact_name||context?.contact_name||(context?.customers?customerName(context.customers):'');
+  const due=task?.scheduled_at?localDateTimeValue(task.scheduled_at):localDateTimeValue(new Date());
+  callFormShell(task?'Edit Call Task':'Schedule Call',`<form id="callTaskForm"><div class="form-grid">
+    ${callAssociationFields(orderId,customerId)}
+    <div class="form-group"><label for="callContact">Contact name</label><input id="callContact" value="${escapeAttribute(initialContact)}" placeholder="Name or business"></div>
+    <div class="form-group"><label for="callPhone">Phone number</label><input id="callPhone" type="tel" value="${escapeAttribute(initialPhone)}"></div>
+    <div class="form-group"><label for="callMethod">Method</label><select id="callMethod">${['phone','text','email','other'].map(x=>`<option ${task?.task_type===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="form-group"><label for="callDue">Scheduled date and time</label><input id="callDue" type="datetime-local" value="${escapeAttribute(due)}"></div>
+    <div class="form-group"><label for="callPriority">Priority</label><select id="callPriority">${['low','normal','high'].map(x=>`<option ${task?.priority===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="form-group"><label for="callStatus">Status</label><select id="callStatus">${['pending','completed','cancelled'].map(x=>`<option ${task?.status===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="form-group full"><label for="callPurpose">Purpose / outstanding question</label><textarea id="callPurpose" required placeholder="What do you need to discuss or resolve?">${callText(task?.purpose||'')}</textarea></div>
+    </div><div class="form-actions calls-form-actions"><button type="button" class="secondary" id="callCancel">Cancel</button><button type="submit" class="primary" id="callSave">${task?'Save Changes':'Schedule Call'}</button></div></form>`);
+  callAssociationWiring();
+  document.getElementById('callCancel').onclick=()=>orderId?showWorkOrderDetail(orderId):showCalls();
+  document.getElementById('callTaskForm').onsubmit=async e=>{
+    e.preventDefault();const btn=document.getElementById('callSave');btn.disabled=true;
+    const val=id=>document.getElementById(id).value.trim()||null;
+    const status=val('callStatus');
+    const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),task_type:val('callMethod'),scheduled_at:val('callDue')?new Date(val('callDue')).toISOString():null,priority:val('callPriority'),status,purpose:val('callPurpose'),updated_at:new Date().toISOString(),completed_at:status==='completed'?(task?.completed_at||new Date().toISOString()):null};
+    if(!payload.purpose){showMessage('Enter a purpose.',true);btn.disabled=false;return}
+    try{
+      const q=task?db.from('communication_tasks').update(payload).eq('id',task.id):db.from('communication_tasks').insert({...payload,created_by_user_id:currentProfile.id});
+      const {error}=await q;if(error)throw error;
+      showMessage('Call task saved.');await (orderId?showWorkOrderDetail(orderId):showCalls());
+    }catch(err){console.error(err);showMessage(err.message,true);btn.disabled=false}
+  };
+}
+async function showCallLogForm(taskId=null,context=null){
+  if(!callOffice())return showMessage('Office access required.',true);
+  try{await loadCallDirectory()}catch(e){showMessage(e.message,true);return}
+  const task=taskId?callsCache.tasks.find(t=>t.id===taskId):null;
+  const orderId=task?.service_call_id||context?.service_call_id||(context?.work_order_number!=null?context.id:null);
+  const customerId=task?.customer_id||context?.customer_id||null;
+  const initialPhone=task?.phone_number||context?.phone_number||context?.customers?.phone||'';
+  const initialContact=task?.contact_name||context?.contact_name||(context?.customers?customerName(context.customers):'');
+  callFormShell('Record Communication',`<form id="callLogForm"><div class="form-grid">${callAssociationFields(orderId,customerId)}
+    <div class="form-group"><label for="callContact">Contact</label><input id="callContact" value="${escapeAttribute(initialContact)}"></div>
+    <div class="form-group"><label for="callPhone">Phone number</label><input id="callPhone" type="tel" value="${escapeAttribute(initialPhone)}"></div>
+    <div class="form-group"><label for="callMethod">Method</label><select id="callMethod">${['phone','text','email','other'].map(x=>`<option ${task?.task_type===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="form-group"><label for="callDirection">Direction</label><select id="callDirection"><option value="outgoing">Outgoing</option><option value="incoming">Incoming</option></select></div>
+    <div class="form-group"><label for="callOutcome">Result</label><select id="callOutcome"><option value="spoke">Spoke with contact</option><option value="voicemail">Left voicemail</option><option value="no_answer">No answer</option><option value="message_sent">Message sent</option><option value="message_received">Message received</option><option value="other">Other</option></select></div>
+    <div class="form-group"><label for="callOccurred">Date and time</label><input id="callOccurred" type="datetime-local" value="${escapeAttribute(localDateTimeValue(new Date()))}"></div>
+    <div class="form-group full"><label for="callNotes">What was discussed? What remains unresolved?</label><textarea id="callNotes" placeholder="Conversation details, commitments, unanswered questions..."></textarea></div>
+    <div class="form-group full"><label><input id="callFollowup" type="checkbox" style="width:auto"> Schedule another follow-up after saving</label></div>
+    <div class="form-group full"><label><input id="callCompleteTask" type="checkbox" style="width:auto" ${task?'checked':'disabled'}> Mark the scheduled task complete</label></div>
+    </div><div class="form-actions calls-form-actions"><button type="button" class="secondary" id="callCancel">Cancel</button><button type="submit" class="primary" id="callSave">Save Communication</button></div></form>`);
+  callAssociationWiring();
+  document.getElementById('callCancel').onclick=()=>orderId?showWorkOrderDetail(orderId):showCalls();
+  document.getElementById('callLogForm').onsubmit=async e=>{
+    e.preventDefault();const btn=document.getElementById('callSave');btn.disabled=true;
+    const val=id=>document.getElementById(id).value.trim()||null;
+    const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),communication_type:val('callMethod'),direction:val('callDirection'),outcome:val('callOutcome'),notes:val('callNotes'),occurred_at:val('callOccurred')?new Date(val('callOccurred')).toISOString():new Date().toISOString(),created_by_user_id:currentProfile.id};
+    try{
+      const {data,error}=await db.from('communications').insert(payload).select('id').single();if(error)throw error;
+      if(task && document.getElementById('callCompleteTask').checked){
+        const {error:taskError}=await db.from('communication_tasks').update({status:'completed',completed_at:new Date().toISOString(),communication_id:data.id,updated_at:new Date().toISOString()}).eq('id',task.id);
+        if(taskError){showMessage('Communication saved, but task could not be completed: '+taskError.message,true);await showCalls();return}
+      }
+      showMessage('Communication saved.');
+      if(document.getElementById('callFollowup').checked){await showCallTaskForm(null,{...payload});return}
+      await (orderId?showWorkOrderDetail(orderId):showCalls());
+    }catch(err){console.error(err);showMessage(err.message,true);btn.disabled=false}
+  };
+}
+async function loadWorkOrderCommunications(id){
+  const el=document.getElementById('detailCommunications');if(!el)return;
+  const [comms,tasks]=await Promise.all([
+    db.from('communications').select('*').eq('service_call_id',id).order('occurred_at',{ascending:false}),
+    db.from('communication_tasks').select('*').eq('service_call_id',id).order('scheduled_at',{ascending:true})
+  ]);
+  if(comms.error||tasks.error){el.textContent='Unable to load communications: '+(comms.error||tasks.error).message;return}
+  const open=(tasks.data||[]).filter(t=>t.status==='pending');
+  const history=comms.data||[];
+  el.innerHTML=`<div class="call-actions" style="margin:0 0 12px"><button class="secondary" id="detailLogCall">+ Log Call / Text</button></div>
+    <h3>Outstanding follow-ups (${open.length})</h3>${open.length?open.map(t=>`<div class="call-history"><strong>${callText(t.purpose)}</strong><div class="small-muted">${callText(callDate(t.scheduled_at))} · ${callText(t.contact_name||'')} · ${callText(t.phone_number||'')}</div><div class="call-actions">${callLink(t.phone_number,t.task_type)}<button class="secondary" data-wo-log="${escapeAttribute(t.id)}">Record Result</button><button class="secondary" data-wo-edit="${escapeAttribute(t.id)}">Edit</button></div></div>`).join(''):'<p class="small-muted">No pending calls.</p>'}
+    <h3>Communication history (${history.length})</h3>${history.length?history.map(c=>`<div class="call-history"><strong>${callText(callDate(c.occurred_at))}</strong> · ${callText(c.communication_type)} · ${callText(c.direction)} · ${callText(c.outcome||'')}<div>${callText(c.contact_name||'')} ${callText(c.phone_number||'')}</div><div>${callText(c.notes||'No notes')}</div></div>`).join(''):'<p class="small-muted">No communications recorded yet.</p>'}`;
+  document.getElementById('detailLogCall').onclick=()=>showCallLogForm(null,{service_call_id:id});
+  el.querySelectorAll('[data-wo-log]').forEach(b=>b.onclick=async()=>{await loadCallData();showCallLogForm(b.dataset.woLog)});
+  el.querySelectorAll('[data-wo-edit]').forEach(b=>b.onclick=()=>showCallTaskForm(open.find(t=>t.id===b.dataset.woEdit)));
+}
+
 // ============================================
 // NAVIGATION
 // ============================================
@@ -6820,6 +7032,8 @@ document.querySelectorAll(
 
         await showWorkOrders();
 
+      } else if (page === "calls") {
+        await showCalls();
       } else if (page === "schedule-blocks") {
         await showScheduleBlocks();
       } else if (
