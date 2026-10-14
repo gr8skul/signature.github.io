@@ -676,6 +676,9 @@
 .call-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .call-actions a{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;background:#e9f2ec;border:1px solid #c6d9cc;color:#245638;border-radius:6px;padding:10px 13px;font-weight:600}
 .call-actions button{min-height:40px}
+.call-latest-answer{margin:10px 0;padding:10px 12px;border-left:3px solid #9aa9b2;background:#f6f8f9;border-radius:3px}
+.call-latest-answer .small-muted{margin-left:9px}
+.call-latest-answer p{margin:5px 0 0}
 .call-history{border-bottom:1px solid var(--border);padding:12px 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .call-history:last-child{border:0}
 #callOrderResults,#callCustomerResults{position:relative;top:auto;max-height:220px;box-shadow:none;margin-top:4px}
@@ -7026,13 +7029,39 @@ async function loadCallData(){
   callsCache.tasks=tasks.data||[];
   callsCache.communications=comms.data||[];
 }
+// Show the most recent recorded answer associated with this scheduled call.
+function latestCallAnswer(task){
+  const comms = callsCache.communications || [];
+  // A completed task may explicitly point to the communication that resolved it.
+  const linked = task.communication_id
+    ? comms.find(c => String(c.id) === String(task.communication_id)) : null;
+  // Otherwise use the most recent communication for the same work order/customer.
+  // Contact name and phone help distinguish different people on the same order.
+  const norm = v => String(v || '').trim().toLowerCase();
+  const candidates = comms.filter(c => {
+    if (task.service_call_id && String(c.service_call_id || '') !== String(task.service_call_id)) return false;
+    if (!task.service_call_id && task.customer_id && String(c.customer_id || '') !== String(task.customer_id)) return false;
+    if (!task.service_call_id && !task.customer_id) {
+      if (!norm(task.phone_number) && !norm(task.contact_name)) return false;
+      if (norm(task.phone_number) && norm(c.phone_number) === norm(task.phone_number)) return true;
+      return !!norm(task.contact_name) && norm(c.contact_name) === norm(task.contact_name);
+    }
+    // If contact information is present on both records, require agreement.
+    if (norm(task.contact_name) && norm(c.contact_name) && norm(task.contact_name) !== norm(c.contact_name)) return false;
+    return true;
+  }).filter(c => String(c.answer || c.notes || '').trim());
+  const latest = linked || candidates.sort((a,b) => new Date(b.occurred_at || 0) - new Date(a.occurred_at || 0))[0];
+  return latest && String(latest.answer || latest.notes || '').trim() ? latest : null;
+}
 function callTaskCard(t){
   const late=t.status==='pending' && t.scheduled_at && new Date(t.scheduled_at)<new Date();
   const number=t.phone_number || t.customers?.phone || '';
   return `<article class="call-card ${late?'overdue':''}">
     <div class="call-card-head"><div><h3>${callText(callContact(t))}</h3><div class="small-muted">${callText(callOrder(t)||'General call')} · ${callText(t.task_type)} · ${callText(t.priority)} priority</div></div>
     <span class="status">${late?'Overdue':callText(t.status)}</span></div>
-    <p><strong>${callText(t.purpose)}</strong></p><div class="small-muted">${callText(callDate(t.scheduled_at))}</div>
+    <p><strong>${callText(t.purpose)}</strong></p>
+    ${latestCallAnswer(t) ? `<div class="call-latest-answer"><strong>Latest answer</strong><span class="small-muted">${callText(callDate(latestCallAnswer(t).occurred_at))}</span><p>${callText(latestCallAnswer(t).answer || latestCallAnswer(t).notes)}</p></div>` : `<div class="small-muted" style="margin:8px 0">No answer recorded yet</div>`}
+    <div class="small-muted">${callText(callDate(t.scheduled_at))}</div>
     <div class="call-actions">${callLink(number,t.task_type)}
     ${t.status==='pending'?`<button class="primary" data-call-result="${escapeAttribute(t.id)}">Record Result</button>`:''}
     <button class="secondary" data-call-edit="${escapeAttribute(t.id)}">${t.status==='pending'?'Reschedule / Edit':'View / Edit'}</button>
