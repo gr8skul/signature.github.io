@@ -7392,20 +7392,43 @@ async function showCallTaskForm(task=null,context=null){
     <div class="form-group"><label for="callPriority">Priority</label><select id="callPriority">${['low','normal','high'].map(x=>`<option ${task?.priority===x?'selected':''}>${x}</option>`).join('')}</select></div>
     <div class="form-group"><label for="callStatus">Status</label><select id="callStatus">${['pending','completed','cancelled'].map(x=>`<option ${task?.status===x?'selected':''}>${x}</option>`).join('')}</select></div>
     <div class="form-group full"><label for="callPurpose">Purpose / outstanding question</label><textarea id="callPurpose" required placeholder="What do you need to discuss or resolve?">${callText(task?.purpose||'')}</textarea></div>
-    </div><div class="form-actions calls-form-actions"><button type="button" class="secondary" id="callCancel">Cancel</button><button type="submit" class="primary" id="callSave">${task?'Save Changes':'Schedule Call'}</button></div></form>`);
+    </div><div class="form-actions calls-form-actions"><button type="button" class="secondary" id="callCancel">Cancel</button><button type="submit" class="primary" id="callSave">${task?'Save Changes':'Schedule Call'}</button></div><div id="callSaveFeedback" role="status" aria-live="polite" style="padding:12px 0;font-weight:600"></div></form>`);
   callAssociationWiring();
   document.getElementById('callCancel').onclick=callBack;
   document.getElementById('callTaskForm').onsubmit=async e=>{
-    e.preventDefault();const btn=document.getElementById('callSave');btn.disabled=true;
-    const val=id=>document.getElementById(id).value.trim()||null;
-    const status=val('callStatus');
-    const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),task_type:val('callMethod'),scheduled_at:callReadDateTime('callDue'),priority:val('callPriority'),status,purpose:val('callPurpose'),updated_at:new Date().toISOString(),completed_at:status==='completed'?(task?.completed_at||new Date().toISOString()):null};
-    if(!payload.purpose){showMessage('Enter a purpose.',true);btn.disabled=false;return}
+    e.preventDefault();
+    const btn=document.getElementById('callSave');
+    if(btn.disabled)return;
+    const feedback=document.getElementById('callSaveFeedback');
+    const report=(text,error=false)=>{
+      if(feedback){feedback.textContent=text;feedback.style.color=error?'#9d2222':'#245638';}
+      if(error)showMessage(text,true);
+    };
+    btn.disabled=true;
+    btn.textContent='Scheduling…';
+    report('Saving scheduled call…');
     try{
-      const q=task?db.from('communication_tasks').update(payload).eq('id',task.id):db.from('communication_tasks').insert({...payload,created_by_user_id:currentProfile.id});
-      const {error}=await q;if(error)throw error;
-      showMessage('Call task saved.');await callBack();
-    }catch(err){console.error(err);showMessage(err.message,true);btn.disabled=false}
+      const val=id=>document.getElementById(id)?.value.trim()||null;
+      const status=val('callStatus');
+      const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),task_type:val('callMethod'),scheduled_at:callReadDateTime('callDue'),priority:val('callPriority'),status,purpose:val('callPurpose'),updated_at:new Date().toISOString(),completed_at:status==='completed'?(task?.completed_at||new Date().toISOString()):null};
+      if(!payload.purpose)throw new Error('Enter a purpose before scheduling.');
+      if(!payload.scheduled_at)throw new Error('Choose a scheduled date and time.');
+      // A returned row confirms that Supabase actually saved the task.
+      const query=task
+        ?db.from('communication_tasks').update(payload).eq('id',task.id)
+        :db.from('communication_tasks').insert({...payload,created_by_user_id:currentProfile.id});
+      const {data,error}=await query.select('id,scheduled_at,status,service_call_id,customer_id').single();
+      if(error)throw error;
+      if(!data?.id)throw new Error('No saved call was returned by the database. Check table permissions.');
+      report('Saved successfully. Opening the Calls list…');
+      showMessage('Scheduled call saved.');
+      await callBack();
+    }catch(err){
+      console.error('Schedule Call failed:',err);
+      report('Schedule failed: '+(err?.message||String(err)),true);
+      btn.disabled=false;
+      btn.textContent=task?'Save Changes':'Schedule Call';
+    }
   };
 }
 async function showCallLogForm(taskId=null,context=null){
