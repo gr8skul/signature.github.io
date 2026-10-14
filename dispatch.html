@@ -689,6 +689,15 @@
   .friendly-datetime select{width:auto;min-width:67px;flex:0 1 auto}
   .friendly-datetime span{font-weight:700}
   @media(max-width:600px){.friendly-datetime input[type=date]{flex-basis:100%}}
+
+  /* Collapsible Work Order detail sections: no data or actions removed. */
+  .wo-panel > .card-head {cursor:pointer;user-select:none}
+  .wo-panel > .card-head:focus-visible {outline:2px solid #555;outline-offset:-3px}
+  .wo-panel .wo-panel-arrow {margin-left:auto;font-size:17px;color:#666;line-height:1}
+  .wo-panel.wo-collapsed > .card-body {display:none}
+  .wo-panel.wo-collapsed > .card-head {border-bottom:0}
+  .wo-panel.wo-collapsed > .card-head > button,
+  .wo-panel.wo-collapsed > .card-head > .release-badge {display:none}
   </style>
 
 </head>
@@ -800,6 +809,8 @@
   let calendarSelectedDay = new Date().getDate();
   let calendarRequest = 0;
   let currentBlockFilter = "active";
+  const workOrderPanelState = {}; // Remember which sections are expanded while navigating.
+
   let workOrderSort = { field: "created_at", ascending: false };
   const dispatchSearch = { "work-orders": "", parts: "", notes: "", photos: "",
     customers: "", locations: "", technicians: "" };
@@ -2332,6 +2343,47 @@ function setFriendlyDateTime(id, value) {
   // WORK ORDER DETAIL
   // ============================================
 
+  function initWorkOrderCollapsiblePanels(orderId) {
+    const main = document.getElementById("mainContent");
+    if (!main) return;
+    // Only the seven detail cards, not the work order toolbar.
+    const titles = ["Customer", "Billing & Completion", "Description", "Communications", "Parts", "Notes", "Photos"];
+    const cards = Array.from(main.children).filter(el => el.classList?.contains("card"));
+    const stateKey = String(orderId);
+    if (!workOrderPanelState[stateKey]) workOrderPanelState[stateKey] = {};
+    cards.slice(0, titles.length).forEach((card, index) => {
+      const head = card.querySelector(":scope > .card-head");
+      const body = card.querySelector(":scope > .card-body");
+      if (!head || !body) return;
+      const key = titles[index];
+      card.classList.add("wo-panel");
+      const isOpen = workOrderPanelState[stateKey][key] ?? (index === 0);
+      function setOpen(open) {
+        card.classList.toggle("wo-collapsed", !open);
+        head.setAttribute("aria-expanded", String(open));
+        arrow.textContent = open ? "▴" : "▾";
+        workOrderPanelState[stateKey][key] = open;
+      }
+      head.setAttribute("role", "button");
+      head.setAttribute("tabindex", "0");
+      head.setAttribute("aria-label", key === "Customer" ? "Toggle customer details" : `Toggle ${key}`);
+      const arrow = document.createElement("span");
+      arrow.className = "wo-panel-arrow";
+      arrow.setAttribute("aria-hidden", "true");
+      head.appendChild(arrow);
+      head.addEventListener("click", e => {
+        if (e.target.closest("button, a, input, select")) return;
+        setOpen(card.classList.contains("wo-collapsed"));
+      });
+      head.addEventListener("keydown", e => {
+        if (e.target !== head || !["Enter", " "].includes(e.key)) return;
+        e.preventDefault();
+        setOpen(card.classList.contains("wo-collapsed"));
+      });
+      setOpen(isOpen);
+    });
+  }
+
   async function showWorkOrderDetail(id) {
     try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
 
@@ -2615,6 +2667,7 @@ function setFriendlyDateTime(id, value) {
         <div class="card-body" id="detailPhotos">Loading photos...</div></div>
     `;
 
+     initWorkOrderCollapsiblePanels(call.id);
      document.getElementById("editWorkOrderBilling")?.addEventListener("click", () => showBillingEditForm(call));
     document.getElementById("detailAddPart").addEventListener("click", () => showPartForm(null, call.id));
     document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm(null, call.id));
