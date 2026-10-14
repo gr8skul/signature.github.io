@@ -1213,6 +1213,11 @@
   }
 
   function updateWorkOrderSortHeaders() {
+    document.getElementById("statusCycleButton").onclick = () => {
+      const choices = ["waiting", "scheduled", "in_progress", "completed", "cancelled", "open"];
+      const index = choices.indexOf(currentWorkOrderFilter);
+      showWorkOrders(choices[(index + 1) % choices.length]);
+    };
     document.getElementById("communicationCycleButton").onclick = () => {
       const choices = ["comm_callback","comm_resolved","comm_none"];
       const index = choices.indexOf(currentWorkOrderFilter);
@@ -1994,10 +1999,9 @@ function setFriendlyDateTime(id, value) {
           ${filterButton("install", "Installation")}
           ${filterButton("checkout", "Check-Out")}
           ${filterButton("unreleased", "Unreleased")}
-          ${filterButton("waiting", "Waiting")}
+          <button type="button" class="filter-button ${["waiting","scheduled","in_progress","completed","cancelled","open"].includes(currentWorkOrderFilter)?"active":""}" id="statusCycleButton" title="Cycle through Work Order statuses">Status: ${statusLabel(["waiting","scheduled","in_progress","completed","cancelled","open"].includes(currentWorkOrderFilter)?currentWorkOrderFilter:"waiting")} ↻</button>
           ${filterButton("in_progress", "Current / In Progress")}
           <button type="button" class="filter-button ${['comm_callback','comm_resolved','comm_none'].includes(currentWorkOrderFilter)?'active':''}" id="communicationCycleButton" title="Cycle communication designations">Communication: ${currentWorkOrderFilter==='comm_callback'?'Call Back':currentWorkOrderFilter==='comm_resolved'?'Resolved':currentWorkOrderFilter==='comm_none'?'No Communication':'Call Back'} ↻</button>
-          ${filterButton("cancelled", "Cancelled")}
 
         </div>
 
@@ -2164,8 +2168,8 @@ function setFriendlyDateTime(id, value) {
     }
 
 
-    if (currentWorkOrderFilter === "waiting") {
-      query = query.eq("status", "waiting");
+    if (["waiting", "scheduled", "open"].includes(currentWorkOrderFilter)) {
+      query = query.eq("status", currentWorkOrderFilter);
     }
 
     if (
