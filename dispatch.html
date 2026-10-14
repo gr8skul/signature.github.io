@@ -692,6 +692,10 @@
 
   .wo-waiting-preview {display:inline-block;max-width:170px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;white-space:nowrap;margin-left:6px;color:var(--muted);font-size:12px;cursor:help}
   .wo-waiting-field[hidden] {display:none!important}
+  .comm-flag{display:inline-block;padding:3px 6px;margin:2px 3px 2px 0;border-radius:4px;background:#e8eef6;color:#244d83;font-size:11px;white-space:normal}
+  .comm-options{padding:12px;border:1px solid var(--border);border-radius:6px;background:#f9fafb}
+  .comm-options label{display:flex;gap:8px;align-items:center;font-weight:normal;margin:7px 0}
+  .comm-options input{width:auto}
 
   /* Collapsible Work Order detail sections: no data or actions removed. */
   .wo-panel > .card-head {cursor:pointer;user-select:none}
@@ -1273,6 +1277,15 @@
     return type === "checkout" ? "Check-Out" : type === "install" ? "Installation" : "Service";
   }
 
+
+   // Communication instructions persist across completion and re-opening.
+   function communicationFlagsHtml(call) {
+     if (call.status === 'completed') return '';
+     return [
+       call.awaiting_return_call ? '<span class="comm-flag">Awaiting Return Call</span>' : '',
+       call.call_before_arrival ? '<span class="comm-flag">Call Before Arrival</span>' : ''
+     ].filter(Boolean).join(' ');
+   }
 
   function waitingSnippet(reason) {
     const words = String(reason || "").trim().replace(/\s+/g, " ").split(" ");
@@ -2329,6 +2342,7 @@ function setFriendlyDateTime(id, value) {
             </td>
             <td>
               <button type="button" class="row-button" onclick="showCallTaskForm(null,{...workOrderDistanceRecords.get('${call.id}'),service_call_id:'${call.id}',returnTo:'order'})" title="Schedule a call for this Work Order">${escapeHtml(communicationState)}</button>
+              <div>${communicationFlagsHtml(call)}</div>
             </td>
 
             <td>
@@ -2503,6 +2517,7 @@ function setFriendlyDateTime(id, value) {
               statusLabel(call.status)
             )}
             ${call.status === "waiting" && call.waiting_reason ? `<span title="${escapeAttribute(call.waiting_reason)}"> · ${escapeHtml(call.waiting_reason)}</span>` : ""}
+            <span>${communicationFlagsHtml(call)}</span>
           </p>
 
         </div>
@@ -7313,9 +7328,9 @@ function callSearchPicker(inputId,hiddenId,resultId,records,label,haystack,onSel
     const matches=records.filter(x=>!q||q.split(/\s+/).every(t=>haystack(x).toLowerCase().includes(t))).slice(0,40);
     results.innerHTML=matches.map(x=>`<button type="button" class="wo-result" data-choice="${escapeAttribute(x.id)}">${callText(label(x))}</button>`).join('')||'<div class="small-muted" style="padding:12px">No matches</div>';
     results.hidden=false;
-    results.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>{const x=records.find(r=>String(r.id)===b.dataset.choice);if(!x)return;hidden.value=x.id;input.value=label(x);results.hidden=true;onSelect?.(x)});
+    results.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>{const x=records.find(r=>String(r.id)===b.dataset.choice);if(!x)return;hidden.value=x.id;hidden.dispatchEvent(new Event('change'));input.value=label(x);results.hidden=true;onSelect?.(x)});
   };
-  input.addEventListener('input',()=>{hidden.value='';draw()});
+  input.addEventListener('input',()=>{hidden.value='';hidden.dispatchEvent(new Event('change'));draw()});
   input.addEventListener('focus',draw);
   input.addEventListener('blur',()=>setTimeout(()=>{results.hidden=true;if(!hidden.value && input.value.trim())input.value=''},180));
 }
@@ -7379,6 +7394,23 @@ async function showCallTaskForm(task=null,context=null){
     <div class="form-group full"><label for="callPurpose">Purpose / outstanding question</label><textarea id="callPurpose" required placeholder="What do you need to discuss or resolve?">${callText(task?.purpose||'')}</textarea></div>
     </div><div class="form-actions calls-form-actions"><button type="button" class="secondary" id="callCancel">Cancel</button><button type="submit" class="primary" id="callSave">${task?'Save Changes':'Schedule Call'}</button></div></form>`);
   callAssociationWiring();
+  // Read existing flags so recording another communication never silently clears them.
+  const flagOrderSelect=document.getElementById('callOrderSelect');
+  async function loadCallFlags(){
+    const id=flagOrderSelect?.value;
+    const awaiting=document.getElementById('callAwaitingReturn');
+    const before=document.getElementById('callBeforeArrival');
+    const hint=document.getElementById('callFlagHint');
+    awaiting.disabled=before.disabled=!id;
+    if(!id){awaiting.checked=before.checked=false;hint.textContent='Select a Work Order to use these instructions.';return;}
+    const {data,error}=await db.from('service_calls').select('awaiting_return_call,call_before_arrival,status').eq('id',id).single();
+    if(error){hint.textContent='Unable to load communication instructions: '+error.message;awaiting.disabled=before.disabled=true;return;}
+    if(flagOrderSelect.value!==id)return;
+    awaiting.checked=!!data.awaiting_return_call;before.checked=!!data.call_before_arrival;
+    hint.textContent=data.status==='completed'?'Saved instructions are hidden while completed and return if reopened.':'These instructions appear in the Work Order and are preserved through completion.';
+  }
+  flagOrderSelect?.addEventListener('change',loadCallFlags);
+  await loadCallFlags();
   document.getElementById('callCancel').onclick=callBack;
   document.getElementById('callTaskForm').onsubmit=async e=>{
     e.preventDefault();const btn=document.getElementById('callSave');btn.disabled=true;
@@ -7412,6 +7444,11 @@ async function showCallLogForm(taskId=null,context=null){
     <div class="form-group full"><label for="callPurposeLog">Purpose / Question</label><textarea id="callPurposeLog" placeholder="What was the question or reason for contact?">${callText(task?.purpose||context?.purpose||'')}</textarea></div>
     <div class="form-group full"><label for="callAnswer">Answer / Response</label><textarea id="callAnswer" placeholder="What did they say? What was the response?"></textarea></div>
     <div class="form-group full"><label for="callNotes">Additional notes / unresolved items</label><textarea id="callNotes" placeholder="Conversation details, commitments, unanswered questions..."></textarea></div>
+    <div class="form-group full comm-options"><strong>Work Order communication instructions</strong>
+      <label><input id="callAwaitingReturn" type="checkbox"> Awaiting Return Call — customer owes us a response</label>
+      <label><input id="callBeforeArrival" type="checkbox"> Call Before Arrival — contact customer before heading out</label>
+      <span class="small-muted" id="callFlagHint">These instructions remain saved if the Work Order is completed; they become visible again if it is reopened.</span>
+    </div>
     <div class="form-group full"><label><input id="callFollowup" type="checkbox" style="width:auto"> Schedule another follow-up after saving</label></div>
     <div class="form-group full"><label><input id="callCompleteTask" type="checkbox" style="width:auto" ${task?'checked':'disabled'}> Mark the scheduled task complete</label></div>
     </div><div class="form-actions calls-form-actions"><button type="button" class="secondary" id="callCancel">Cancel</button><button type="submit" class="primary" id="callSave">Save Communication</button></div></form>`);
@@ -7422,7 +7459,15 @@ async function showCallLogForm(taskId=null,context=null){
     const val=id=>document.getElementById(id).value.trim()||null;
     const payload={service_call_id:val('callOrderSelect'),customer_id:val('callCustomerSelect'),contact_name:val('callContact'),phone_number:val('callPhone'),communication_type:val('callMethod'),direction:val('callDirection'),outcome:val('callOutcome'),purpose:val('callPurposeLog'),answer:val('callAnswer'),notes:val('callNotes'),occurred_at:callReadDateTime('callOccurred'),created_by_user_id:currentProfile.id};
     try{
+      const orderId=val('callOrderSelect');
+      const awaiting=document.getElementById('callAwaitingReturn');
+      const before=document.getElementById('callBeforeArrival');
+      if(orderId && (awaiting.disabled || before.disabled))throw new Error('Communication instructions could not be loaded. Please reopen this form.');
       const {data,error}=await db.from('communications').insert(payload).select('id').single();if(error)throw error;
+      if(orderId){
+        const {error:flagError}=await db.from('service_calls').update({awaiting_return_call:awaiting.checked,call_before_arrival:before.checked}).eq('id',orderId);
+        if(flagError)throw new Error('Communication saved, but Work Order instructions could not be updated: '+flagError.message);
+      }
       if(task && document.getElementById('callCompleteTask').checked){
         const {error:taskError}=await db.from('communication_tasks').update({status:'completed',completed_at:new Date().toISOString(),communication_id:data.id,updated_at:new Date().toISOString()}).eq('id',task.id);
         if(taskError){showMessage('Communication saved, but task could not be completed: '+taskError.message,true);await showCalls();return}
@@ -7442,10 +7487,25 @@ async function loadWorkOrderCommunications(id){
   if(comms.error||tasks.error){el.textContent='Unable to load communications: '+(comms.error||tasks.error).message;return}
   const open=(tasks.data||[]).filter(t=>t.status==='pending');
   const history=comms.data||[];
+  const {data:flagOrder,error:flagError}=await db.from('service_calls').select('awaiting_return_call,call_before_arrival,status').eq('id',id).single();
   el.innerHTML=`<div class="call-actions" style="margin:0 0 12px"><button class="secondary" id="detailLogCall">+ Log Call / Text</button></div>
+    <div class="comm-options" style="margin-bottom:16px"><strong>Communication instructions</strong>
+      ${flagError?`<p class="error">${callText(flagError.message)} — run the included SQL setup first.</p>`:`
+      <label><input type="checkbox" id="woAwaitingReturn" ${flagOrder?.awaiting_return_call?'checked':''}> Awaiting Return Call</label>
+      <label><input type="checkbox" id="woBeforeArrival" ${flagOrder?.call_before_arrival?'checked':''}> Call Before Arrival</label>
+      <div class="small-muted">${flagOrder?.status==='completed'?'Instructions are saved but hidden from active indicators while this Work Order is completed.':'Changes are saved to this Work Order.'}</div>
+      <div class="call-actions"><button type="button" class="secondary" id="saveWoCommFlags">Save Instructions</button></div>`}
+    </div>
     <h3>Outstanding follow-ups (${open.length})</h3>${open.length?open.map(t=>`<div class="call-history"><strong>${callText(t.purpose)}</strong><div class="small-muted">${callText(callDate(t.scheduled_at))} · ${callText(t.contact_name||'')} · ${callText(t.phone_number||'')}</div><div class="call-actions">${callLink(t.phone_number,t.task_type)}<button class="secondary" data-wo-log="${escapeAttribute(t.id)}">Record Result</button><button class="secondary" data-wo-edit="${escapeAttribute(t.id)}">Edit</button></div></div>`).join(''):'<p class="small-muted">No pending calls.</p>'}
     <h3>Communication history (${history.length})</h3>${history.length?history.map(c=>`<div class="call-history"><strong>${callText(callDate(c.occurred_at))}</strong> · ${callText(c.communication_type)} · ${callText(c.direction)} · ${callText(c.outcome||'')}<div>${callText(c.contact_name||'')} ${callText(c.phone_number||'')}</div><div><strong>Purpose:</strong> ${callText(c.purpose||'—')}</div><div><strong>Answer:</strong> ${callText(c.answer||'—')}</div><div>${callText(c.notes||'')}</div><div class="call-actions"><button class="danger" data-wo-delete-comm="${escapeAttribute(c.id)}">Delete</button></div></div>`).join(''):'<p class="small-muted">No communications recorded yet.</p>'}`;
   el.querySelectorAll('[data-wo-delete-comm]').forEach(b=>b.onclick=async()=>{const deleted=await deleteCallRecord('communications',b.dataset.woDeleteComm,true);if(deleted)await showWorkOrderDetail(id)});
+  const flagSave=document.getElementById('saveWoCommFlags');
+  if(flagSave)flagSave.onclick=async()=>{
+    flagSave.disabled=true;
+    const {error}=await db.from('service_calls').update({awaiting_return_call:document.getElementById('woAwaitingReturn').checked,call_before_arrival:document.getElementById('woBeforeArrival').checked}).eq('id',id);
+    if(error){showMessage(error.message,true);flagSave.disabled=false;return;}
+    showMessage('Communication instructions saved.');await showWorkOrderDetail(id);
+  };
   document.getElementById('detailLogCall').onclick=()=>showCallLogForm(null,{service_call_id:id,returnTo:'order'});
   el.querySelectorAll('[data-wo-log]').forEach(b=>b.onclick=async()=>{await loadCallData();showCallLogForm(b.dataset.woLog)});
   el.querySelectorAll('[data-wo-edit]').forEach(b=>b.onclick=()=>showCallTaskForm(open.find(t=>t.id===b.dataset.woEdit)));
