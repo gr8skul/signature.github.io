@@ -925,19 +925,22 @@
     const key = JSON.stringify([origin.trim().toLowerCase(), destination.trim().toLowerCase()]);
     if (drivingRouteCache.has(key)) return drivingRouteCache.get(key);
     const request = (async () => {
-      const { data, error } = await db.functions.invoke("driving-distance", {
-        body: { origin, destination }
-      });
-      if (error) {
-        let detail = error.message || "Could not contact driving-distance";
-        try {
-          const response = error.context;
-          if (response && typeof response.json === "function") {
-            const payload = await response.json();
-            detail = payload?.error || detail;
-          }
-        } catch (_) {}
-        throw new Error(detail);
+      // Routing lives in a separate Supabase project from Dispatch.
+      // A simple POST avoids sending Dispatch's unrelated project credentials.
+      // JWT verification must be OFF on this routing function for this integration.
+      const response = await fetch(
+        "https://rijzolipyabfggrrhgab.supabase.co/functions/v1/driving-distance",
+        {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ origin, destination })
+        }
+      );
+      let data;
+      try { data = await response.json(); }
+      catch (_) { throw new Error(`Routing function returned HTTP ${response.status}`); }
+      if (!response.ok) {
+        throw new Error(data?.error || `Routing function returned HTTP ${response.status}`);
       }
       if (!data?.success || !Number.isFinite(Number(data.distance_miles))) {
         throw new Error(data?.error || "Routing service did not return driving mileage");
