@@ -960,6 +960,9 @@
       const result = workOrderDistanceResults.get(cell.dataset.distanceId);
       cell.textContent = result ? result.label : "Locating…";
       cell.title = result ? result.reason : "Calculating road distance from assigned shop";
+      const locationCell = [...document.querySelectorAll("[data-route-location-id]")]
+        .find(element => element.dataset.routeLocationId === cell.dataset.distanceId);
+      if (locationCell && result?.location) locationCell.textContent = result.location;
     });
   }
 
@@ -987,6 +990,8 @@
             const route = await getDrivingRoute(origin, destination.address);
             result = {
               label: Number(route.distance_miles).toFixed(1),
+              miles: Number(route.distance_miles),
+              location: route.destination || destination.address,
               reason: `Driving miles · approximately ${route.duration_minutes} minutes. Matched: ${route.origin} → ${route.destination}`
             };
           } catch (error) {
@@ -1001,6 +1006,12 @@
         if (cell) {
           cell.textContent = result.label;
           cell.title = result.reason;
+        }
+        const locationCell = [...document.querySelectorAll("[data-route-location-id]")]
+          .find(element => element.dataset.routeLocationId === String(order.id));
+        if (locationCell && result.location) locationCell.textContent = result.location;
+        if (workOrderSort.field === "distance" && document.getElementById("workOrdersBody")) {
+          applyDispatchSearch("work-orders", "workOrdersBody");
         }
       }
     }
@@ -1121,6 +1132,15 @@
         const field = workOrderSort.field;
         const av = a.record[field];
         const bv = b.record[field];
+        // Numeric driving mileage sorts closest/furthest, with unknown routes last.
+        if (field === "distance") {
+          const am = workOrderDistanceResults.get(String(a.record.id))?.miles;
+          const bm = workOrderDistanceResults.get(String(b.record.id))?.miles;
+          const aValid = Number.isFinite(am), bValid = Number.isFinite(bm);
+          if (aValid !== bValid) return aValid ? -1 : 1;
+          if (aValid && am !== bm) return workOrderSort.ascending ? am - bm : bm - am;
+          return compareWorkOrderDates(a.record, b.record, "created_at", false);
+        }
         // Unscheduled orders always follow scheduled orders.
         if (field === "scheduled_at") {
           if (!av && !bv) return compareWorkOrderDates(a.record, b.record, "created_at", false);
@@ -1132,7 +1152,7 @@
     }
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
-      : `<tr><td colspan="${page === "work-orders" ? 12 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
+      : `<tr><td colspan="${page === "work-orders" ? 13 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
           <div class="empty">No matching records.</div></td></tr>`;
     if (page === "work-orders") paintWorkOrderDistances();
     const count = document.getElementById("dispatchSearchCount");
@@ -1154,7 +1174,8 @@
     };
     document.querySelectorAll("[data-work-sort]").forEach(button => {
       const active = button.dataset.workSort === workOrderSort.field;
-      const label = button.dataset.workSort === "created_at" ? "Work Order" : "Scheduled";
+      const label = button.dataset.workSort === "created_at" ? "Work Order"
+        : button.dataset.workSort === "distance" ? "Distance (mi)" : "Scheduled";
       button.textContent = label + (active ? (workOrderSort.ascending ? " ↑" : " ↓") : " ↕");
       button.setAttribute("aria-sort", active ? (workOrderSort.ascending ? "ascending" : "descending") : "none");
     });
@@ -1878,7 +1899,8 @@
                 <th><button type="button" class="sort-heading" data-work-sort="created_at">Work Order ↓</button></th>
                 <th>Type</th>
                 <th>Shop</th>
-                <th title="Approximate straight-line miles from assigned shop to service address">Distance (mi) ≈</th>
+                <th title="Driving miles from assigned shop to service address"><button type="button" class="sort-heading" data-work-sort="distance">Distance (mi) ↕</button></th>
+                <th>Location</th>
                 <th>Customer</th>
                 <th>Description</th>
                 <th>Communication</th>
@@ -1893,7 +1915,7 @@
             <tbody id="workOrdersBody">
 
               <tr>
-                <td colspan="12">
+                <td colspan="13">
                   <div class="empty">
                     Loading work orders...
                   </div>
@@ -2173,6 +2195,7 @@
 
             <td>${escapeHtml(shopName(call.shop_id))}</td>
             <td class="wo-distance" data-distance-id="${escapeAttribute(call.id)}" title="Looking up service address">Locating…</td>
+            <td data-route-location-id="${escapeAttribute(call.id)}">${escapeHtml(workOrderServiceAddress(call.locations).address || "No service address")}</td>
             <td>
               ${escapeHtml(
                 customerName(call.customers)
