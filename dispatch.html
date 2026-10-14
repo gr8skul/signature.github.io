@@ -901,7 +901,7 @@
     kirksville: {lat:40.23246765136719,lon:-92.58580780029297}
   };
   const workOrderDistanceRecords = new Map();
-  const workOrderDistanceMiles = new Map();
+  const workOrderDistanceResults = new Map();
   const workOrderGeocodeCache = new Map();
   let workOrderDistanceGeneration = 0;
   function shopPoint(id) {
@@ -914,45 +914,79 @@
     const h=Math.sin(dlat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dlon/2)**2;
     return 3958.7613*2*Math.asin(Math.min(1,Math.sqrt(h)));
   }
+  // Returns a result AND a reason when an address cannot be located.
+  // The Census locations endpoint does not require a vintage parameter.
   async function lookupJobCoordinates(location) {
-    const address=[location?.address,location?.city,location?.state,location?.zip].filter(Boolean).join(', ');
-    if(!location?.address || !location?.city || !location?.state) return null;
+    const street=String(location?.address||'').trim();
+    const city=String(location?.city||'').trim();
+    const state=String(location?.state||'MO').trim();
+    const zip=String(location?.zip||'').trim();
+    if(!street) return {point:null,reason:'Missing service street address'};
+    if(!city) return {point:null,reason:'Missing service city'};
+    const address=[street,city,state,zip].filter(Boolean).join(', ');
     if(workOrderGeocodeCache.has(address)) return workOrderGeocodeCache.get(address);
     const task=(async()=>{
-      try {
-        const url='https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?address='+encodeURIComponent(address)+'&benchmark=Public_AR_Current&vintage=Current_Current&format=json';
-        const response=await fetch(url);
-        if(!response.ok) return null;
-        const result=await response.json();
-        const point=result?.result?.addressMatches?.[0]?.coordinates;
-        return Number.isFinite(Number(point?.y)) && Number.isFinite(Number(point?.x)) ? {lat:Number(point.y),lon:Number(point.x)} : null;
-      } catch(e) { console.warn('Distance lookup unavailable',e); return null; }
+      // Try the Census geocoder with its documented current benchmark, then
+      // the general Public_AR_Census2020 benchmark for unmatched addresses.
+      const benchmarks=['Public_AR_Current','Public_AR_Census2020'];
+      let lastError='Address not matched by U.S. Census geocoder';
+      for(const benchmark of benchmarks){
+        try {
+          const params=new URLSearchParams({address,benchmark,format:'json'});
+          const url='https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?'+params;
+          const controller=new AbortController();
+          const timeout=setTimeout(()=>controller.abort(),12000);
+          let response;
+          try { response=await fetch(url,{signal:controller.signal}); }
+          finally { clearTimeout(timeout); }
+          if(!response.ok){lastError='Geocoding service returned HTTP '+response.status;continue;}
+          const result=await response.json();
+          const matches=result?.result?.addressMatches||[];
+          const point=matches[0]?.coordinates;
+          const lat=Number(point?.y),lon=Number(point?.x);
+          if(point && Number.isFinite(lat) && Number.isFinite(lon))
+            return {point:{lat,lon},reason:'Matched: '+(matches[0]?.matchedAddress||address)};
+          lastError='Address not matched by U.S. Census geocoder';
+        } catch(e) {
+          lastError=e?.name==='AbortError'?'Geocoding request timed out':'Geocoding network/CORS error';
+          console.warn('Distance lookup failed for',address,e);
+        }
+      }
+      return {point:null,reason:lastError+' — '+address};
     })();
     workOrderGeocodeCache.set(address,task);
     return task;
   }
   function paintWorkOrderDistances() {
     document.querySelectorAll('[data-distance-id]').forEach(cell=>{
-      const miles=workOrderDistanceMiles.get(cell.dataset.distanceId);
-      cell.textContent=Number.isFinite(miles)?miles.toFixed(1):'—';
+      const result=workOrderDistanceResults.get(cell.dataset.distanceId);
+      cell.textContent=result ? result.label : 'Locating…';
+      cell.title=result ? result.reason : 'Looking up service address';
     });
   }
   async function updateWorkOrderDistances(orders) {
     const generation=++workOrderDistanceGeneration;
-    workOrderDistanceRecords.clear();workOrderDistanceMiles.clear();
+    workOrderDistanceRecords.clear();workOrderDistanceResults.clear();
     for(const order of orders) workOrderDistanceRecords.set(order.id,order);
-    // A small worker pool avoids firing hundreds of geocoding requests at once.
+    paintWorkOrderDistances();
     let index=0;
     async function worker(){
       while(index<orders.length && generation===workOrderDistanceGeneration){
         const order=orders[index++];
         const shop=shopPoint(order.shop_id);
-        if(!shop || !order.locations)continue;
-        const job=await lookupJobCoordinates(order.locations);
+        let result;
+        if(!shop) result={label:'No shop',reason:'Assigned shop is missing or is not Boonville/Kirksville'};
+        else if(!order.locations) result={label:'No address',reason:'No service location is attached to this Work Order'};
+        else {
+          const job=await lookupJobCoordinates(order.locations);
+          result=job.point
+            ? {label:milesBetween(shop,job.point).toFixed(1),reason:'Approximate straight-line miles. '+job.reason}
+            : {label:'Unavailable',reason:job.reason};
+        }
         if(generation!==workOrderDistanceGeneration)return;
-        if(job)workOrderDistanceMiles.set(order.id,milesBetween(shop,job));
+        workOrderDistanceResults.set(order.id,result);
         const cell=document.querySelector('[data-distance-id="'+order.id+'"]');
-        if(cell)cell.textContent=job?workOrderDistanceMiles.get(order.id).toFixed(1):'—';
+        if(cell){cell.textContent=result.label;cell.title=result.reason;}
       }
     }
     await Promise.all(Array.from({length:Math.min(3,orders.length)},()=>worker()));
@@ -1930,7 +1964,8 @@
           locations (
             address,
             city,
-            state
+            state,
+            zip
           ),
           technicians!service_calls_assigned_technician_id_fkey (
             first_name,
@@ -2122,7 +2157,7 @@
             </td>
 
             <td>${escapeHtml(shopName(call.shop_id))}</td>
-            <td class="wo-distance" data-distance-id="${escapeAttribute(call.id)}" title="Approximate straight-line distance; not driving mileage">—</td>
+            <td class="wo-distance" data-distance-id="${escapeAttribute(call.id)}" title="Looking up service address">Locating…</td>
             <td>
               ${escapeHtml(
                 customerName(call.customers)
