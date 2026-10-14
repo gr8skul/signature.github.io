@@ -893,103 +893,115 @@
   }
 
 
-  // Approximate shop-to-job distance (straight line, NOT driving mileage).
-  // Uses the shop coordinates supplied by Signature and Census address geocoding.
-  // No changes to Supabase tables, Edge Functions, or Google Calendar integration.
-  const shopCoordinates = {
-    boonville: {lat:38.96488952636719,lon:-92.73123168945312},
-    kirksville: {lat:40.23246765136719,lon:-92.58580780029297}
+  // Driving mileage via the existing Supabase driving-distance Edge Function.
+  // Accepts any origin/destination pair for future job-to-job routing.
+  const shopAddresses = {
+    boonville: "1220 11th St, Boonville, MO 65233",
+    kirksville: "320 W Brewington Ave, Kirksville, MO 63501"
   };
   const workOrderDistanceRecords = new Map();
   const workOrderDistanceResults = new Map();
-  const workOrderGeocodeCache = new Map();
+  const drivingRouteCache = new Map();
   let workOrderDistanceGeneration = 0;
-  function shopPoint(id) {
+
+  function shopRouteAddress(id) {
     const name = String(shopName(id)).toLowerCase();
-    return Object.entries(shopCoordinates).find(([key]) => name.includes(key))?.[1] || null;
+    const key = Object.keys(shopAddresses).find(key => name.includes(key));
+    return key ? shopAddresses[key] : null;
   }
-  function milesBetween(a,b) {
-    const rad = x => x*Math.PI/180;
-    const dlat=rad(b.lat-a.lat), dlon=rad(b.lon-a.lon);
-    const h=Math.sin(dlat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dlon/2)**2;
-    return 3958.7613*2*Math.asin(Math.min(1,Math.sqrt(h)));
+
+  function workOrderServiceAddress(location) {
+    const street = String(location?.address || "").trim();
+    const city = String(location?.city || "").trim();
+    const state = String(location?.state || "MO").trim();
+    const zip = String(location?.zip || "").trim();
+    if (!street) return { address: null, reason: "Missing service street address" };
+    if (!city) return { address: null, reason: "Missing service city" };
+    return { address: [street, city, state, zip].filter(Boolean).join(", "), reason: "" };
   }
-  // Returns a result AND a reason when an address cannot be located.
-  // The Census locations endpoint does not require a vintage parameter.
-  async function lookupJobCoordinates(location) {
-    const street=String(location?.address||'').trim();
-    const city=String(location?.city||'').trim();
-    const state=String(location?.state||'MO').trim();
-    const zip=String(location?.zip||'').trim();
-    if(!street) return {point:null,reason:'Missing service street address'};
-    if(!city) return {point:null,reason:'Missing service city'};
-    const address=[street,city,state,zip].filter(Boolean).join(', ');
-    if(workOrderGeocodeCache.has(address)) return workOrderGeocodeCache.get(address);
-    const task=(async()=>{
-      // Try the Census geocoder with its documented current benchmark, then
-      // the general Public_AR_Census2020 benchmark for unmatched addresses.
-      const benchmarks=['Public_AR_Current','Public_AR_Census2020'];
-      let lastError='Address not matched by U.S. Census geocoder';
-      for(const benchmark of benchmarks){
+
+  // Shared route lookup: works for shop-to-job and job-to-job.
+  async function getDrivingRoute(origin, destination) {
+    const key = JSON.stringify([origin.trim().toLowerCase(), destination.trim().toLowerCase()]);
+    if (drivingRouteCache.has(key)) return drivingRouteCache.get(key);
+    const request = (async () => {
+      const { data, error } = await db.functions.invoke("driving-distance", {
+        body: { origin, destination }
+      });
+      if (error) {
+        let detail = error.message || "Could not contact driving-distance";
         try {
-          const params=new URLSearchParams({address,benchmark,format:'json'});
-          const url='https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?'+params;
-          const controller=new AbortController();
-          const timeout=setTimeout(()=>controller.abort(),12000);
-          let response;
-          try { response=await fetch(url,{signal:controller.signal}); }
-          finally { clearTimeout(timeout); }
-          if(!response.ok){lastError='Geocoding service returned HTTP '+response.status;continue;}
-          const result=await response.json();
-          const matches=result?.result?.addressMatches||[];
-          const point=matches[0]?.coordinates;
-          const lat=Number(point?.y),lon=Number(point?.x);
-          if(point && Number.isFinite(lat) && Number.isFinite(lon))
-            return {point:{lat,lon},reason:'Matched: '+(matches[0]?.matchedAddress||address)};
-          lastError='Address not matched by U.S. Census geocoder';
-        } catch(e) {
-          lastError=e?.name==='AbortError'?'Geocoding request timed out':'Geocoding network/CORS error';
-          console.warn('Distance lookup failed for',address,e);
-        }
+          const response = error.context;
+          if (response && typeof response.json === "function") {
+            const payload = await response.json();
+            detail = payload?.error || detail;
+          }
+        } catch (_) {}
+        throw new Error(detail);
       }
-      return {point:null,reason:lastError+' — '+address};
+      if (!data?.success || !Number.isFinite(Number(data.distance_miles))) {
+        throw new Error(data?.error || "Routing service did not return driving mileage");
+      }
+      return data;
     })();
-    workOrderGeocodeCache.set(address,task);
-    return task;
+    drivingRouteCache.set(key, request);
+    try { return await request; }
+    catch (error) {
+      drivingRouteCache.delete(key); // allow retry after transient failures
+      throw error;
+    }
   }
+
   function paintWorkOrderDistances() {
-    document.querySelectorAll('[data-distance-id]').forEach(cell=>{
-      const result=workOrderDistanceResults.get(cell.dataset.distanceId);
-      cell.textContent=result ? result.label : 'Locating…';
-      cell.title=result ? result.reason : 'Looking up service address';
+    document.querySelectorAll("[data-distance-id]").forEach(cell => {
+      const result = workOrderDistanceResults.get(cell.dataset.distanceId);
+      cell.textContent = result ? result.label : "Locating…";
+      cell.title = result ? result.reason : "Calculating road distance from assigned shop";
     });
   }
+
   async function updateWorkOrderDistances(orders) {
-    const generation=++workOrderDistanceGeneration;
-    workOrderDistanceRecords.clear();workOrderDistanceResults.clear();
-    for(const order of orders) workOrderDistanceRecords.set(order.id,order);
+    const generation = ++workOrderDistanceGeneration;
+    workOrderDistanceRecords.clear();
+    workOrderDistanceResults.clear();
+    for (const order of orders) workOrderDistanceRecords.set(order.id, order);
     paintWorkOrderDistances();
-    let index=0;
-    async function worker(){
-      while(index<orders.length && generation===workOrderDistanceGeneration){
-        const order=orders[index++];
-        const shop=shopPoint(order.shop_id);
+    let index = 0;
+    async function worker() {
+      while (index < orders.length && generation === workOrderDistanceGeneration) {
+        const order = orders[index++];
+        const origin = shopRouteAddress(order.shop_id);
+        const destination = workOrderServiceAddress(order.locations);
         let result;
-        if(!shop) result={label:'No shop',reason:'Assigned shop is missing or is not Boonville/Kirksville'};
-        else if(!order.locations) result={label:'No address',reason:'No service location is attached to this Work Order'};
-        else {
-          const job=await lookupJobCoordinates(order.locations);
-          result=job.point
-            ? {label:milesBetween(shop,job.point).toFixed(1),reason:'Approximate straight-line miles. '+job.reason}
-            : {label:'Unavailable',reason:job.reason};
+        if (!origin) {
+          result = { label: "No shop", reason: "Assigned shop is missing or is not Boonville/Kirksville" };
+        } else if (!order.locations) {
+          result = { label: "No address", reason: "No service location is attached to this Work Order" };
+        } else if (!destination.address) {
+          result = { label: "No address", reason: destination.reason };
+        } else {
+          try {
+            const route = await getDrivingRoute(origin, destination.address);
+            result = {
+              label: Number(route.distance_miles).toFixed(1),
+              reason: `Driving miles · approximately ${route.duration_minutes} minutes. Matched: ${route.origin} → ${route.destination}`
+            };
+          } catch (error) {
+            result = { label: "Unavailable", reason: error?.message || "Driving route lookup failed" };
+            console.warn("Driving mileage unavailable:", destination.address, error);
+          }
         }
-        if(generation!==workOrderDistanceGeneration)return;
-        workOrderDistanceResults.set(order.id,result);
-        const cell=document.querySelector('[data-distance-id="'+order.id+'"]');
-        if(cell){cell.textContent=result.label;cell.title=result.reason;}
+        if (generation !== workOrderDistanceGeneration) return;
+        workOrderDistanceResults.set(order.id, result);
+        const cell = [...document.querySelectorAll("[data-distance-id]")]
+          .find(element => element.dataset.distanceId === String(order.id));
+        if (cell) {
+          cell.textContent = result.label;
+          cell.title = result.reason;
+        }
       }
     }
-    await Promise.all(Array.from({length:Math.min(3,orders.length)},()=>worker()));
+    await Promise.all(Array.from({ length: Math.min(3, orders.length) }, () => worker()));
   }
 
   // Multiple technician assignments are stored in service_call_technicians.
