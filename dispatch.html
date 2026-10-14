@@ -684,6 +684,11 @@
 #callOrderResults,#callCustomerResults{position:relative;top:auto;max-height:220px;box-shadow:none;margin-top:4px}
 .call-datetime{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.call-datetime input[type=date]{flex:2;min-width:150px}.call-datetime select{flex:0 1 auto;width:auto;min-width:66px}.call-datetime span{font-weight:700}
 @media(max-width:600px){.call-datetime input[type=date]{width:100%;flex:auto}.call-datetime select{flex:1}.call-actions>*{flex:1}.calls-toolbar>*{width:100%!important}.call-card{padding:13px}.calls-form-actions{flex-direction:column}.calls-form-actions button{width:100%}}
+  .friendly-datetime{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  .friendly-datetime input[type=date]{flex:2 1 180px;min-width:160px}
+  .friendly-datetime select{width:auto;min-width:67px;flex:0 1 auto}
+  .friendly-datetime span{font-weight:700}
+  @media(max-width:600px){.friendly-datetime input[type=date]{flex-basis:100%}}
   </style>
 
 </head>
@@ -1353,6 +1358,55 @@
       } catch (error) { console.error(error); showMessage(error.message || "Could not save billing details.",true); button.disabled = false; }
     });
   }
+
+
+// Friendly scheduling controls: date calendar plus scrollable hour/minute/AM-PM menus.
+function friendlyDateTime(id, value, label, required=false, named=false) {
+  const d = value ? new Date(value) : new Date();
+  const valid = Number.isFinite(d.getTime()) ? d : new Date();
+  const local = localDateTimeValue(valid);
+  const hh = valid.getHours()%12 || 12, mm=valid.getMinutes();
+  const hours = Array.from({length:12},(_,i)=>i+1).map(n=>
+    `<option value="${n}" ${n===hh?'selected':''}>${n}</option>`).join('');
+  const minutes = Array.from({length:60},(_,i)=>
+    `<option value="${i}" ${i===mm?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('');
+  return `<div class="friendly-datetime" data-friendly-id="${id}">
+    <input type="date" id="${id}Date" value="${value ? local.slice(0,10) : ''}" ${required?'required':''} aria-label="${escapeAttribute(label)} date">
+    <select id="${id}Hour" aria-label="${escapeAttribute(label)} hour">${hours}</select>
+    <span>:</span><select id="${id}Minute" aria-label="${escapeAttribute(label)} minute">${minutes}</select>
+    <select id="${id}AmPm" aria-label="${escapeAttribute(label)} AM or PM"><option ${valid.getHours()<12?'selected':''}>AM</option><option ${valid.getHours()>=12?'selected':''}>PM</option></select>
+    <input type="hidden" id="${id}" ${named?`name="${id}"`:''} value="${value?local:''}">
+  </div>`;
+}
+function syncFriendlyDateTime(id) {
+  const date=document.getElementById(id+'Date')?.value;
+  const output=document.getElementById(id);
+  if(!output)return;
+  if(!date){output.value='';return;}
+  const h=Number(document.getElementById(id+'Hour').value)%12;
+  const m=Number(document.getElementById(id+'Minute').value);
+  const pm=document.getElementById(id+'AmPm').value==='PM';
+  output.value=`${date}T${String(h+(pm?12:0)).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function initFriendlyDateTimes() {
+  document.querySelectorAll('[data-friendly-id]').forEach(group=>{
+    const id=group.dataset.friendlyId;
+    group.querySelectorAll('input[type=date],select').forEach(el=>{
+      el.addEventListener('change',()=>syncFriendlyDateTime(id));
+    });
+    syncFriendlyDateTime(id);
+  });
+}
+function setFriendlyDateTime(id, value) {
+  const d=value?new Date(value):null;
+  if(d && Number.isFinite(d.getTime())){
+    document.getElementById(id+'Date').value=localDateTimeValue(d).slice(0,10);
+    document.getElementById(id+'Hour').value=String(d.getHours()%12||12);
+    document.getElementById(id+'Minute').value=String(d.getMinutes());
+    document.getElementById(id+'AmPm').value=d.getHours()<12?'AM':'PM';
+  } else document.getElementById(id+'Date').value='';
+  syncFriendlyDateTime(id);
+}
 
   // ============================================
   // AUTH
@@ -2806,10 +2860,7 @@
                   Scheduled
                 </label>
 
-                <input
-                  type="datetime-local"
-                  id="scheduledAt"
-                >
+                ${friendlyDateTime("scheduledAt", null, "Scheduled")}
 
               </div>
 
@@ -2987,6 +3038,8 @@ document.getElementById("clearTechnicians").addEventListener("click", () => {
 });
 
 
+initFriendlyDateTimes();
+
 if (existing) {
 
   document.getElementById("customer").value =
@@ -3003,12 +3056,7 @@ if (existing) {
   document.getElementById("billingMethod").value =
     existing.billing_method || "standard";
 
-  document.getElementById("scheduledAt").value =
-    existing.scheduled_at
-      ? localDateTimeValue(
-          existing.scheduled_at
-        )
-      : "";
+  setFriendlyDateTime("scheduledAt", existing.scheduled_at);
 
   document.getElementById("priority").value =
     existing.priority || "normal";
@@ -6959,12 +7007,13 @@ async function showScheduleBlockForm(existing=null){
  <div class="form-group full"><label>Title</label><input name="title" required value="${escapeAttribute(existing?.title||'')}"></div>
  <div class="form-group"><label>Status</label><select name="status"><option value="pending" ${existing?.status==='pending'?'selected':''}>Pending Approval</option><option value="approved" ${!existing||existing.status==='approved'?'selected':''}>Approved</option><option value="declined" ${existing?.status==='declined'?'selected':''}>Declined</option><option value="cancelled" ${existing?.status==='cancelled'?'selected':''}>Cancelled</option></select></div>
  <div class="form-group full"><label style="font-weight:normal"><input type="checkbox" name="released" style="width:auto" ${existing?.released?'checked':''}> Release approved block to assigned technicians immediately</label><div class="small-muted">Leave unchecked to save without releasing. Only approved blocks can be released.</div></div>
- <div class="form-group"><label>Start</label><input name="starts_at" type="datetime-local" required value="${escapeAttribute(localDateTimeValue(existing?.starts_at||now))}"></div>
- <div class="form-group"><label>End</label><input name="ends_at" type="datetime-local" required value="${escapeAttribute(localDateTimeValue(existing?.ends_at||later))}"></div>
+ <div class="form-group full"><label>Start date and time</label>${friendlyDateTime('starts_at',existing?.starts_at||now,'Block start',true,true)}</div>
+ <div class="form-group full"><label>End date and time (choose a later day for multi-day blocks)</label>${friendlyDateTime('ends_at',existing?.ends_at||later,'Block end',true,true)}</div>
  <div class="form-group full"><label>Technicians</label><div style="display:flex;flex-wrap:wrap;gap:12px">${(techs||[]).map(t=>`<label style="font-weight:normal"><input style="width:auto" type="checkbox" name="technician" value="${t.id}" ${chosen.has(t.id)?'checked':''}> ${escapeHtml(technicianName(t))}</label>`).join('')}</div></div>
  <div class="form-group full"><label>Description (optional)</label><textarea name="description">${escapeHtml(existing?.description||'')}</textarea></div>
  <div class="form-group"><label>Location (optional)</label><input name="location" value="${escapeAttribute(existing?.location||'')}"></div>
  </div><div class="form-actions"><button type="button" class="secondary" id="cancelBlockForm">Back</button><button type="submit" class="primary" id="saveBlock">Save Schedule Block</button></div></form></div></div>`;
+ initFriendlyDateTimes();
  document.getElementById('cancelBlockForm').onclick=showScheduleBlocks;
  document.getElementById('blockForm').onsubmit=async ev=>{
   ev.preventDefault();const f=new FormData(ev.currentTarget);const start=new Date(f.get('starts_at')),end=new Date(f.get('ends_at'));
@@ -7156,20 +7205,7 @@ function callDateTimeFields(id, value, label){
     <span>:</span><select id="${id}Minute" class="scroll-time" aria-label="Minute">${minutes}</select>
     <select id="${id}AmPm" aria-label="AM or PM"><option ${hour24<12?'selected':''}>AM</option><option ${hour24>=12?'selected':''}>PM</option></select></div></div>`;
 }
-// Expand hour/minute menus into scrollable lists when focused, avoiding clipped native pickers.
-document.addEventListener('focusin', e => {
-  if (!e.target.matches('select.scroll-time')) return;
-  const select=e.target;
-  select.size= Math.min(8, select.options.length);
-  select.style.maxHeight='220px';
-  select.style.overflowY='auto';
-});
-document.addEventListener('change', e => {
-  if(e.target.matches('select.scroll-time')) {e.target.size=1; e.target.blur();}
-});
-document.addEventListener('focusout', e => {
-  if(e.target.matches('select.scroll-time')) e.target.size=1;
-});
+// Native dropdown menus keep all 12 hours and 60 minutes scrollable.
 function callReadDateTime(id){
   const day=document.getElementById(id+'Date')?.value;
   if(!day)return null;
