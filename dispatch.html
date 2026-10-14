@@ -893,6 +893,71 @@
   }
 
 
+  // Approximate shop-to-job distance (straight line, NOT driving mileage).
+  // Uses the shop coordinates supplied by Signature and Census address geocoding.
+  // No changes to Supabase tables, Edge Functions, or Google Calendar integration.
+  const shopCoordinates = {
+    boonville: {lat:38.96488952636719,lon:-92.73123168945312},
+    kirksville: {lat:40.23246765136719,lon:-92.58580780029297}
+  };
+  const workOrderDistanceRecords = new Map();
+  const workOrderDistanceMiles = new Map();
+  const workOrderGeocodeCache = new Map();
+  let workOrderDistanceGeneration = 0;
+  function shopPoint(id) {
+    const name = String(shopName(id)).toLowerCase();
+    return Object.entries(shopCoordinates).find(([key]) => name.includes(key))?.[1] || null;
+  }
+  function milesBetween(a,b) {
+    const rad = x => x*Math.PI/180;
+    const dlat=rad(b.lat-a.lat), dlon=rad(b.lon-a.lon);
+    const h=Math.sin(dlat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dlon/2)**2;
+    return 3958.7613*2*Math.asin(Math.min(1,Math.sqrt(h)));
+  }
+  async function lookupJobCoordinates(location) {
+    const address=[location?.address,location?.city,location?.state,location?.zip].filter(Boolean).join(', ');
+    if(!location?.address || !location?.city || !location?.state) return null;
+    if(workOrderGeocodeCache.has(address)) return workOrderGeocodeCache.get(address);
+    const task=(async()=>{
+      try {
+        const url='https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?address='+encodeURIComponent(address)+'&benchmark=Public_AR_Current&vintage=Current_Current&format=json';
+        const response=await fetch(url);
+        if(!response.ok) return null;
+        const result=await response.json();
+        const point=result?.result?.addressMatches?.[0]?.coordinates;
+        return Number.isFinite(Number(point?.y)) && Number.isFinite(Number(point?.x)) ? {lat:Number(point.y),lon:Number(point.x)} : null;
+      } catch(e) { console.warn('Distance lookup unavailable',e); return null; }
+    })();
+    workOrderGeocodeCache.set(address,task);
+    return task;
+  }
+  function paintWorkOrderDistances() {
+    document.querySelectorAll('[data-distance-id]').forEach(cell=>{
+      const miles=workOrderDistanceMiles.get(cell.dataset.distanceId);
+      cell.textContent=Number.isFinite(miles)?miles.toFixed(1):'—';
+    });
+  }
+  async function updateWorkOrderDistances(orders) {
+    const generation=++workOrderDistanceGeneration;
+    workOrderDistanceRecords.clear();workOrderDistanceMiles.clear();
+    for(const order of orders) workOrderDistanceRecords.set(order.id,order);
+    // A small worker pool avoids firing hundreds of geocoding requests at once.
+    let index=0;
+    async function worker(){
+      while(index<orders.length && generation===workOrderDistanceGeneration){
+        const order=orders[index++];
+        const shop=shopPoint(order.shop_id);
+        if(!shop || !order.locations)continue;
+        const job=await lookupJobCoordinates(order.locations);
+        if(generation!==workOrderDistanceGeneration)return;
+        if(job)workOrderDistanceMiles.set(order.id,milesBetween(shop,job));
+        const cell=document.querySelector('[data-distance-id="'+order.id+'"]');
+        if(cell)cell.textContent=job?workOrderDistanceMiles.get(order.id).toFixed(1):'—';
+      }
+    }
+    await Promise.all(Array.from({length:Math.min(3,orders.length)},()=>worker()));
+  }
+
   // Multiple technician assignments are stored in service_call_technicians.
   async function fetchAssignmentMap(calls) {
     const ids = [...new Set((calls || []).map(c => c.id).filter(Boolean))];
@@ -1018,8 +1083,9 @@
     }
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
-      : `<tr><td colspan="${page === "work-orders" ? 11 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
+      : `<tr><td colspan="${page === "work-orders" ? 12 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
           <div class="empty">No matching records.</div></td></tr>`;
+    if (page === "work-orders") paintWorkOrderDistances();
     const count = document.getElementById("dispatchSearchCount");
     if (count) count.textContent = `${matching.length} of ${body._dispatchRecords.length} records shown`;
   }
@@ -1763,6 +1829,7 @@
                 <th><button type="button" class="sort-heading" data-work-sort="created_at">Work Order ↓</button></th>
                 <th>Type</th>
                 <th>Shop</th>
+                <th title="Approximate straight-line miles from assigned shop to service address">Distance (mi) ≈</th>
                 <th>Customer</th>
                 <th>Description</th>
                 <th>Communication</th>
@@ -1777,7 +1844,7 @@
             <tbody id="workOrdersBody">
 
               <tr>
-                <td colspan="11">
+                <td colspan="12">
                   <div class="empty">
                     Loading work orders...
                   </div>
@@ -1940,7 +2007,7 @@
 
       body.innerHTML = `
         <tr>
-          <td colspan="11">
+          <td colspan="12">
 
             <div class="empty">
               Unable to load work orders.<br><br>
@@ -1959,7 +2026,7 @@
 
       body.innerHTML = `
         <tr>
-          <td colspan="11">
+          <td colspan="12">
 
             <div class="empty">
               No work orders match this view.
@@ -2055,6 +2122,7 @@
             </td>
 
             <td>${escapeHtml(shopName(call.shop_id))}</td>
+            <td class="wo-distance" data-distance-id="${escapeAttribute(call.id)}" title="Approximate straight-line distance; not driving mileage">—</td>
             <td>
               ${escapeHtml(
                 customerName(call.customers)
@@ -2065,7 +2133,7 @@
               ${escapeHtml(descriptionPreview(call.description))}
             </td>
             <td>
-              <button type="button" class="row-button" onclick="showWorkOrderDetail('${call.id}')" title="Open Work Order communications">${escapeHtml(communicationState)}</button>
+              <button type="button" class="row-button" onclick="showCallTaskForm(null,{...workOrderDistanceRecords.get('${call.id}'),service_call_id:'${call.id}',returnTo:'order'})" title="Schedule a call for this Work Order">${escapeHtml(communicationState)}</button>
             </td>
 
             <td>
@@ -2113,6 +2181,7 @@
 
       });
     applyDispatchSearch("work-orders", "workOrdersBody");
+    updateWorkOrderDistances(data);
   }
 
 
