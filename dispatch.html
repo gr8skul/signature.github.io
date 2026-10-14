@@ -690,6 +690,9 @@
   .friendly-datetime span{font-weight:700}
   @media(max-width:600px){.friendly-datetime input[type=date]{flex-basis:100%}}
 
+  .wo-waiting-preview {display:inline-block;max-width:170px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;white-space:nowrap;margin-left:6px;color:var(--muted);font-size:12px;cursor:help}
+  .wo-waiting-field[hidden] {display:none!important}
+
   /* Collapsible Work Order detail sections: no data or actions removed. */
   .wo-panel > .card-head {cursor:pointer;user-select:none}
   .wo-panel > .card-head:focus-visible {outline:2px solid #555;outline-offset:-3px}
@@ -1241,6 +1244,11 @@
     return type === "checkout" ? "Check-Out" : type === "install" ? "Installation" : "Service";
   }
 
+
+  function waitingSnippet(reason) {
+    const words = String(reason || "").trim().replace(/\s+/g, " ").split(" ");
+    return words.slice(0, 5).join(" ") + (words.length > 5 ? "…" : "");
+  }
 
   function statusLabel(status) {
 
@@ -1962,6 +1970,7 @@ function setFriendlyDateTime(id, value) {
           ${filterButton("install", "Installation")}
           ${filterButton("checkout", "Check-Out")}
           ${filterButton("unreleased", "Unreleased")}
+          ${filterButton("waiting", "Waiting")}
           ${filterButton("in_progress", "Current / In Progress")}
           <button type="button" class="filter-button ${['comm_callback','comm_resolved','comm_none'].includes(currentWorkOrderFilter)?'active':''}" id="communicationCycleButton" title="Cycle communication designations">Communication: ${currentWorkOrderFilter==='comm_callback'?'Call Back':currentWorkOrderFilter==='comm_resolved'?'Resolved':currentWorkOrderFilter==='comm_none'?'No Communication':'Call Back'} ↻</button>
           ${filterButton("cancelled", "Cancelled")}
@@ -2131,6 +2140,10 @@ function setFriendlyDateTime(id, value) {
     }
 
 
+    if (currentWorkOrderFilter === "waiting") {
+      query = query.eq("status", "waiting");
+    }
+
     if (
       currentWorkOrderFilter === "cancelled"
     ) {
@@ -2258,7 +2271,7 @@ function setFriendlyDateTime(id, value) {
 
 
         const search = dispatchSearchText(call, [
-          assignedNames(call), call.status,
+          assignedNames(call), call.status, call.waiting_reason,
           call.locations?.city, call.locations?.state, communicationState
         ]);
         const html = `
@@ -2301,11 +2314,9 @@ function setFriendlyDateTime(id, value) {
             </td>
 
             <td>
-              <span class="status">
-                ${escapeHtml(
-                  statusLabel(call.status)
-                )}
-              </span>
+              <span class="status">${escapeHtml(statusLabel(call.status))}</span>
+              ${call.status === "waiting" && call.waiting_reason ?
+                `<span class="wo-waiting-preview" title="${escapeAttribute(call.waiting_reason)}">${escapeHtml(waitingSnippet(call.waiting_reason))}</span>` : ""}
             </td>
 
             <td>
@@ -2463,6 +2474,7 @@ function setFriendlyDateTime(id, value) {
             ${escapeHtml(
               statusLabel(call.status)
             )}
+            ${call.status === "waiting" && call.waiting_reason ? `<span title="${escapeAttribute(call.waiting_reason)}"> · ${escapeHtml(call.waiting_reason)}</span>` : ""}
           </p>
 
         </div>
@@ -2986,6 +2998,10 @@ function setFriendlyDateTime(id, value) {
                     In Progress
                   </option>
 
+                  <option value="waiting">
+                    Waiting
+                  </option>
+
                   <option value="completed">
                     Completed
                   </option>
@@ -2998,6 +3014,11 @@ function setFriendlyDateTime(id, value) {
 
               </div>
 
+
+              <div class="form-group full wo-waiting-field" id="waitingReasonGroup" hidden>
+                <label for="waitingReason">What are we waiting for?</label>
+                <textarea id="waitingReason" rows="3" placeholder="Parts, construction completion, customer callback…"></textarea>
+              </div>
 
               <div class="form-group">
 
@@ -3111,6 +3132,12 @@ document.getElementById("clearTechnicians").addEventListener("click", () => {
 
 
 initFriendlyDateTimes();
+const workOrderStatusInput = document.getElementById("status");
+const waitingReasonGroup = document.getElementById("waitingReasonGroup");
+function updateWaitingReasonVisibility() {
+  waitingReasonGroup.hidden = workOrderStatusInput.value !== "waiting";
+}
+workOrderStatusInput.addEventListener("change", updateWaitingReasonVisibility);
 
 if (existing) {
 
@@ -3136,6 +3163,7 @@ if (existing) {
 
   document.getElementById("status").value =
     existing.status || "open";
+  document.getElementById("waitingReason").value = existing.waiting_reason || "";
 
   document.getElementById("released").checked =
     existing.released === true;
@@ -3144,6 +3172,8 @@ if (existing) {
     existing.description || "";
 }
 
+
+updateWaitingReasonVisibility();
 
 document.getElementById("customer")
   .addEventListener("change", async () => {
@@ -3612,6 +3642,12 @@ const priority =
 
 const status =
   document.getElementById("status").value;
+const waitingReason = document.getElementById("waitingReason").value.trim();
+if (status === "waiting" && !waitingReason) {
+  showMessage("Describe what this Work Order is waiting for.", true);
+  document.getElementById("waitingReason").focus();
+  return;
+}
 
 const released =
   document.getElementById("released").checked;
@@ -3654,6 +3690,8 @@ const payload = {
 
   status:
     status,
+
+  waiting_reason: waitingReason || null,
 
   priority:
     priority,
