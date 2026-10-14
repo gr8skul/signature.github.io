@@ -1633,14 +1633,8 @@ function setFriendlyDateTime(id, value) {
           last_name
         )
       `)
-      .gte(
-        "scheduled_at",
-        start.toISOString()
-      )
-      .lte(
-        "scheduled_at",
-        end.toISOString()
-      )
+      .lte("scheduled_at", end.toISOString())
+      .or(`scheduled_at.gte.${start.toISOString()},scheduled_end_at.gt.${start.toISOString()}`)
       .order(
         "scheduled_at",
         {
@@ -1808,8 +1802,9 @@ function setFriendlyDateTime(id, value) {
     const to=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,1);
     const [ordersResult,blocksResult]=await Promise.all([
       db.from('service_calls')
-        .select('id,shop_id,work_order_number,description,scheduled_at,released,status,customers(first_name,last_name,company_name),technicians!service_calls_assigned_technician_id_fkey(first_name,last_name)')
-        .gte('scheduled_at',from.toISOString()).lt('scheduled_at',to.toISOString())
+        .select('id,shop_id,work_order_number,description,scheduled_at,scheduled_end_at,released,status,customers(first_name,last_name,company_name),technicians!service_calls_assigned_technician_id_fkey(first_name,last_name)')
+        .lt('scheduled_at',to.toISOString())
+        .or(`scheduled_at.gte.${from.toISOString()},scheduled_end_at.gt.${from.toISOString()}`)
         .order('scheduled_at',{ascending:true}),
       db.from('schedule_blocks')
         .select('id,title,block_type,description,location,starts_at,ends_at,all_day,status,released,schedule_block_technicians(technician_id,technicians(first_name,last_name))')
@@ -1833,7 +1828,21 @@ function setFriendlyDateTime(id, value) {
     else blocks=(blocksResult.data||[]).filter(b=>!['cancelled','declined'].includes(String(b.status||'').toLowerCase()));
     const byDay=new Map();
     const add=(key,item)=>{if(!byDay.has(key))byDay.set(key,[]);byDay.get(key).push(item)};
-    for(const c of calls)add(calendarDateKey(c.scheduled_at),{kind:'order',time:new Date(c.scheduled_at),data:c});
+    // A work order occupies every calendar date touched by its start/finish interval.
+    // Legacy orders without a finish remain on their original start day only.
+    for (const c of calls) {
+      if (!c.scheduled_at) continue;
+      const start = new Date(c.scheduled_at);
+      const finish = c.scheduled_end_at ? new Date(c.scheduled_end_at) : null;
+      if (!Number.isFinite(start.getTime())) continue;
+      const last = finish && Number.isFinite(finish.getTime()) && finish > start
+        ? finish : new Date(start.getTime() + 1);
+      let day = new Date(Math.max(from.getTime(), new Date(start.getFullYear(),start.getMonth(),start.getDate()).getTime()));
+      for (; day < to && day < last; day.setDate(day.getDate()+1)) {
+        const next = new Date(day.getFullYear(),day.getMonth(),day.getDate()+1);
+        if (start < next && last > day) add(calendarDateKey(day),{kind:'order',time:start,data:c});
+      }
+    }
     // Add multi-day blocks to every date they overlap, not just their start date.
     for(const b of blocks){
       const start=new Date(b.starts_at),end=new Date(b.ends_at);
@@ -1850,7 +1859,11 @@ function setFriendlyDateTime(id, value) {
     const count=new Date(year,month+1,0).getDate();
     const total=Math.ceil((firstDay+count)/7)*7;
     const now=new Date();
-    const timeLabel=item=>item.kind==='block'&&item.data.all_day?'All day':new Date(item.time).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const timeLabel=(item,dayKey)=>{
+      if(item.kind==='block'&&item.data.all_day)return 'All day';
+      if(item.kind==='order'&&dayKey&&calendarDateKey(item.time)!==dayKey)return 'Continues';
+      return new Date(item.time).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    };
     const itemTitle=item=>item.kind==='block'?item.data.title:[shopName(item.data.shop_id),assignedNames(item.data),customerName(item.data.customers)].join(' | ');
     const itemDescription=item=>item.kind==='block'?(item.data.description||statusLabel(item.data.block_type)):descriptionPreview(item.data.description,45);
     const itemPeople=item=>item.kind==='block'?blockTechnicians(item.data):assignedNames(item.data);
@@ -1863,7 +1876,7 @@ function setFriendlyDateTime(id, value) {
       const isToday=year===now.getFullYear()&&month===now.getMonth()&&day===now.getDate();
       return `<div class="calendar-day ${isToday?'today':''}">
         <button type="button" data-calendar-day="${day}" class="row-button calendar-number" aria-label="Show ${escapeAttribute(key)} scheduled entries">${day}</button>
-        ${items.slice(0,3).map(item=>`<button type="button" class="calendar-entry ${item.kind==='block'?'schedule-block':item.data.released?'':'unreleased'}" ${itemAttribute(item)} title="${escapeAttribute(`${item.kind==='block'?'Schedule Block':'Work Order'} | ${itemTitle(item)} | ${itemDescription(item)} | ${itemPeople(item)}`)}"><strong>${escapeHtml(timeLabel(item))} · ${escapeHtml(itemTitle(item))}</strong><span class="calendar-desc">${escapeHtml(itemDescription(item))}</span><span class="calendar-tech">${escapeHtml(itemPeople(item))}</span></button>`).join('')}
+        ${items.slice(0,3).map(item=>`<button type="button" class="calendar-entry ${item.kind==='block'?'schedule-block':item.data.released?'':'unreleased'}" ${itemAttribute(item)} title="${escapeAttribute(`${item.kind==='block'?'Schedule Block':'Work Order'} | ${itemTitle(item)} | ${itemDescription(item)} | ${itemPeople(item)}`)}"><strong>${escapeHtml(timeLabel(item,key))} · ${escapeHtml(itemTitle(item))}</strong><span class="calendar-desc">${escapeHtml(itemDescription(item))}</span><span class="calendar-tech">${escapeHtml(itemPeople(item))}</span></button>`).join('')}
         ${items.length>3?`<button type="button" class="row-button calendar-more" data-calendar-day="${day}">+${items.length-3} more</button>`:''}</div>`;
     }).join('');
     function showAgenda(){
@@ -1872,7 +1885,7 @@ function setFriendlyDateTime(id, value) {
       const agenda=document.getElementById('calendarAgenda');
       if(!agenda)return;
       agenda.innerHTML=`<h3>${escapeHtml(new Date(year,month,calendarSelectedDay).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}))} · ${items.length} scheduled entr${items.length===1?'y':'ies'}</h3>`+
-        (items.length?items.map(item=>`<div class="calendar-agenda-item"><div style="min-width:85px"><strong>${escapeHtml(timeLabel(item))}</strong></div><div style="flex:1;min-width:0"><strong>${escapeHtml(itemTitle(item))}</strong> · ${item.kind==='block'?'Schedule Block':escapeHtml(workOrderLabel(item.data))}<div>${escapeHtml(itemDescription(item))}</div><div class="small-muted">${escapeHtml(itemPeople(item))} · ${item.kind==='block'?escapeHtml(statusLabel(item.data.status)):`${item.data.released?'Released':'Not Released'} · ${escapeHtml(statusLabel(item.data.status))}`}</div></div><button type="button" class="row-button" ${itemAttribute(item)}>Open</button></div>`).join(''):'<p class="small-muted">No scheduled work orders or schedule blocks for this day.</p>');
+        (items.length?items.map(item=>`<div class="calendar-agenda-item"><div style="min-width:85px"><strong>${escapeHtml(timeLabel(item,key))}</strong></div><div style="flex:1;min-width:0"><strong>${escapeHtml(itemTitle(item))}</strong> · ${item.kind==='block'?'Schedule Block':escapeHtml(workOrderLabel(item.data))}<div>${escapeHtml(itemDescription(item))}</div><div class="small-muted">${escapeHtml(itemPeople(item))} · ${item.kind==='block'?escapeHtml(statusLabel(item.data.status)):`${item.data.released?'Released':'Not Released'} · ${escapeHtml(statusLabel(item.data.status))}`}</div></div><button type="button" class="row-button" ${itemAttribute(item)}>Open</button></div>`).join(''):'<p class="small-muted">No scheduled work orders or schedule blocks for this day.</p>');
     }
     function openCalendarEntry(event){
       const block=event.target.closest('[data-calendar-block]');
@@ -2497,6 +2510,11 @@ function setFriendlyDateTime(id, value) {
             </div>
 
             <div class="detail-item">
+              <div class="detail-label">Finish</div>
+              <div class="detail-value">${call.scheduled_end_at ? escapeHtml(new Date(call.scheduled_end_at).toLocaleString()) : "Not set"}</div>
+            </div>
+
+            <div class="detail-item">
               <div class="detail-label">
                 Priority
               </div>
@@ -2856,12 +2874,13 @@ function setFriendlyDateTime(id, value) {
 
               <div class="form-group">
 
-                <label for="scheduledAt">
-                  Scheduled
-                </label>
-
-                ${friendlyDateTime("scheduledAt", null, "Scheduled")}
-
+                <label for="scheduledAtDate">Start Date & Time</label>
+                ${friendlyDateTime("scheduledAt", null, "Start")}
+              </div>
+              <div class="form-group">
+                <label for="scheduledEndAtDate">Finish Date & Time</label>
+                ${friendlyDateTime("scheduledEndAt", null, "Finish")}
+                <div class="small-muted">Select a later date to schedule work across multiple days.</div>
               </div>
 
 
@@ -3057,6 +3076,7 @@ if (existing) {
     existing.billing_method || "standard";
 
   setFriendlyDateTime("scheduledAt", existing.scheduled_at);
+  setFriendlyDateTime("scheduledEndAt", existing.scheduled_end_at);
 
   document.getElementById("priority").value =
     existing.priority || "normal";
@@ -3523,8 +3543,16 @@ if (technicianIds.length > 1 && !leadTechnicianId) {
 const workType =
   document.getElementById("workType").value;
 
-const scheduledAt =
-  document.getElementById("scheduledAt").value;
+const scheduledAt = document.getElementById("scheduledAt").value;
+const scheduledEndAt = document.getElementById("scheduledEndAt").value;
+if (scheduledEndAt && !scheduledAt) {
+  showMessage("Select a Start Date & Time before choosing a Finish.", true);
+  return;
+}
+if (scheduledAt && scheduledEndAt && new Date(scheduledEndAt) <= new Date(scheduledAt)) {
+  showMessage("Finish must be later than Start.", true);
+  return;
+}
 
 const priority =
   document.getElementById("priority").value;
@@ -3580,12 +3608,8 @@ const payload = {
   description:
     description,
 
-  scheduled_at:
-    scheduledAt
-      ? new Date(
-          scheduledAt
-        ).toISOString()
-      : null
+  scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+  scheduled_end_at: scheduledEndAt ? new Date(scheduledEndAt).toISOString() : null
 };
 
 
