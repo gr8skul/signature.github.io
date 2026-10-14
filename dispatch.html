@@ -2496,6 +2496,22 @@ function setFriendlyDateTime(id, value) {
       showMessage("Technician assignments unavailable; showing existing work order.", true);
     }
 
+    // Additional customer numbers are stored separately from customers.phone.
+    let workOrderExtraPhones = [];
+    if (call.customer_id) {
+      const { data: extraPhones, error: extraPhonesError } = await db
+        .from("customer_phone_numbers")
+        .select("phone_number,phone_type")
+        .eq("customer_id", call.customer_id)
+        .order("created_at");
+      if (extraPhonesError) {
+        console.error("Could not load Work Order customer phones", extraPhonesError);
+        showMessage("Additional phone numbers unavailable: " + extraPhonesError.message, true);
+      } else {
+        workOrderExtraPhones = extraPhones || [];
+      }
+    }
+
     const main =
       document.getElementById("mainContent");
 
@@ -2548,9 +2564,7 @@ function setFriendlyDateTime(id, value) {
         <div class="card-head">
 
           <h2>
-            ${escapeHtml(
-              customerName(call.customers)
-            )}
+            ${customerDisplayHtml(call.customers)}
           </h2>
 
           <span class="release-badge ${call.released ? "released" : "unreleased"}">
@@ -2661,15 +2675,19 @@ function setFriendlyDateTime(id, value) {
               </div>
             </div>
 
+            ${call.customers?.company_name ? `<div class="detail-item">
+              <div class="detail-label">Contact Name</div>
+              <div class="detail-value">${escapeHtml([call.customers.first_name, call.customers.last_name].filter(Boolean).join(" ") || "Not provided")}</div>
+            </div>` : ""}
+
             <div class="detail-item">
               <div class="detail-label">
                 Customer Phone
               </div>
 
               <div class="detail-value">
-                ${escapeHtml(
-                  call.customers?.phone || "—"
-                )}
+                ${escapeHtml(call.customers?.phone || (workOrderExtraPhones.length ? "" : "—"))}
+                ${workOrderExtraPhones.map(phone => `<div style="margin-top:5px">${escapeHtml(phone.phone_number)} <span class="small-muted">· ${escapeHtml(phone.phone_type || "Additional")}</span></div>`).join("")}
               </div>
             </div>
 
