@@ -701,6 +701,30 @@
   .wo-panel.wo-collapsed > .card-head {border-bottom:0}
   .wo-panel.wo-collapsed > .card-head > button,
   .wo-panel.wo-collapsed > .card-head > .release-badge {display:none}
+
+  /* Compact Work Orders table: keep every column while fitting desktop widths. */
+  #workOrdersBody {font-size:12px}
+  .work-orders-compact {width:100%;table-layout:fixed}
+  .work-orders-compact th,.work-orders-compact td {padding:8px 5px;font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .work-orders-compact th {letter-spacing:0;text-transform:none}
+  .work-orders-compact .sort-heading {white-space:nowrap;font-size:11px}
+  .work-orders-compact .row-button {padding:5px 4px;font-size:11px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .work-orders-compact .status,.work-orders-compact .type-badge,.work-orders-compact .release-badge {font-size:10px;padding:4px 5px}
+  .work-orders-compact .wo-waiting-preview {display:block;max-width:100%;margin:3px 0 0;font-size:10px}
+  .work-orders-compact th:nth-child(1){width:8%}
+  .work-orders-compact th:nth-child(2){width:5%}
+  .work-orders-compact th:nth-child(3){width:6%}
+  .work-orders-compact th:nth-child(4){width:6%}
+  .work-orders-compact th:nth-child(5){width:10%}
+  .work-orders-compact th:nth-child(6){width:8%}
+  .work-orders-compact th:nth-child(7){width:9%}
+  .work-orders-compact th:nth-child(8){width:9%}
+  .work-orders-compact th:nth-child(9){width:9%}
+  .work-orders-compact th:nth-child(10){width:8%}
+  .work-orders-compact th:nth-child(11){width:10%}
+  .work-orders-compact th:nth-child(12){width:7%}
+  .work-orders-compact th:nth-child(13){width:5%}
+  @media(max-width:1000px){.work-orders-compact{min-width:1050px}}
   </style>
 
 </head>
@@ -1982,7 +2006,7 @@ function setFriendlyDateTime(id, value) {
 
         <div class="table-wrap">
 
-          <table>
+          <table class="work-orders-compact">
 
             <thead>
               <tr>
@@ -2287,10 +2311,10 @@ function setFriendlyDateTime(id, value) {
               </span>
             </td>
 
-            <td>${escapeHtml(shopName(call.shop_id))}</td>
+            <td title="${escapeAttribute(shopName(call.shop_id))}">${escapeHtml(shopName(call.shop_id))}</td>
             <td class="wo-distance" data-distance-id="${escapeAttribute(call.id)}" title="Looking up service address">Locating…</td>
-            <td data-route-location-id="${escapeAttribute(call.id)}">${escapeHtml(workOrderServiceAddress(call.locations).address || "No service address")}</td>
-            <td>
+            <td title="${escapeAttribute(workOrderServiceAddress(call.locations).address || 'No service address')}" data-route-location-id="${escapeAttribute(call.id)}">${escapeHtml(workOrderServiceAddress(call.locations).address || "No service address")}</td>
+            <td title="${escapeAttribute(customerName(call.customers))}">
               ${escapeHtml(
                 customerName(call.customers)
               )}
@@ -2307,7 +2331,7 @@ function setFriendlyDateTime(id, value) {
               ${escapeHtml(scheduled)}
             </td>
 
-            <td>
+            <td title="${escapeAttribute(assignedNames(call))}">
               ${escapeHtml(
                 assignedNames(call)
               )}
