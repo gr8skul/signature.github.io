@@ -7394,23 +7394,6 @@ async function showCallTaskForm(task=null,context=null){
     <div class="form-group full"><label for="callPurpose">Purpose / outstanding question</label><textarea id="callPurpose" required placeholder="What do you need to discuss or resolve?">${callText(task?.purpose||'')}</textarea></div>
     </div><div class="form-actions calls-form-actions"><button type="button" class="secondary" id="callCancel">Cancel</button><button type="submit" class="primary" id="callSave">${task?'Save Changes':'Schedule Call'}</button></div></form>`);
   callAssociationWiring();
-  // Read existing flags so recording another communication never silently clears them.
-  const flagOrderSelect=document.getElementById('callOrderSelect');
-  async function loadCallFlags(){
-    const id=flagOrderSelect?.value;
-    const awaiting=document.getElementById('callAwaitingReturn');
-    const before=document.getElementById('callBeforeArrival');
-    const hint=document.getElementById('callFlagHint');
-    awaiting.disabled=before.disabled=!id;
-    if(!id){awaiting.checked=before.checked=false;hint.textContent='Select a Work Order to use these instructions.';return;}
-    const {data,error}=await db.from('service_calls').select('awaiting_return_call,call_before_arrival,status').eq('id',id).single();
-    if(error){hint.textContent='Unable to load communication instructions: '+error.message;awaiting.disabled=before.disabled=true;return;}
-    if(flagOrderSelect.value!==id)return;
-    awaiting.checked=!!data.awaiting_return_call;before.checked=!!data.call_before_arrival;
-    hint.textContent=data.status==='completed'?'Saved instructions are hidden while completed and return if reopened.':'These instructions appear in the Work Order and are preserved through completion.';
-  }
-  flagOrderSelect?.addEventListener('change',loadCallFlags);
-  await loadCallFlags();
   document.getElementById('callCancel').onclick=callBack;
   document.getElementById('callTaskForm').onsubmit=async e=>{
     e.preventDefault();const btn=document.getElementById('callSave');btn.disabled=true;
@@ -7454,6 +7437,23 @@ async function showCallLogForm(taskId=null,context=null){
     </div><div class="form-actions calls-form-actions"><button type="button" class="secondary" id="callCancel">Cancel</button><button type="submit" class="primary" id="callSave">Save Communication</button></div></form>`);
   callAssociationWiring();
   document.getElementById('callCancel').onclick=callBack;
+  // Read existing flags so recording another communication never silently clears them.
+  const flagOrderSelect=document.getElementById('callOrderSelect');
+  async function loadCallFlags(){
+    const id=flagOrderSelect?.value;
+    const awaiting=document.getElementById('callAwaitingReturn');
+    const before=document.getElementById('callBeforeArrival');
+    const hint=document.getElementById('callFlagHint');
+    awaiting.disabled=before.disabled=!id;
+    if(!id){awaiting.checked=before.checked=false;hint.textContent='Select a Work Order to use these instructions.';return;}
+    const {data,error}=await db.from('service_calls').select('awaiting_return_call,call_before_arrival,status').eq('id',id).single();
+    if(error){hint.textContent='Unable to load communication instructions: '+error.message;awaiting.disabled=before.disabled=true;return;}
+    if(flagOrderSelect.value!==id)return;
+    awaiting.checked=!!data.awaiting_return_call;before.checked=!!data.call_before_arrival;
+    hint.textContent=data.status==='completed'?'Saved instructions are hidden while completed and return if reopened.':'These instructions appear in the Work Order and are preserved through completion.';
+  }
+  flagOrderSelect?.addEventListener('change',loadCallFlags);
+  await loadCallFlags();
   document.getElementById('callLogForm').onsubmit=async e=>{
     e.preventDefault();const btn=document.getElementById('callSave');btn.disabled=true;
     const val=id=>document.getElementById(id).value.trim()||null;
