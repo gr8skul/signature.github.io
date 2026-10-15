@@ -1109,16 +1109,23 @@
   }
   // Ticket designation is independent of work type and scheduling status.
   const TICKET_DESIGNATIONS = [
-    "Intake", "Service Call", "Check-Out", "Prospect", "Quoted",
-    "Approved", "Work Order", "Work Fulfilled", "Finalized"
+    ["intake", "Intake"], ["service_call", "Service Call"],
+    ["check_out", "Check-Out"], ["prospect", "Prospect"],
+    ["quoted", "Quoted"], ["approved", "Approved"],
+    ["work_order", "Work Order"], ["work_fulfilled", "Work Fulfilled"],
+    ["finalized", "Finalized"]
   ];
   let currentTicketDesignationFilter = "all";
   function ticketDesignation(call) {
-    return TICKET_DESIGNATIONS.includes(call?.designation) ? call.designation : "Intake";
+    const value = call?.ticket_designation || "work_order";
+    return TICKET_DESIGNATIONS.some(([key]) => key === value) ? value : "work_order";
+  }
+  function ticketDesignationLabel(value) {
+    return TICKET_DESIGNATIONS.find(([key]) => key === value)?.[1] || "Work Order";
   }
   function ticketDesignationOptions(selected) {
-    return TICKET_DESIGNATIONS.map(name =>
-      `<option value="${escapeAttribute(name)}" ${name === selected ? "selected" : ""}>${escapeHtml(name)}</option>`
+    return TICKET_DESIGNATIONS.map(([key, label]) =>
+      `<option value="${escapeAttribute(key)}" ${key === selected ? "selected" : ""}>${escapeHtml(label)}</option>`
     ).join("");
   }
 
@@ -1157,7 +1164,7 @@
     const customer = call.customers || {};
     const number = call.work_order_number == null ? "" : String(call.work_order_number);
     return [
-      number, number ? `WO-${number.padStart(6, "0")}` : "", number ? `T-${number.padStart(6, "0")}` : "", call.designation,
+      number, number ? `WO-${number.padStart(6, "0")}` : "", number ? `T-${number.padStart(6, "0")}` : "", call.ticket_designation,
       call.work_type, workTypeLabel(call.work_type),
       call.description, customer.first_name, customer.last_name,
       customer.company_name, customerName(customer),
@@ -2349,7 +2356,7 @@ function setFriendlyDateTime(id, value) {
           <tr>
 
             <td><strong>${escapeHtml(workOrderLabel(call))}</strong></td>
-            <td>${escapeHtml(ticketDesignation(call))}</td>
+            <td>${escapeHtml(ticketDesignationLabel(ticketDesignation(call)))}</td>
             <td>
               <span class="type-badge">
                 ${escapeHtml(
@@ -2608,7 +2615,7 @@ function setFriendlyDateTime(id, value) {
           <div class="detail-grid">
 
             <div class="detail-item"><div class="detail-label">Shop</div><div class="detail-value">${escapeHtml(shopName(call.shop_id))}</div></div>
-            <div class="detail-item"><div class="detail-label">Designation</div><div class="detail-value">${escapeHtml(ticketDesignation(call))}</div></div>
+            <div class="detail-item"><div class="detail-label">Designation</div><div class="detail-value">${escapeHtml(ticketDesignationLabel(ticketDesignation(call)))}</div></div>
             <div class="detail-item">
               <div class="detail-label">
                 Work Type
@@ -2977,7 +2984,7 @@ function setFriendlyDateTime(id, value) {
 
               <div class="form-group">
                 <label for="ticketDesignation">Ticket Designation</label>
-                <select id="ticketDesignation">${ticketDesignationOptions(existing ? ticketDesignation(existing) : "Intake")}</select>
+                <select id="ticketDesignation">${ticketDesignationOptions(existing ? ticketDesignation(existing) : "work_order")}</select>
                 <div class="small-muted">Change this at any time. Work Type and Status remain separate.</div>
               </div>
 
@@ -3780,7 +3787,7 @@ const payload = {
 
   work_type:
     workType,
-  designation: document.getElementById("ticketDesignation").value,
+  ticket_designation: document.getElementById("ticketDesignation").value,
 
   billing_method: billingMethod,
   // Lead is saved after technician assignments have been synchronized.
