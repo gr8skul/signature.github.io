@@ -708,6 +708,16 @@
 
   /* Compact Work Orders table: keep every column while fitting desktop widths. */
   #workOrdersBody {font-size:12px}
+  #workOrdersBody tr.ticket-row {cursor:pointer}
+  #workOrdersBody tr.ticket-row:hover {background:#f5f7f9}
+  #workOrdersBody tr.ticket-row:focus-visible {outline:2px solid #555;outline-offset:-2px}
+  #workOrdersBody tr.ticket-row.ticket-expanded {background:#eef2f5}
+  #workOrdersBody tr.ticket-inline-detail td {padding:0!important;white-space:normal;overflow:visible}
+  .ticket-inline-content {padding:18px 20px;background:#f8f9fa;border-bottom:2px solid #cdd4db}
+  .ticket-inline-content .page-head {margin-bottom:14px}
+  .ticket-inline-content .page-head h1 {font-size:21px}
+  .ticket-inline-content .card {margin-bottom:12px}
+  .ticket-row .ticket-arrow {margin-right:4px;color:#666}
   .work-orders-compact {width:100%;table-layout:fixed}
   .work-orders-compact th,.work-orders-compact td {padding:8px 5px;font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .work-orders-compact th {letter-spacing:0;text-transform:none}
@@ -1227,7 +1237,7 @@
     }
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
-      : `<tr><td colspan="${page === "work-orders" ? 14 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
+      : `<tr><td colspan="${page === "work-orders" ? 13 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
           <div class="empty">No matching records.</div></td></tr>`;
     if (page === "work-orders") paintWorkOrderDistances();
     const count = document.getElementById("dispatchSearchCount");
@@ -2070,14 +2080,13 @@ function setFriendlyDateTime(id, value) {
                 <th>Technician</th>
                 <th>Status</th>
                 <th>Release</th>
-                <th></th>
               </tr>
             </thead>
 
             <tbody id="workOrdersBody">
 
               <tr>
-                <td colspan="14">
+                <td colspan="13">
                   <div class="empty">
                     Loading work orders...
                   </div>
@@ -2128,6 +2137,16 @@ function setFriendlyDateTime(id, value) {
     };
     document.getElementById("workOrderShopFilter").onchange=e=>{currentWorkOrderShop=e.target.value;applyDispatchSearch("work-orders","workOrdersBody")};
     setupDispatchSearch("work-orders", "workOrdersBody");
+    document.getElementById("workOrdersBody").addEventListener("click", event => {
+      if (event.target.closest("button,a,input,select,textarea")) return;
+      const row = event.target.closest("tr.ticket-row");
+      if (row) toggleInlineTicket(row.dataset.ticketId);
+    });
+    document.getElementById("workOrdersBody").addEventListener("keydown", event => {
+      if (event.target.matches("tr.ticket-row") && ["Enter", " "].includes(event.key)) {
+        event.preventDefault(); toggleInlineTicket(event.target.dataset.ticketId);
+      }
+    });
     await loadWorkOrders();
     await appendWorkOrderBlockPanel();
   }
@@ -2249,7 +2268,7 @@ function setFriendlyDateTime(id, value) {
 
       body.innerHTML = `
         <tr>
-          <td colspan="14">
+          <td colspan="13">
 
             <div class="empty">
               Unable to load work orders.<br><br>
@@ -2268,7 +2287,7 @@ function setFriendlyDateTime(id, value) {
 
       body.innerHTML = `
         <tr>
-          <td colspan="14">
+          <td colspan="13">
 
             <div class="empty">
               No work orders match this view.
@@ -2352,9 +2371,9 @@ function setFriendlyDateTime(id, value) {
         ]);
         const html = `
 
-          <tr>
+          <tr class="ticket-row" data-ticket-id="${escapeAttribute(call.id)}" tabindex="0" role="button" aria-expanded="false" title="Click to expand ticket">
 
-            <td><strong>${escapeHtml(workOrderLabel(call))}</strong></td>
+            <td><strong><span class="ticket-arrow" aria-hidden="true">▸</span>${escapeHtml(workOrderLabel(call))}</strong></td>
             <td>${escapeHtml(ticketDesignationLabel(ticketDesignation(call)))}</td>
             <td>
               <span class="type-badge">
@@ -2407,17 +2426,6 @@ function setFriendlyDateTime(id, value) {
 
             </td>
 
-            <td>
-
-              <button
-                class="row-button"
-                onclick="showWorkOrderDetail('${call.id}')"
-              >
-                Open
-              </button>
-
-            </td>
-
           </tr>
         `;
         return { html, search, record: call };
@@ -2432,8 +2440,8 @@ function setFriendlyDateTime(id, value) {
   // WORK ORDER DETAIL
   // ============================================
 
-  function initWorkOrderCollapsiblePanels(orderId) {
-    const main = document.getElementById("mainContent");
+  function initWorkOrderCollapsiblePanels(orderId, host = null) {
+    const main = host || document.getElementById("mainContent");
     if (!main) return;
     // Only the seven detail cards, not the work order toolbar.
     const titles = ["Customer", "Billing & Completion", "Description", "Communications", "Parts", "Notes", "Photos"];
@@ -2473,7 +2481,33 @@ function setFriendlyDateTime(id, value) {
     });
   }
 
-  async function showWorkOrderDetail(id) {
+  let activeInlineTicket = null;
+  async function toggleInlineTicket(id) {
+    const body = document.getElementById("workOrdersBody");
+    if (!body) return;
+    const row = [...body.querySelectorAll("tr.ticket-row")].find(r => r.dataset.ticketId === id);
+    if (!row) return;
+    const wasOpen = activeInlineTicket === id;
+    body.querySelectorAll("tr.ticket-inline-detail").forEach(r => r.remove());
+    body.querySelectorAll("tr.ticket-row").forEach(r => {
+      r.classList.remove("ticket-expanded"); r.setAttribute("aria-expanded", "false");
+      const arrow = r.querySelector(".ticket-arrow"); if (arrow) arrow.textContent = "▸";
+    });
+    activeInlineTicket = null;
+    if (wasOpen) return;
+    activeInlineTicket = id;
+    row.classList.add("ticket-expanded"); row.setAttribute("aria-expanded", "true");
+    row.querySelector(".ticket-arrow").textContent = "▾";
+    const detailRow = document.createElement("tr");
+    detailRow.className = "ticket-inline-detail";
+    const cell = document.createElement("td"); cell.colSpan = 13;
+    const content = document.createElement("div"); content.className = "ticket-inline-content";
+    content.innerHTML = '<div class="small-muted">Loading ticket details…</div>';
+    cell.appendChild(content); detailRow.appendChild(cell); row.after(detailRow);
+    await showWorkOrderDetail(id, content);
+  }
+
+  async function showWorkOrderDetail(id, inlineHost = null) {
     try { await ensureShops(); } catch(e) { showMessage("Could not load shops: "+e.message,true); return; }
 
     const {
@@ -2552,7 +2586,8 @@ function setFriendlyDateTime(id, value) {
       document.getElementById("mainContent");
 
 
-    main.innerHTML = `
+    const detailHost = inlineHost || main;
+    detailHost.innerHTML = `
 
       <div class="page-head">
 
@@ -2777,7 +2812,7 @@ function setFriendlyDateTime(id, value) {
         <div class="card-body" id="detailPhotos">Loading photos...</div></div>
     `;
 
-     initWorkOrderCollapsiblePanels(call.id);
+     initWorkOrderCollapsiblePanels(call.id, detailHost);
      document.getElementById("editWorkOrderBilling")?.addEventListener("click", () => showBillingEditForm(call));
     document.getElementById("detailAddPart").addEventListener("click", () => showPartForm(null, call.id));
     document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm(null, call.id));
@@ -2789,7 +2824,7 @@ function setFriendlyDateTime(id, value) {
     document.getElementById("backToWorkOrders")
       .addEventListener(
         "click",
-        () => showWorkOrders()
+        () => inlineHost ? toggleInlineTicket(id) : showWorkOrders()
       );
 
 
