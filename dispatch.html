@@ -715,19 +715,20 @@
   .work-orders-compact .row-button {padding:5px 4px;font-size:11px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .work-orders-compact .status,.work-orders-compact .type-badge,.work-orders-compact .release-badge {font-size:10px;padding:4px 5px}
   .work-orders-compact .wo-waiting-preview {display:block;max-width:100%;margin:3px 0 0;font-size:10px}
-  .work-orders-compact th:nth-child(1){width:8%}
-  .work-orders-compact th:nth-child(2){width:5%}
-  .work-orders-compact th:nth-child(3){width:6%}
+  .work-orders-compact th:nth-child(1){width:7%}
+  .work-orders-compact th:nth-child(2){width:9%}
+  .work-orders-compact th:nth-child(3){width:5%}
   .work-orders-compact th:nth-child(4){width:6%}
-  .work-orders-compact th:nth-child(5){width:10%}
-  .work-orders-compact th:nth-child(6){width:8%}
-  .work-orders-compact th:nth-child(7){width:9%}
-  .work-orders-compact th:nth-child(8){width:9%}
-  .work-orders-compact th:nth-child(9){width:9%}
-  .work-orders-compact th:nth-child(10){width:8%}
-  .work-orders-compact th:nth-child(11){width:10%}
-  .work-orders-compact th:nth-child(12){width:7%}
-  .work-orders-compact th:nth-child(13){width:5%}
+  .work-orders-compact th:nth-child(5){width:6%}
+  .work-orders-compact th:nth-child(6){width:9%}
+  .work-orders-compact th:nth-child(7){width:8%}
+  .work-orders-compact th:nth-child(8){width:8%}
+  .work-orders-compact th:nth-child(9){width:8%}
+  .work-orders-compact th:nth-child(10){width:9%}
+  .work-orders-compact th:nth-child(11){width:8%}
+  .work-orders-compact th:nth-child(12){width:8%}
+  .work-orders-compact th:nth-child(13){width:6%}
+  .work-orders-compact th:nth-child(14){width:3%}
   @media(max-width:1000px){.work-orders-compact{min-width:1050px}}
   </style>
 
@@ -1106,16 +1107,31 @@
   function shopFilterHtml(id, selected) {
     return `<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--border)"><label for="${id}" style="margin:0">Shop</label><select id="${id}" style="width:auto;min-width:180px">${shopOptions(selected,true)}</select></div>`;
   }
+  // Ticket designation is independent of work type and scheduling status.
+  const TICKET_DESIGNATIONS = [
+    "Intake", "Service Call", "Check-Out", "Prospect", "Quoted",
+    "Approved", "Work Order", "Work Fulfilled", "Finalized"
+  ];
+  let currentTicketDesignationFilter = "all";
+  function ticketDesignation(call) {
+    return TICKET_DESIGNATIONS.includes(call?.designation) ? call.designation : "Intake";
+  }
+  function ticketDesignationOptions(selected) {
+    return TICKET_DESIGNATIONS.map(name =>
+      `<option value="${escapeAttribute(name)}" ${name === selected ? "selected" : ""}>${escapeHtml(name)}</option>`
+    ).join("");
+  }
+
   function workOrderLabel(call) {
     return call.work_order_number != null
-      ? `WO-${String(call.work_order_number).padStart(6, "0")}`
+      ? `T-${String(call.work_order_number).padStart(6, "0")}`
       : `ID ${String(call.id || "").slice(0, 8)}`;
   }
 
   function dispatchSearchField(page) {
     return `
       <div class="dispatch-search">
-        <label for="dispatchSearchInput">Search ${page === "work-orders" ? "Work Orders" : page[0].toUpperCase() + page.slice(1)}</label>
+        <label for="dispatchSearchInput">Search ${page === "work-orders" ? "Tickets" : page[0].toUpperCase() + page.slice(1)}</label>
         <input id="dispatchSearchInput" type="search"
           placeholder="${escapeAttribute({
             customers: "Name, company, phone, email…",
@@ -1141,7 +1157,7 @@
     const customer = call.customers || {};
     const number = call.work_order_number == null ? "" : String(call.work_order_number);
     return [
-      number, number ? `WO-${number.padStart(6, "0")}` : "",
+      number, number ? `WO-${number.padStart(6, "0")}` : "", number ? `T-${number.padStart(6, "0")}` : "", call.designation,
       call.work_type, workTypeLabel(call.work_type),
       call.description, customer.first_name, customer.last_name,
       customer.company_name, customerName(customer),
@@ -1175,7 +1191,10 @@
     const terms = (dispatchSearch[page] || "").trim().toLowerCase().split(/\\s+/).filter(Boolean);
     const matching = body._dispatchRecords.filter(item =>
       terms.every(term => item.search.includes(term)) &&
-      (page !== "work-orders" || currentWorkOrderShop === "all" || String(item.record.shop_id) === currentWorkOrderShop)
+      (page !== "work-orders" || (
+         (currentWorkOrderShop === "all" || String(item.record.shop_id) === currentWorkOrderShop) &&
+         (currentTicketDesignationFilter === "all" || ticketDesignation(item.record) === currentTicketDesignationFilter)
+       ))
     );
     if (page === "work-orders") {
       matching.sort((a, b) => {
@@ -1202,7 +1221,7 @@
     }
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
-      : `<tr><td colspan="${page === "work-orders" ? 13 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
+      : `<tr><td colspan="${page === "work-orders" ? 14 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
           <div class="empty">No matching records.</div></td></tr>`;
     if (page === "work-orders") paintWorkOrderDistances();
     const count = document.getElementById("dispatchSearchCount");
@@ -1229,7 +1248,7 @@
     };
     document.querySelectorAll("[data-work-sort]").forEach(button => {
       const active = button.dataset.workSort === workOrderSort.field;
-      const label = button.dataset.workSort === "created_at" ? "Work Order"
+      const label = button.dataset.workSort === "created_at" ? "Ticket"
         : button.dataset.workSort === "distance" ? "Distance (mi)" : "Scheduled";
       button.textContent = label + (active ? (workOrderSort.ascending ? " ↑" : " ↓") : " ↕");
       button.setAttribute("aria-sort", active ? (workOrderSort.ascending ? "ascending" : "descending") : "none");
@@ -1561,7 +1580,7 @@ function setFriendlyDateTime(id, value) {
           class="primary"
           id="newWorkOrderButton"
         >
-          + New Work Order
+          + Create Ticket
         </button>
         <button class="secondary" id="newScheduleBlockButton">+ Schedule Block</button>
 
@@ -1987,10 +2006,10 @@ function setFriendlyDateTime(id, value) {
       <div class="page-head">
 
         <div>
-          <h1>Work Orders</h1>
+          <h1>Tickets</h1>
 
           <p>
-            All dispatch work, including work not yet released to technicians.
+            All tickets, including those not yet released to technicians.
           </p>
         </div>
 
@@ -1998,7 +2017,7 @@ function setFriendlyDateTime(id, value) {
           class="primary"
           id="newWorkOrderButton"
         >
-          + New Work Order
+          + Create Ticket
         </button>
 
       </div>
@@ -2007,6 +2026,11 @@ function setFriendlyDateTime(id, value) {
 
         <div class="filter-bar">
 
+          <label for="ticketDesignationFilter" style="align-self:center;margin:0 2px 0 0">Designation</label>
+          <select id="ticketDesignationFilter" aria-label="Filter tickets by designation" style="width:auto;min-width:155px;padding:7px 9px">
+            <option value="all">All designations</option>
+            ${ticketDesignationOptions(currentTicketDesignationFilter)}
+          </select>
           ${filterButton("all", "All")}
           ${filterButton("service", "Service")}
           ${filterButton("install", "Installation")}
@@ -2027,7 +2051,8 @@ function setFriendlyDateTime(id, value) {
 
             <thead>
               <tr>
-                <th><button type="button" class="sort-heading" data-work-sort="created_at">Work Order ↓</button></th>
+                <th><button type="button" class="sort-heading" data-work-sort="created_at">Ticket ↓</button></th>
+                <th>Designation</th>
                 <th>Type</th>
                 <th>Shop</th>
                 <th title="Driving miles from assigned shop to service address"><button type="button" class="sort-heading" data-work-sort="distance">Distance (mi) ↕</button></th>
@@ -2046,7 +2071,7 @@ function setFriendlyDateTime(id, value) {
             <tbody id="workOrdersBody">
 
               <tr>
-                <td colspan="13">
+                <td colspan="14">
                   <div class="empty">
                     Loading work orders...
                   </div>
@@ -2091,6 +2116,10 @@ function setFriendlyDateTime(id, value) {
       button.addEventListener("click", () => changeWorkOrderSort(button.dataset.workSort));
     });
     updateWorkOrderSortHeaders();
+    document.getElementById("ticketDesignationFilter").onchange = event => {
+      currentTicketDesignationFilter = event.target.value;
+      applyDispatchSearch("work-orders", "workOrdersBody");
+    };
     document.getElementById("workOrderShopFilter").onchange=e=>{currentWorkOrderShop=e.target.value;applyDispatchSearch("work-orders","workOrdersBody")};
     setupDispatchSearch("work-orders", "workOrdersBody");
     await loadWorkOrders();
@@ -2214,7 +2243,7 @@ function setFriendlyDateTime(id, value) {
 
       body.innerHTML = `
         <tr>
-          <td colspan="12">
+          <td colspan="14">
 
             <div class="empty">
               Unable to load work orders.<br><br>
@@ -2233,7 +2262,7 @@ function setFriendlyDateTime(id, value) {
 
       body.innerHTML = `
         <tr>
-          <td colspan="12">
+          <td colspan="14">
 
             <div class="empty">
               No work orders match this view.
@@ -2320,6 +2349,7 @@ function setFriendlyDateTime(id, value) {
           <tr>
 
             <td><strong>${escapeHtml(workOrderLabel(call))}</strong></td>
+            <td>${escapeHtml(ticketDesignation(call))}</td>
             <td>
               <span class="type-badge">
                 ${escapeHtml(
@@ -2551,7 +2581,7 @@ function setFriendlyDateTime(id, value) {
             class="primary"
             id="editWorkOrder"
           >
-            Edit Work Order
+            Edit Ticket
           </button>
 
         </div>
@@ -2578,6 +2608,7 @@ function setFriendlyDateTime(id, value) {
           <div class="detail-grid">
 
             <div class="detail-item"><div class="detail-label">Shop</div><div class="detail-value">${escapeHtml(shopName(call.shop_id))}</div></div>
+            <div class="detail-item"><div class="detail-label">Designation</div><div class="detail-value">${escapeHtml(ticketDesignation(call))}</div></div>
             <div class="detail-item">
               <div class="detail-label">
                 Work Type
@@ -2850,8 +2881,8 @@ function setFriendlyDateTime(id, value) {
 
           <h1>
             ${editing
-              ? "Edit Work Order"
-              : "New Work Order"}
+              ? "Edit Ticket"
+              : "Create Ticket"}
           </h1>
 
           <p>
@@ -2943,6 +2974,12 @@ function setFriendlyDateTime(id, value) {
 
               </div>
 
+
+              <div class="form-group">
+                <label for="ticketDesignation">Ticket Designation</label>
+                <select id="ticketDesignation">${ticketDesignationOptions(existing ? ticketDesignation(existing) : "Intake")}</select>
+                <div class="small-muted">Change this at any time. Work Type and Status remain separate.</div>
+              </div>
 
               <div class="form-group">
 
@@ -3134,8 +3171,8 @@ function setFriendlyDateTime(id, value) {
             class="primary"
           >
             ${editing
-              ? "Save Work Order"
-              : "Create Work Order"}
+              ? "Save Ticket"
+              : "Create Ticket"}
           </button>
 
         </div>
@@ -3212,6 +3249,7 @@ if (existing) {
 
   document.getElementById("workType").value =
     existing.work_type || "service";
+  document.getElementById("ticketDesignation").value = ticketDesignation(existing);
 
   document.getElementById("billingMethod").value =
     existing.billing_method || "standard";
@@ -3742,6 +3780,7 @@ const payload = {
 
   work_type:
     workType,
+  designation: document.getElementById("ticketDesignation").value,
 
   billing_method: billingMethod,
   // Lead is saved after technician assignments have been synchronized.
@@ -5637,7 +5676,7 @@ async function showCatalogPartDetail(id) {
       <div class="detail-grid">${item('Part Number',p.part_number)}${item('Name',p.name)}${item('Description',p.description)}${item('Manufacturer',p.manufacturer)}${item('Supplier',p.supplier)}${item('Cost',partMoney(p.unit_cost))}${item('Selling Price',partMoney(p.unit_price))}${item('On Hand',p.quantity_on_hand+' '+p.unit_of_measure)}${item('Reorder Point',p.reorder_point)}${item('Reorder Quantity',p.reorder_quantity)}${item('Storage Location',p.location_code)}${item('Notes',p.notes)}</div>
       ${partsCanEdit()?`<div class="form-actions" style="flex-wrap:wrap"><button class="secondary" id="catalogAdjustStock">Adjust Inventory</button><button class="secondary" id="catalogEditPart">Edit Part</button><button class="secondary" id="catalogToggleActive">${p.active?'Deactivate':'Reactivate'}</button><button class="danger" id="catalogDeletePart">Delete Part</button></div>`:''}
     </div></div>
-    <div class="card"><div class="card-head"><h2>Associated Work Orders</h2></div><div class="table-wrap"><table><thead><tr><th>Work Order</th><th>Customer</th><th>Quantity</th><th>Usage Price</th><th></th></tr></thead><tbody>
+    <div class="card"><div class="card-head"><h2>Associated Work Orders</h2></div><div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer</th><th>Quantity</th><th>Usage Price</th><th></th></tr></thead><tbody>
       ${useError?`<tr><td colspan="5">${escapeHtml(useError.message)}</td></tr>`:(uses||[]).length?(uses||[]).map(u=>`<tr><td>${escapeHtml(u.service_calls?workOrderLabel(u.service_calls):'Unavailable')}</td><td>${escapeHtml(customerName(u.service_calls?.customers))}</td><td>${escapeHtml(u.quantity??'—')}</td><td>${partMoney(u.unit_price??u.unit_cost)}</td><td>${u.service_calls?`<button class="row-button" data-open-work-order="${u.service_call_id}">Open Work Order</button>`:''}</td></tr>`).join(''):'<tr><td colspan="5"><div class="empty">This part has not been attached to a work order.</div></td></tr>'}
     </tbody></table></div></div>
     <div class="card"><div class="card-head"><h2>Inventory History</h2></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Change</th><th>Notes</th></tr></thead><tbody>
@@ -5745,9 +5784,9 @@ async function showPartForm(id=null,contextWorkOrderId=null){
   let usage=null;
   if(id){const {data,error}=await db.from('parts').select('*').eq('id',id).single();if(error)return showMessage(error.message,true);usage=data;}
   const workOrderId=contextWorkOrderId||usage?.service_call_id||null;
-  document.getElementById('mainContent').innerHTML=`<div class="page-head"><div><h1>${usage?'Edit Work Order Part':'Add Part to Work Order'}</h1><p>Choose an existing catalog part, or create a new catalog entry first.</p></div></div>
+  document.getElementById('mainContent').innerHTML=`<div class="page-head"><div><h1>${usage?'Edit Ticket Part':'Add Part to Work Order'}</h1><p>Choose an existing catalog part, or create a new catalog entry first.</p></div></div>
   <div class="card"><div class="card-body"><form id="usagePartForm"><div class="form-grid">
-    <div class="form-group full"><label>Work Order</label><select id="usageWorkOrder" required><option value="">Loading...</option></select></div>
+    <div class="form-group full"><label>Ticket</label><select id="usageWorkOrder" required><option value="">Loading...</option></select></div>
     <div class="form-group full"><label>Find a Part</label><input id="usagePartSearch" type="search" autocomplete="off" placeholder="Search part name or number..."><div id="usagePartMatches" style="border:1px solid #ddd;border-radius:5px;max-height:200px;overflow-y:auto"></div><div id="usageChosen" class="small-muted"></div></div>
     <div class="form-group"><label>Quantity</label><input id="usageQuantity" type="number" min="1" step="1" required value="${escapeAttribute(usage?.quantity??1)}"></div>
     <div class="form-group"><label>Unit Selling Price</label><input id="usagePrice" type="number" min="0" step="0.01" value="${escapeAttribute(usage?.unit_price??'')}"></div>
@@ -5840,7 +5879,7 @@ main.innerHTML = `
         <thead>
 
           <tr>
-            <th>Work Order</th>
+            <th>Ticket</th>
             <th>Type</th>
             <th>Work Description</th>
             <th>Note</th>
@@ -6380,7 +6419,7 @@ main.innerHTML = `
         <thead>
 
           <tr>
-            <th>Work Order</th>
+            <th>Ticket</th>
             <th>Type</th>
             <th>Work Description</th>
             <th>Photo</th>
@@ -7291,7 +7330,7 @@ function callTaskCard(t){
     ${t.status==='pending'?`<button class="primary" data-call-result="${escapeAttribute(t.id)}">Record Result</button>`:''}
     <button class="secondary" data-call-edit="${escapeAttribute(t.id)}">${t.status==='pending'?'Reschedule / Edit':'View / Edit'}</button>
     <button class="danger" data-call-delete-task="${escapeAttribute(t.id)}">Delete</button>
-    ${t.service_call_id?`<button class="secondary" data-call-order="${escapeAttribute(t.service_call_id)}">Work Order</button>`:''}</div></article>`;
+    ${t.service_call_id?`<button class="secondary" data-call-order="${escapeAttribute(t.service_call_id)}">Ticket</button>`:''}</div></article>`;
 }
 async function showCalls(){
   callsReturn={type:'calls',id:null};
@@ -7314,7 +7353,7 @@ function renderCallsList(){
   const match=t=>terms.every(term=>[callContact(t),t.phone_number,t.customers?.phone,t.purpose,t.notes,t.purpose,t.answer,t.outcome,callOrder(t),t.communication_type,t.task_type].join(' ').toLowerCase().includes(term));
   if(callsFilter==='history'){
     const records=callsCache.communications.filter(match);
-    el.innerHTML=records.length?records.map(c=>`<article class="call-card"><div class="call-card-head"><h3>${callText(callContact(c))}</h3><span class="small-muted">${callText(callDate(c.occurred_at))}</span></div><div class="small-muted">${callText(c.communication_type)} · ${callText(c.direction)} · ${callText(c.outcome||'No outcome')} · ${callText(callOrder(c)||'General')}</div><p><strong>Purpose:</strong> ${callText(c.purpose||'—')}</p><p><strong>Answer:</strong> ${callText(c.answer||c.notes||'—')}</p><div class="call-actions">${callLink(c.phone_number||c.customers?.phone,c.communication_type)}${c.service_call_id?`<button class="secondary" data-call-order="${escapeAttribute(c.service_call_id)}">Work Order</button>`:''}<button class="secondary" data-call-follow="${escapeAttribute(c.id)}">Schedule Follow-up</button><button class="danger" data-call-delete-comm="${escapeAttribute(c.id)}">Delete</button></div></article>`).join(''):'<div class="empty">No matching communications.</div>';
+    el.innerHTML=records.length?records.map(c=>`<article class="call-card"><div class="call-card-head"><h3>${callText(callContact(c))}</h3><span class="small-muted">${callText(callDate(c.occurred_at))}</span></div><div class="small-muted">${callText(c.communication_type)} · ${callText(c.direction)} · ${callText(c.outcome||'No outcome')} · ${callText(callOrder(c)||'General')}</div><p><strong>Purpose:</strong> ${callText(c.purpose||'—')}</p><p><strong>Answer:</strong> ${callText(c.answer||c.notes||'—')}</p><div class="call-actions">${callLink(c.phone_number||c.customers?.phone,c.communication_type)}${c.service_call_id?`<button class="secondary" data-call-order="${escapeAttribute(c.service_call_id)}">Ticket</button>`:''}<button class="secondary" data-call-follow="${escapeAttribute(c.id)}">Schedule Follow-up</button><button class="danger" data-call-delete-comm="${escapeAttribute(c.id)}">Delete</button></div></article>`).join(''):'<div class="empty">No matching communications.</div>';
   }else{
     const records=callsCache.tasks.filter(t=>(callsFilter==='all'||t.status===callsFilter)&&match(t)).sort((a,b)=>{
       if(!a.scheduled_at)return 1;if(!b.scheduled_at)return -1;return new Date(a.scheduled_at)-new Date(b.scheduled_at);
