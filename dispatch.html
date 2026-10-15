@@ -1109,8 +1109,7 @@
   }
   // Ticket designation is independent of work type and scheduling status.
   const TICKET_DESIGNATIONS = [
-    ["intake", "Intake"], ["service_call", "Service Call"],
-    ["check_out", "Check-Out"], ["prospect", "Prospect"],
+    ["intake", "Intake"], ["prospect", "Prospect"],
     ["quoted", "Quoted"], ["approved", "Approved"],
     ["work_order", "Work Order"], ["work_fulfilled", "Work Fulfilled"],
     ["finalized", "Finalized"]
@@ -2984,7 +2983,7 @@ function setFriendlyDateTime(id, value) {
 
               <div class="form-group">
                 <label for="ticketDesignation">Ticket Designation</label>
-                <select id="ticketDesignation">${ticketDesignationOptions(existing ? ticketDesignation(existing) : "work_order")}</select>
+                <select id="ticketDesignation">${ticketDesignationOptions(existing ? ticketDesignation(existing) : "intake")}</select>
                 <div class="small-muted">Change this at any time. Work Type and Status remain separate.</div>
               </div>
 
