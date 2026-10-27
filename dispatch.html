@@ -1310,7 +1310,7 @@
 
   function workTypeLabel(type) {
 
-    return type === "construction" ? "Construction" : type === "checkout" ? "Check-Out" : type === "install" ? "Installation" : "Service";
+    return type === "action" ? "Action" : type === "construction" ? "Construction" : type === "checkout" ? "Check-Out" : type === "install" ? "Installation" : "Service";
   }
 
 
@@ -2142,7 +2142,7 @@ function setFriendlyDateTime(id, value) {
     setupDispatchSearch("work-orders", "workOrdersBody");
     document.getElementById("workOrdersBody").addEventListener("click", event => {
       const actionButton = event.target.closest("[data-action-ticket]");
-      if (actionButton) { toggleTicketAction(actionButton.dataset.actionTicket); return; }
+      if (actionButton) return;
       if (event.target.closest("button,a,input,select,textarea")) return;
       const row = event.target.closest("tr.ticket-row");
       if (row) toggleInlineTicket(row.dataset.ticketId);
@@ -2381,7 +2381,7 @@ function setFriendlyDateTime(id, value) {
 
             <td><strong><span class="ticket-arrow" aria-hidden="true">▸</span>${escapeHtml(workOrderLabel(call))}</strong></td>
             <td>${escapeHtml(ticketDesignationLabel(ticketDesignation(call)))}</td>
-            <td><button type="button" class="row-button" data-action-ticket="${escapeAttribute(call.id)}" title="Click to change action status">${escapeHtml(call.action_status === "complete" ? "Complete" : "Open")}</button></td>
+            <td><button type="button" class="row-button" data-action-ticket="${escapeAttribute(call.id)}" title="Automatically calculated from linked actions" disabled>${escapeHtml(call.action_status === "complete" ? "Complete" : "Open")}</button></td>
             <td>
               <span class="type-badge">
                 ${escapeHtml(
@@ -2451,7 +2451,7 @@ function setFriendlyDateTime(id, value) {
     const main = host || document.getElementById("mainContent");
     if (!main) return;
     // Only the seven detail cards, not the work order toolbar.
-    const titles = ["Customer", "Billing & Completion", "Description", "Communications", "Parts", "Notes", "Photos"];
+    const titles = ["Customer", "Billing & Completion", "Description", "Communications", "Actions", "Parts", "Notes", "Photos"];
     const cards = Array.from(main.children).filter(el => el.classList?.contains("card"));
     const stateKey = String(orderId);
     if (!workOrderPanelState[stateKey]) workOrderPanelState[stateKey] = {};
@@ -2811,6 +2811,8 @@ function setFriendlyDateTime(id, value) {
 
       <div class="card"><div class="card-head"><h2>Communications</h2><button class="row-button" id="detailScheduleCall">+ Schedule Call</button></div><div class="card-body" id="detailCommunications">Loading...</div></div>
 
+      <div class="card"><div class="card-head"><h2>Actions</h2><button class="row-button" id="detailAddAction">+ Schedule Action</button></div><div class="card-body" id="detailActions">Loading actions...</div></div>
+
       <div class="card"><div class="card-head"><h2>Parts</h2><button class="row-button" id="detailAddPart">+ Add Part</button></div>
         <div class="card-body" id="detailParts">Loading parts...</div></div>
       <div class="card"><div class="card-head"><h2>Notes</h2><button class="row-button" id="detailAddNote">+ Add Note</button></div>
@@ -2825,7 +2827,9 @@ function setFriendlyDateTime(id, value) {
     document.getElementById("detailAddNote").addEventListener("click", () => showNoteForm(null, call.id));
     document.getElementById("detailAddPhoto").addEventListener("click", () => showPhotoForm(null, call.id));
     document.getElementById("detailScheduleCall")?.addEventListener("click",()=>showCallTaskForm(null,{...call,service_call_id:call.id,returnTo:'order'}));
+    document.getElementById("detailAddAction")?.addEventListener("click", () => showActionForm(null, call.id));
     await loadWorkOrderCommunications(call.id);
+    await loadWorkOrderActions(call.id);
     await loadWorkOrderRelated(call.id);
 
     document.getElementById("backToWorkOrders")
@@ -3029,7 +3033,7 @@ function setFriendlyDateTime(id, value) {
                 <div class="small-muted">Change this at any time. Work Type and Status remain separate.</div>
               </div>
 
-              <div class="form-group"><label for="ticketActionStatus">Action</label><select id="ticketActionStatus"><option value="open">Open</option><option value="complete">Complete</option></select></div>
+              <div class="form-group"><label>Action Status</label><div class="small-muted">Automatically determined by linked actions. Manage these inside the ticket.</div></div>
 
               <div class="form-group">
 
@@ -3050,6 +3054,7 @@ function setFriendlyDateTime(id, value) {
                     Check-Out
                   </option>
                   <option value="construction">Construction</option>
+                  <option value="action">Action</option>
 
                 </select>
 
@@ -3298,7 +3303,7 @@ if (existing) {
   );
   syncWorkOrderLookupDisplays();
 
-  document.getElementById("ticketActionStatus").value = existing?.action_status === "complete" ? "complete" : "open";
+  
   document.getElementById("workType").value =
     existing.work_type || "service";
   document.getElementById("ticketDesignation").value = ticketDesignation(existing);
@@ -3833,7 +3838,7 @@ const payload = {
   work_type:
     workType,
   ticket_designation: document.getElementById("ticketDesignation").value,
-  action_status: document.getElementById("ticketActionStatus").value,
+
 
   billing_method: billingMethod,
   // Lead is saved after technician assignments have been synchronized.
@@ -7656,77 +7661,114 @@ async function deleteCallRecord(table,id,stay=false){
 // NAVIGATION
 // ============================================
 
-// Ticket action status and scheduled actions are distinct from communication tasks.
-async function toggleTicketAction(id) {
-  if (!['dispatcher','secretary'].includes(currentProfile?.role)) return showMessage('Read-only access.',true);
-  const record = document.getElementById('workOrdersBody')?._dispatchRecords?.find(item=>String(item.record.id)===String(id));
-  if (!record) return;
-  const next = record.record.action_status === 'complete' ? 'open' : 'complete';
-  const {error} = await db.from('service_calls').update({action_status:next}).eq('id',id);
-  if (error) return showMessage(error.message,true);
-  record.record.action_status = next;
-  applyDispatchSearch('work-orders','workOrdersBody');
-  showMessage('Ticket action marked '+next+'.');
+// Action status is maintained by database triggers, never by manual ticket toggles.
+async function loadWorkOrderActions(id) {
+  const el=document.getElementById('detailActions'); if(!el)return;
+  const {data,error}=await db.from('ticket_actions').select('*').eq('service_call_id',id).order('scheduled_at',{ascending:true});
+  if(error){el.textContent='Could not load actions: '+error.message;return;}
+  el.innerHTML=(data||[]).length ? data.map(a=>`<article class="call-card" style="margin-bottom:10px">
+    <div class="call-card-head"><h3>${escapeHtml(a.title)}</h3><span class="status">${a.status==='complete'?'Complete':'Open'}</span></div>
+    <p class="small-muted">${a.scheduled_at?escapeHtml(new Date(a.scheduled_at).toLocaleString()):'Unscheduled'}</p>
+    <p>${escapeHtml(a.notes||'')}</p>
+    <div class="call-actions"><button class="secondary" data-ticket-action-edit="${escapeAttribute(a.id)}">Edit</button>
+    <button class="secondary" data-ticket-action-toggle="${escapeAttribute(a.id)}">${a.status==='complete'?'Reopen':'Complete'}</button>
+    <button class="danger" data-ticket-action-delete="${escapeAttribute(a.id)}">Delete</button></div></article>`).join('') : '<div class="small-muted">No actions yet. Use + Schedule Action to add one.</div>';
+  el.querySelectorAll('[data-ticket-action-edit]').forEach(b=>b.onclick=e=>{e.stopPropagation();showActionForm(data.find(a=>a.id===b.dataset.ticketActionEdit),id)});
+  el.querySelectorAll('[data-ticket-action-toggle]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const a=data.find(x=>x.id===b.dataset.ticketActionToggle);await changeActionStatus(a,id)});
+  el.querySelectorAll('[data-ticket-action-delete]').forEach(b=>b.onclick=async e=>{e.stopPropagation();await deleteScheduledAction(b.dataset.ticketActionDelete,id)});
 }
-
+async function changeActionStatus(a, ticketId=null) {
+  const status=a.status==='complete'?'open':'complete';
+  const {error}=await db.from('ticket_actions').update({status,completed_at:status==='complete'?new Date().toISOString():null}).eq('id',a.id);
+  if(error)return showMessage(error.message,true);
+  showMessage('Action '+(status==='complete'?'completed.':'reopened.'));
+  if(ticketId) await loadWorkOrderActions(ticketId); else await showActions();
+  // The ticket-level status is updated by the database trigger.
+}
+async function deleteScheduledAction(id,ticketId=null) {
+  if(!confirmDelete('Delete this scheduled action?'))return;
+  const {error}=await db.from('ticket_actions').delete().eq('id',id);
+  if(error)return showMessage(error.message,true);
+  showMessage('Action deleted.');
+  if(ticketId) await loadWorkOrderActions(ticketId); else await showActions();
+}
 async function showActions() {
   setActiveNav('actions');
-  const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-head"><div><h1>Actions</h1><p>Scheduled tasks and follow-ups associated with tickets.</p></div><button class="primary" id="newAction">+ Schedule Action</button></div>
-    <div class="card"><div class="card-body"><div class="calls-toolbar"><input type="search" id="actionSearch" placeholder="Search actions, tickets, customers..."><select id="actionFilter"><option value="open">Open</option><option value="all">All</option><option value="complete">Complete</option></select></div><div id="actionList" class="calls-list">Loading actions...</div></div></div>`;
-  document.getElementById('actionFilter').value = actionListFilter;
-  document.getElementById('newAction').onclick = () => showActionForm();
-  document.getElementById('actionFilter').onchange = e => { actionListFilter=e.target.value;renderActionList(); };
-  document.getElementById('actionSearch').oninput = () => renderActionList();
-  try {
-    const {data,error} = await db.from('ticket_actions').select('*,service_calls(id,work_order_number,description,customers(first_name,last_name,company_name))').order('scheduled_at',{ascending:true});
-    if(error)throw error;
-    window.ticketActionRecords = data||[];
-    renderActionList();
-  } catch(e) { document.getElementById('actionList').innerHTML = `<div class="empty">Could not load actions: ${escapeHtml(e.message)}. Run the accompanying SQL setup first.</div>`; }
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-head"><div><h1>Actions</h1><p>Scheduled tasks and follow-ups linked to tickets.</p></div><button class="primary" id="newAction">+ Schedule Action</button></div>
+  <div class="card"><div class="card-body"><div class="calls-toolbar"><input type="search" id="actionSearch" placeholder="Search actions, tickets, customers..."><select id="actionFilter"><option value="open">Open</option><option value="all">All</option><option value="complete">Complete</option></select></div><div id="actionList" class="calls-list">Loading actions...</div></div></div>`;
+  document.getElementById('actionFilter').value=actionListFilter;
+  document.getElementById('newAction').onclick=()=>showActionForm();
+  document.getElementById('actionFilter').onchange=e=>{actionListFilter=e.target.value;renderActionList()};
+  document.getElementById('actionSearch').oninput=()=>renderActionList();
+  const {data,error}=await db.from('ticket_actions').select('*,service_calls(id,work_order_number,description,customers(first_name,last_name,company_name))').order('scheduled_at',{ascending:true});
+  if(error){document.getElementById('actionList').textContent='Could not load actions: '+error.message;return;}
+  window.ticketActionRecords=data||[];renderActionList();
 }
-function renderActionList() {
+function renderActionList(){
   const list=document.getElementById('actionList');if(!list)return;
   const term=(document.getElementById('actionSearch')?.value||'').toLowerCase();
-  const records=(window.ticketActionRecords||[]).filter(a =>
-    (actionListFilter==='all'||a.status===actionListFilter) &&
+  const records=(window.ticketActionRecords||[]).filter(a=>(actionListFilter==='all'||a.status===actionListFilter)&&
     [a.title,a.notes,a.service_calls?.work_order_number,a.service_calls?.description,customerName(a.service_calls?.customers)].join(' ').toLowerCase().includes(term));
-  list.innerHTML = records.length ? records.map(a=>`<article class="call-card ${a.status==='open'&&a.scheduled_at&&new Date(a.scheduled_at)<new Date()?'overdue':''}">
+  list.innerHTML=records.length?records.map(a=>`<article class="call-card ${a.status==='open'&&a.scheduled_at&&new Date(a.scheduled_at)<new Date()?'overdue':''}">
     <div class="call-card-head"><h3>${escapeHtml(a.title)}</h3><span class="status">${a.status==='complete'?'Complete':'Open'}</span></div>
     <p class="small-muted">${a.scheduled_at?new Date(a.scheduled_at).toLocaleString():'Unscheduled'} · ${a.service_calls?escapeHtml(workOrderLabel(a.service_calls)):'No ticket'} · ${escapeHtml(customerName(a.service_calls?.customers))}</p>
-    <p>${escapeHtml(a.notes||'')}</p><div class="call-actions"><button class="secondary" data-action-edit="${escapeAttribute(a.id)}">Edit</button><button class="secondary" data-action-toggle="${escapeAttribute(a.id)}">${a.status==='complete'?'Reopen':'Complete'}</button>${a.service_call_id?`<button class="secondary" data-action-open-ticket="${escapeAttribute(a.service_call_id)}">Ticket</button>`:''}<button class="danger" data-action-delete="${escapeAttribute(a.id)}">Delete</button></div></article>`).join(''):'<div class="empty">No matching scheduled actions.</div>';
-  list.querySelectorAll('[data-action-edit]').forEach(b=>b.onclick=()=>showActionForm((window.ticketActionRecords||[]).find(a=>a.id===b.dataset.actionEdit)));
+    <p>${escapeHtml(a.notes||'')}</p><div class="call-actions"><button class="secondary" data-action-edit="${escapeAttribute(a.id)}">Edit</button><button class="secondary" data-action-toggle="${escapeAttribute(a.id)}">${a.status==='complete'?'Reopen':'Complete'}</button><button class="secondary" data-action-open-ticket="${escapeAttribute(a.service_call_id)}">Ticket</button><button class="danger" data-action-delete="${escapeAttribute(a.id)}">Delete</button></div></article>`).join(''):'<div class="empty">No matching scheduled actions.</div>';
+  list.querySelectorAll('[data-action-edit]').forEach(b=>b.onclick=()=>showActionForm(window.ticketActionRecords.find(a=>a.id===b.dataset.actionEdit)));
   list.querySelectorAll('[data-action-open-ticket]').forEach(b=>b.onclick=()=>showWorkOrderDetail(b.dataset.actionOpenTicket));
-  list.querySelectorAll('[data-action-toggle]').forEach(b=>b.onclick=async()=>{
-    const a=window.ticketActionRecords.find(x=>x.id===b.dataset.actionToggle);const status=a.status==='complete'?'open':'complete';
-    const {error}=await db.from('ticket_actions').update({status,completed_at:status==='complete'?new Date().toISOString():null}).eq('id',a.id);
-    if(error)return showMessage(error.message,true);a.status=status;renderActionList();
-  });
-  list.querySelectorAll('[data-action-delete]').forEach(b=>b.onclick=async()=>{
-    if(!confirmDelete('Delete this scheduled action?'))return;
-    const {error}=await db.from('ticket_actions').delete().eq('id',b.dataset.actionDelete);
-    if(error)return showMessage(error.message,true);
-    window.ticketActionRecords=window.ticketActionRecords.filter(a=>a.id!==b.dataset.actionDelete);renderActionList();
-  });
+  list.querySelectorAll('[data-action-toggle]').forEach(b=>b.onclick=()=>changeActionStatus(window.ticketActionRecords.find(a=>a.id===b.dataset.actionToggle)));
+  list.querySelectorAll('[data-action-delete]').forEach(b=>b.onclick=()=>deleteScheduledAction(b.dataset.actionDelete));
 }
-async function showActionForm(action=null) {
+async function showActionForm(action=null, ticketContext=null) {
   setActiveNav('actions');
   const main=document.getElementById('mainContent');
-  const {data:tickets,error}=await db.from('service_calls').select('id,work_order_number,description').order('created_at',{ascending:false}).limit(1000);
+  const selectedId=ticketContext||action?.service_call_id||'';
+  const {data:tickets,error}=await db.from('service_calls').select('id,work_order_number,description,customers(first_name,last_name,company_name)').order('created_at',{ascending:false}).limit(1000);
   if(error)return showMessage(error.message,true);
+  const ticketRows=tickets||[];
+  const selected=ticketRows.find(t=>String(t.id)===String(selectedId));
+  const ticketText=t=>`${workOrderLabel(t)} — ${customerName(t.customers)} — ${descriptionPreview(t.description,80)}`;
   main.innerHTML=`<div class="page-head"><h1>${action?'Edit':'Schedule'} Action</h1></div><div class="card"><div class="card-body"><form id="actionForm"><div class="form-grid">
-    <div class="form-group"><label for="actionTicket">Ticket</label><select id="actionTicket"><option value="">General action (no ticket)</option>${(tickets||[]).map(t=>`<option value="${escapeAttribute(t.id)}" ${action?.service_call_id===t.id?'selected':''}>${escapeHtml(workOrderLabel(t))} — ${escapeHtml(descriptionPreview(t.description,55))}</option>`).join('')}</select></div>
+    <div class="form-group full"><label for="actionTicketSearch">Ticket (search number, customer, or description)</label>
+      <div class="wo-lookup"><input id="actionTicketSearch" type="search" autocomplete="off" placeholder="Search tickets or leave blank to create a standalone Action ticket" value="${escapeAttribute(selected?ticketText(selected):'')}">
+      <div id="actionTicketResults" class="wo-results" hidden></div></div>
+      <div id="actionTicketSelection" class="small-muted">${selected?'Linked to '+escapeHtml(workOrderLabel(selected)):'No ticket selected — a standalone Work Order / Action ticket will be created.'}</div></div>
     <div class="form-group"><label for="actionWhen">Scheduled Date & Time</label><input id="actionWhen" type="datetime-local" value="${action?.scheduled_at?escapeAttribute(localDateTimeValue(action.scheduled_at)):''}" required></div>
     <div class="form-group full"><label for="actionTitle">Action</label><input id="actionTitle" value="${escapeAttribute(action?.title||'')}" required maxlength="250" placeholder="What needs to be done?"></div>
     <div class="form-group full"><label for="actionNotes">Notes</label><textarea id="actionNotes">${escapeHtml(action?.notes||'')}</textarea></div></div>
     <div class="form-actions"><button class="secondary" type="button" id="cancelAction">Cancel</button><button class="primary" type="submit">Save Action</button></div></form></div></div>`;
-  document.getElementById('cancelAction').onclick=()=>showActions();
+  let chosenId=selectedId;
+  const search=document.getElementById('actionTicketSearch'),results=document.getElementById('actionTicketResults'),selection=document.getElementById('actionTicketSelection');
+  const refresh=()=>{
+    const term=search.value.trim().toLowerCase();
+    if(!term){chosenId='';results.hidden=true;selection.textContent='Standalone Action ticket will be created.';return;}
+    if(chosenId && ticketRows.find(t=>String(t.id)===String(chosenId)) && search.value===ticketText(ticketRows.find(t=>String(t.id)===String(chosenId)))){results.hidden=true;return;}
+    chosenId='';selection.textContent='Select a matching ticket below, or clear the search to create a standalone ticket.';
+    const matches=ticketRows.filter(t=>ticketText(t).toLowerCase().includes(term)).slice(0,30);
+    results.innerHTML=matches.length?matches.map(t=>`<button type="button" class="wo-result" data-choose-ticket="${escapeAttribute(t.id)}">${escapeHtml(ticketText(t))}</button>`).join(''):'<div class="small-muted" style="padding:12px">No matching tickets.</div>';
+    results.hidden=false;
+    results.querySelectorAll('[data-choose-ticket]').forEach(b=>b.onclick=()=>{const t=ticketRows.find(t=>String(t.id)===b.dataset.chooseTicket);chosenId=t.id;search.value=ticketText(t);selection.textContent='Linked to '+workOrderLabel(t);results.hidden=true;});
+  };
+  search.addEventListener('input',refresh);
+  document.getElementById('cancelAction').onclick=()=>ticketContext?showWorkOrderDetail(ticketContext):showActions();
   document.getElementById('actionForm').onsubmit=async e=>{
-    e.preventDefault();const form=e.currentTarget;const button=form.querySelector('[type=submit]');button.disabled=true;
-    const payload={service_call_id:document.getElementById('actionTicket').value||null,title:document.getElementById('actionTitle').value.trim(),notes:document.getElementById('actionNotes').value.trim()||null,scheduled_at:new Date(document.getElementById('actionWhen').value).toISOString()};
-    const result=action?await db.from('ticket_actions').update(payload).eq('id',action.id):await db.from('ticket_actions').insert(payload);
-    if(result.error){showMessage(result.error.message,true);button.disabled=false;return;}
-    showMessage('Action saved.');await showActions();
+    e.preventDefault();const button=e.currentTarget.querySelector('[type=submit]');button.disabled=true;
+    const title=document.getElementById('actionTitle').value.trim();
+    if(!chosenId && search.value.trim()){showMessage('Select a ticket from the search results, or clear the search to create a standalone action.',true);button.disabled=false;return;}
+    let newTicketId=null;
+    try{
+      if(!chosenId){
+        const {data:ticket,error:ticketError}=await db.from('service_calls').insert({description:title,work_type:'action',ticket_designation:'work_order',status:'open',action_status:'open'}).select('id').single();
+        if(ticketError)throw new Error('Could not create standalone Action ticket: '+ticketError.message);
+        newTicketId=ticket.id;chosenId=ticket.id;
+      }
+      const payload={service_call_id:chosenId,title,notes:document.getElementById('actionNotes').value.trim()||null,scheduled_at:new Date(document.getElementById('actionWhen').value).toISOString()};
+      const result=action?await db.from('ticket_actions').update(payload).eq('id',action.id):await db.from('ticket_actions').insert(payload);
+      if(result.error)throw result.error;
+      showMessage('Action saved.');
+      if(ticketContext)await showWorkOrderDetail(ticketContext);else await showActions();
+    }catch(err){showMessage(err.message||'Could not save action.',true);button.disabled=false;
+      if(newTicketId)showMessage('Standalone ticket created, but action could not be saved. Please retry and link the existing ticket.',true);}
   };
 }
 
