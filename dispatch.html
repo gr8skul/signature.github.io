@@ -726,19 +726,19 @@
   .work-orders-compact .status,.work-orders-compact .type-badge,.work-orders-compact .release-badge {font-size:10px;padding:4px 5px}
   .work-orders-compact .wo-waiting-preview {display:block;max-width:100%;margin:3px 0 0;font-size:10px}
   .work-orders-compact th:nth-child(1){width:7%}
-  .work-orders-compact th:nth-child(2){width:9%}
-  .work-orders-compact th:nth-child(3){width:5%}
+  .work-orders-compact th:nth-child(2){width:8%}
+  .work-orders-compact th:nth-child(3){width:6%}
   .work-orders-compact th:nth-child(4){width:6%}
-  .work-orders-compact th:nth-child(5){width:6%}
-  .work-orders-compact th:nth-child(6){width:9%}
-  .work-orders-compact th:nth-child(7){width:8%}
-  .work-orders-compact th:nth-child(8){width:8%}
-  .work-orders-compact th:nth-child(9){width:8%}
-  .work-orders-compact th:nth-child(10){width:9%}
-  .work-orders-compact th:nth-child(11){width:8%}
+  .work-orders-compact th:nth-child(5){width:7%}
+  .work-orders-compact th:nth-child(6){width:7%}
+  .work-orders-compact th:nth-child(7){width:9%}
+  .work-orders-compact th:nth-child(8){width:9%}
+  .work-orders-compact th:nth-child(9){width:9%}
+  .work-orders-compact th:nth-child(10){width:8%}
+  .work-orders-compact th:nth-child(11){width:9%}
   .work-orders-compact th:nth-child(12){width:8%}
-  .work-orders-compact th:nth-child(13){width:6%}
-  .work-orders-compact th:nth-child(14){width:3%}
+  .work-orders-compact th:nth-child(13){width:8%}
+  .work-orders-compact th:nth-child(14){width:6%}
   @media(max-width:1000px){.work-orders-compact{min-width:1050px}}
   </style>
 
@@ -773,14 +773,12 @@
     <div class="nav-label">Dispatch</div>
 
 
-<button class="nav-button active" data-page="schedule">
-  Schedule
-</button>
+
 
 <button class="nav-button" data-page="calendar">Calendar</button>
 
-<button class="nav-button" data-page="work-orders">
-  Work Orders
+<button class="nav-button active" data-page="work-orders">
+  Tickets
 </button>
 
 <button class="nav-button" data-page="schedule-blocks">Schedule Blocks</button>
@@ -797,6 +795,8 @@
 <button class="nav-button" data-page="technicians">
   Technicians
 </button>
+
+<button class="nav-button" data-page="actions">Actions</button>
 
 <button class="nav-button" data-page="parts">
   Parts
@@ -843,6 +843,7 @@
   let currentDate = new Date();
   let scheduleDayCount = 1;
   let currentWorkOrderFilter = "all";
+  let actionListFilter = "open";
   let currentWorkOrderShop = "all";
   let calendarShop = "all";
   let shopDirectory = [];
@@ -1237,7 +1238,7 @@
     }
     body.innerHTML = matching.length
       ? matching.map(item => item.html).join("")
-      : `<tr><td colspan="${page === "work-orders" ? 13 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
+      : `<tr><td colspan="${page === "work-orders" ? 14 : page === "parts" ? 8 : page === "notes" ? 6 : page === "customers" ? 4 : 6}">
           <div class="empty">No matching records.</div></td></tr>`;
     if (page === "work-orders") paintWorkOrderDistances();
     const count = document.getElementById("dispatchSearchCount");
@@ -1309,7 +1310,7 @@
 
   function workTypeLabel(type) {
 
-    return type === "checkout" ? "Check-Out" : type === "install" ? "Installation" : "Service";
+    return type === "construction" ? "Construction" : type === "checkout" ? "Check-Out" : type === "install" ? "Installation" : "Service";
   }
 
 
@@ -2051,6 +2052,7 @@ function setFriendlyDateTime(id, value) {
           ${filterButton("service", "Service")}
           ${filterButton("install", "Installation")}
           ${filterButton("checkout", "Check-Out")}
+          ${filterButton("construction", "Construction")}
           ${filterButton("unreleased", "Unreleased")}
           <button type="button" class="filter-button ${["waiting","scheduled","in_progress","completed","cancelled","open"].includes(currentWorkOrderFilter)?"active":""}" id="statusCycleButton" title="Cycle through Work Order statuses">Status: ${statusLabel(["waiting","scheduled","in_progress","completed","cancelled","open"].includes(currentWorkOrderFilter)?currentWorkOrderFilter:"waiting")} ↻</button>
           ${filterButton("in_progress", "Current / In Progress")}
@@ -2069,6 +2071,7 @@ function setFriendlyDateTime(id, value) {
               <tr>
                 <th><button type="button" class="sort-heading" data-work-sort="created_at">Ticket ↓</button></th>
                 <th>Designation</th>
+                <th>Action</th>
                 <th>Type</th>
                 <th>Shop</th>
                 <th title="Driving miles from assigned shop to service address"><button type="button" class="sort-heading" data-work-sort="distance">Distance (mi) ↕</button></th>
@@ -2086,7 +2089,7 @@ function setFriendlyDateTime(id, value) {
             <tbody id="workOrdersBody">
 
               <tr>
-                <td colspan="13">
+                <td colspan="14">
                   <div class="empty">
                     Loading work orders...
                   </div>
@@ -2138,6 +2141,8 @@ function setFriendlyDateTime(id, value) {
     document.getElementById("workOrderShopFilter").onchange=e=>{currentWorkOrderShop=e.target.value;applyDispatchSearch("work-orders","workOrdersBody")};
     setupDispatchSearch("work-orders", "workOrdersBody");
     document.getElementById("workOrdersBody").addEventListener("click", event => {
+      const actionButton = event.target.closest("[data-action-ticket]");
+      if (actionButton) { toggleTicketAction(actionButton.dataset.actionTicket); return; }
       if (event.target.closest("button,a,input,select,textarea")) return;
       const row = event.target.closest("tr.ticket-row");
       if (row) toggleInlineTicket(row.dataset.ticketId);
@@ -2200,7 +2205,8 @@ function setFriendlyDateTime(id, value) {
     if (
       currentWorkOrderFilter === "service" ||
       currentWorkOrderFilter === "install" ||
-      currentWorkOrderFilter === "checkout"
+      currentWorkOrderFilter === "checkout" ||
+      currentWorkOrderFilter === "construction"
     ) {
 
       query =
@@ -2268,7 +2274,7 @@ function setFriendlyDateTime(id, value) {
 
       body.innerHTML = `
         <tr>
-          <td colspan="13">
+          <td colspan="14">
 
             <div class="empty">
               Unable to load work orders.<br><br>
@@ -2287,7 +2293,7 @@ function setFriendlyDateTime(id, value) {
 
       body.innerHTML = `
         <tr>
-          <td colspan="13">
+          <td colspan="14">
 
             <div class="empty">
               No work orders match this view.
@@ -2367,7 +2373,7 @@ function setFriendlyDateTime(id, value) {
 
         const search = dispatchSearchText(call, [
           assignedNames(call), call.status, call.waiting_reason,
-          call.locations?.city, call.locations?.state, communicationState
+          call.locations?.city, call.locations?.state, communicationState, call.action_status
         ]);
         const html = `
 
@@ -2375,6 +2381,7 @@ function setFriendlyDateTime(id, value) {
 
             <td><strong><span class="ticket-arrow" aria-hidden="true">▸</span>${escapeHtml(workOrderLabel(call))}</strong></td>
             <td>${escapeHtml(ticketDesignationLabel(ticketDesignation(call)))}</td>
+            <td><button type="button" class="row-button" data-action-ticket="${escapeAttribute(call.id)}" title="Click to change action status">${escapeHtml(call.action_status === "complete" ? "Complete" : "Open")}</button></td>
             <td>
               <span class="type-badge">
                 ${escapeHtml(
@@ -2500,7 +2507,7 @@ function setFriendlyDateTime(id, value) {
     row.querySelector(".ticket-arrow").textContent = "▾";
     const detailRow = document.createElement("tr");
     detailRow.className = "ticket-inline-detail";
-    const cell = document.createElement("td"); cell.colSpan = 13;
+    const cell = document.createElement("td"); cell.colSpan = 14;
     const content = document.createElement("div"); content.className = "ticket-inline-content";
     content.innerHTML = '<div class="small-muted">Loading ticket details…</div>';
     cell.appendChild(content); detailRow.appendChild(cell); row.after(detailRow);
@@ -3022,6 +3029,8 @@ function setFriendlyDateTime(id, value) {
                 <div class="small-muted">Change this at any time. Work Type and Status remain separate.</div>
               </div>
 
+              <div class="form-group"><label for="ticketActionStatus">Action</label><select id="ticketActionStatus"><option value="open">Open</option><option value="complete">Complete</option></select></div>
+
               <div class="form-group">
 
                 <label for="workType">
@@ -3040,6 +3049,7 @@ function setFriendlyDateTime(id, value) {
                   <option value="checkout">
                     Check-Out
                   </option>
+                  <option value="construction">Construction</option>
 
                 </select>
 
@@ -3288,6 +3298,7 @@ if (existing) {
   );
   syncWorkOrderLookupDisplays();
 
+  document.getElementById("ticketActionStatus").value = existing?.action_status === "complete" ? "complete" : "open";
   document.getElementById("workType").value =
     existing.work_type || "service";
   document.getElementById("ticketDesignation").value = ticketDesignation(existing);
@@ -3822,6 +3833,7 @@ const payload = {
   work_type:
     workType,
   ticket_designation: document.getElementById("ticketDesignation").value,
+  action_status: document.getElementById("ticketActionStatus").value,
 
   billing_method: billingMethod,
   // Lead is saved after technician assignments have been synchronized.
@@ -7644,6 +7656,80 @@ async function deleteCallRecord(table,id,stay=false){
 // NAVIGATION
 // ============================================
 
+// Ticket action status and scheduled actions are distinct from communication tasks.
+async function toggleTicketAction(id) {
+  if (!['dispatcher','secretary'].includes(currentProfile?.role)) return showMessage('Read-only access.',true);
+  const record = document.getElementById('workOrdersBody')?._dispatchRecords?.find(item=>String(item.record.id)===String(id));
+  if (!record) return;
+  const next = record.record.action_status === 'complete' ? 'open' : 'complete';
+  const {error} = await db.from('service_calls').update({action_status:next}).eq('id',id);
+  if (error) return showMessage(error.message,true);
+  record.record.action_status = next;
+  applyDispatchSearch('work-orders','workOrdersBody');
+  showMessage('Ticket action marked '+next+'.');
+}
+
+async function showActions() {
+  setActiveNav('actions');
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="page-head"><div><h1>Actions</h1><p>Scheduled tasks and follow-ups associated with tickets.</p></div><button class="primary" id="newAction">+ Schedule Action</button></div>
+    <div class="card"><div class="card-body"><div class="calls-toolbar"><input type="search" id="actionSearch" placeholder="Search actions, tickets, customers..."><select id="actionFilter"><option value="open">Open</option><option value="all">All</option><option value="complete">Complete</option></select></div><div id="actionList" class="calls-list">Loading actions...</div></div></div>`;
+  document.getElementById('actionFilter').value = actionListFilter;
+  document.getElementById('newAction').onclick = () => showActionForm();
+  document.getElementById('actionFilter').onchange = e => { actionListFilter=e.target.value;renderActionList(); };
+  document.getElementById('actionSearch').oninput = () => renderActionList();
+  try {
+    const {data,error} = await db.from('ticket_actions').select('*,service_calls(id,work_order_number,description,customers(first_name,last_name,company_name))').order('scheduled_at',{ascending:true});
+    if(error)throw error;
+    window.ticketActionRecords = data||[];
+    renderActionList();
+  } catch(e) { document.getElementById('actionList').innerHTML = `<div class="empty">Could not load actions: ${escapeHtml(e.message)}. Run the accompanying SQL setup first.</div>`; }
+}
+function renderActionList() {
+  const list=document.getElementById('actionList');if(!list)return;
+  const term=(document.getElementById('actionSearch')?.value||'').toLowerCase();
+  const records=(window.ticketActionRecords||[]).filter(a =>
+    (actionListFilter==='all'||a.status===actionListFilter) &&
+    [a.title,a.notes,a.service_calls?.work_order_number,a.service_calls?.description,customerName(a.service_calls?.customers)].join(' ').toLowerCase().includes(term));
+  list.innerHTML = records.length ? records.map(a=>`<article class="call-card ${a.status==='open'&&a.scheduled_at&&new Date(a.scheduled_at)<new Date()?'overdue':''}">
+    <div class="call-card-head"><h3>${escapeHtml(a.title)}</h3><span class="status">${a.status==='complete'?'Complete':'Open'}</span></div>
+    <p class="small-muted">${a.scheduled_at?new Date(a.scheduled_at).toLocaleString():'Unscheduled'} · ${a.service_calls?escapeHtml(workOrderLabel(a.service_calls)):'No ticket'} · ${escapeHtml(customerName(a.service_calls?.customers))}</p>
+    <p>${escapeHtml(a.notes||'')}</p><div class="call-actions"><button class="secondary" data-action-edit="${escapeAttribute(a.id)}">Edit</button><button class="secondary" data-action-toggle="${escapeAttribute(a.id)}">${a.status==='complete'?'Reopen':'Complete'}</button>${a.service_call_id?`<button class="secondary" data-action-open-ticket="${escapeAttribute(a.service_call_id)}">Ticket</button>`:''}<button class="danger" data-action-delete="${escapeAttribute(a.id)}">Delete</button></div></article>`).join(''):'<div class="empty">No matching scheduled actions.</div>';
+  list.querySelectorAll('[data-action-edit]').forEach(b=>b.onclick=()=>showActionForm((window.ticketActionRecords||[]).find(a=>a.id===b.dataset.actionEdit)));
+  list.querySelectorAll('[data-action-open-ticket]').forEach(b=>b.onclick=()=>showWorkOrderDetail(b.dataset.actionOpenTicket));
+  list.querySelectorAll('[data-action-toggle]').forEach(b=>b.onclick=async()=>{
+    const a=window.ticketActionRecords.find(x=>x.id===b.dataset.actionToggle);const status=a.status==='complete'?'open':'complete';
+    const {error}=await db.from('ticket_actions').update({status,completed_at:status==='complete'?new Date().toISOString():null}).eq('id',a.id);
+    if(error)return showMessage(error.message,true);a.status=status;renderActionList();
+  });
+  list.querySelectorAll('[data-action-delete]').forEach(b=>b.onclick=async()=>{
+    if(!confirmDelete('Delete this scheduled action?'))return;
+    const {error}=await db.from('ticket_actions').delete().eq('id',b.dataset.actionDelete);
+    if(error)return showMessage(error.message,true);
+    window.ticketActionRecords=window.ticketActionRecords.filter(a=>a.id!==b.dataset.actionDelete);renderActionList();
+  });
+}
+async function showActionForm(action=null) {
+  setActiveNav('actions');
+  const main=document.getElementById('mainContent');
+  const {data:tickets,error}=await db.from('service_calls').select('id,work_order_number,description').order('created_at',{ascending:false}).limit(1000);
+  if(error)return showMessage(error.message,true);
+  main.innerHTML=`<div class="page-head"><h1>${action?'Edit':'Schedule'} Action</h1></div><div class="card"><div class="card-body"><form id="actionForm"><div class="form-grid">
+    <div class="form-group"><label for="actionTicket">Ticket</label><select id="actionTicket"><option value="">General action (no ticket)</option>${(tickets||[]).map(t=>`<option value="${escapeAttribute(t.id)}" ${action?.service_call_id===t.id?'selected':''}>${escapeHtml(workOrderLabel(t))} — ${escapeHtml(descriptionPreview(t.description,55))}</option>`).join('')}</select></div>
+    <div class="form-group"><label for="actionWhen">Scheduled Date & Time</label><input id="actionWhen" type="datetime-local" value="${action?.scheduled_at?escapeAttribute(localDateTimeValue(action.scheduled_at)):''}" required></div>
+    <div class="form-group full"><label for="actionTitle">Action</label><input id="actionTitle" value="${escapeAttribute(action?.title||'')}" required maxlength="250" placeholder="What needs to be done?"></div>
+    <div class="form-group full"><label for="actionNotes">Notes</label><textarea id="actionNotes">${escapeHtml(action?.notes||'')}</textarea></div></div>
+    <div class="form-actions"><button class="secondary" type="button" id="cancelAction">Cancel</button><button class="primary" type="submit">Save Action</button></div></form></div></div>`;
+  document.getElementById('cancelAction').onclick=()=>showActions();
+  document.getElementById('actionForm').onsubmit=async e=>{
+    e.preventDefault();const form=e.currentTarget;const button=form.querySelector('[type=submit]');button.disabled=true;
+    const payload={service_call_id:document.getElementById('actionTicket').value||null,title:document.getElementById('actionTitle').value.trim(),notes:document.getElementById('actionNotes').value.trim()||null,scheduled_at:new Date(document.getElementById('actionWhen').value).toISOString()};
+    const result=action?await db.from('ticket_actions').update(payload).eq('id',action.id):await db.from('ticket_actions').insert(payload);
+    if(result.error){showMessage(result.error.message,true);button.disabled=false;return;}
+    showMessage('Action saved.');await showActions();
+  };
+}
+
 function setActiveNav(page) {
 
 
@@ -7688,6 +7774,8 @@ document.querySelectorAll(
 
         await showWorkOrders();
 
+      } else if (page === "actions") {
+        await showActions();
       } else if (page === "calls") {
         await showCalls();
       } else if (page === "schedule-blocks") {
@@ -7779,7 +7867,7 @@ if (!profileLoaded) {
 }
 
 
-await showSchedule();
+await showWorkOrders();
 
 
 }
